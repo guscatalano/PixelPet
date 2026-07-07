@@ -9,3 +9,7 @@ release/
 assets/icon.png
 assets/tray.png
 assets/icon.ico
+.preview.png
+
+# Gallery build outputs
+.gallery*
