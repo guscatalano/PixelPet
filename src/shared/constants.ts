@@ -1,14 +1,14 @@
 // Shared rendering constants used by both the main process (window sizing)
 // and the renderer (canvas drawing).
 
-import { CAT_IDLE } from './catSprite'
+import { W, H } from './catgen'
 
-/** Native sprite dimensions in pixels, derived from the authored grid. */
-export const SPRITE_W = CAT_IDLE[0].length
-export const SPRITE_H = CAT_IDLE.length
+/** Native sprite dimensions in pixels, from the generator. */
+export const SPRITE_W = W
+export const SPRITE_H = H
 
 /** Integer upscale factor from native pixels to on-screen pixels (nearest-neighbor). */
-export const SCALE = 5
+export const SCALE = 4
 
 /**
  * Vertical headroom, in native sprite pixels, reserved above and below the sprite

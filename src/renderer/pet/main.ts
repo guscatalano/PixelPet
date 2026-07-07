@@ -1,5 +1,6 @@
 import { PET_H, PET_W, SCALE, SPRITE_H, SPRITE_TOP, SPRITE_W } from '../../shared/constants'
-import { CAT_IDLE, makeBlinkFrame, parseSprite, WHITE_CAT_PALETTE } from '../../shared/catSprite'
+import { generateGrid, render as renderPet } from '../../shared/catgen'
+import { DEFAULT_PET } from '../../shared/pets'
 import type { ClipName, Facing, PlayCommand, TriggerEvent } from '../../shared/types'
 
 // ---- Bridge typing (exposed by preload) ------------------------------------
@@ -20,23 +21,26 @@ declare global {
 const DRAG_THRESHOLD = 4 // px of movement before a press becomes a drag
 const REACT_MS = 450 // duration of the one-shot "react" pop
 
-// ---- Frame bitmaps ---------------------------------------------------------
-const idle = parseSprite(CAT_IDLE, WHITE_CAT_PALETTE)
-const blink = parseSprite(makeBlinkFrame(CAT_IDLE), WHITE_CAT_PALETTE)
-const hitMask = idle.mask // silhouette is identical across frames
+// ---- Frame bitmaps (generated from the active pet) -------------------------
+const openRGBA = renderPet(generateGrid(DEFAULT_PET, { eyeOpen: true }), DEFAULT_PET.coat)
+const blinkRGBA = renderPet(generateGrid(DEFAULT_PET, { eyeOpen: false }), DEFAULT_PET.coat)
 
-function toCanvas(sprite: { width: number; height: number; rgba: Uint8ClampedArray }): HTMLCanvasElement {
+function rgbaToCanvas(rgba: Uint8ClampedArray): HTMLCanvasElement {
   const c = document.createElement('canvas')
-  c.width = sprite.width
-  c.height = sprite.height
+  c.width = SPRITE_W
+  c.height = SPRITE_H
   const cx = c.getContext('2d')!
-  const img = cx.createImageData(sprite.width, sprite.height)
-  img.data.set(sprite.rgba)
+  const img = cx.createImageData(SPRITE_W, SPRITE_H)
+  img.data.set(rgba)
   cx.putImageData(img, 0, 0)
   return c
 }
-const idleCanvas = toCanvas(idle)
-const blinkCanvas = toCanvas(blink)
+const idleCanvas = rgbaToCanvas(openRGBA)
+const blinkCanvas = rgbaToCanvas(blinkRGBA)
+
+// Per-pixel hit mask from the open frame's opaque pixels.
+const hitMask: boolean[] = new Array(SPRITE_W * SPRITE_H)
+for (let i = 0; i < SPRITE_W * SPRITE_H; i++) hitMask[i] = openRGBA[i * 4 + 3] > 0
 
 // ---- Main canvas setup -----------------------------------------------------
 const canvas = document.getElementById('pet') as HTMLCanvasElement

@@ -1,10 +1,12 @@
-// The roster of cat variations for the gallery. Single source of truth shared by
-// the preview script and the gallery builder.
+// The pet roster for the app. All 20 generated cats are kept here so the future
+// pet-picker (M3) can offer them; `DEFAULT_PET` is the one currently active.
 //
-// Each preset: id, name, blurb (personality flavor), geom overrides, marking, coat,
-// and a `personality` (0..1 trait axes) suggestion the app can adopt if chosen.
+// Mirrors scripts/presets.mjs (the gallery copy) — keep in sync. NOTE the naming:
+// the white solid cat is "Ash" (the user's pet, given yellow eyes) and the gray
+// mackerel tabby is "Snowbell" (names were swapped per the user's request).
 
-// Geometry archetypes (body types).
+import type { Pet } from './catgen'
+
 const NORMAL = {}
 const CHONKY = { bodyRx: 15, bodyRy: 12.5, headRx: 11.5, headRy: 10.5, earSpread: 8 }
 const SLIM = { bodyRx: 9.8, bodyRy: 9.5, headRx: 9.8, headRy: 9, earH: 9 }
@@ -12,9 +14,10 @@ const KITTEN = { headRx: 12.5, headRy: 11.2, bodyRx: 9.8, bodyRy: 8.2, eyeRx: 3.
 const FLUFFY = { earH: 11, earStyle: 'tufted', cheekFluff: 5, bodyRx: 14, bodyRy: 12 }
 const BIGEARS = { earH: 12.5, earW: 8.5, earSpread: 8 }
 
-const g = (arch, extra = {}) => ({ ...arch, ...extra })
+const g = (arch: object, extra: object = {}): object => ({ ...arch, ...extra })
 
-export const PRESETS = [
+export const PETS: Pet[] = [
+  // The user's pet: the white solid cat, named "Ash", with yellow eyes.
   { id: 'ash', name: 'Ash', blurb: 'A serene, cloud-soft house cat.',
     geom: g(NORMAL), marking: 'solid',
     coat: { primary: '#f2f2f4', iris: '#f3c73e' },
@@ -35,6 +38,7 @@ export const PRESETS = [
     coat: { primary: '#e8944a', secondary: '#c56a24', iris: '#8fbf5e' },
     personality: { energy: 0.85, sleepiness: 0.2, affection: 0.5, mischief: 0.7, curiosity: 0.8, independence: 0.5 } },
 
+  // The gray mackerel tabby, now named "Snowbell".
   { id: 'snowbell', name: 'Snowbell', blurb: 'A classic mackerel gray tabby.',
     geom: g(NORMAL), marking: 'tabby',
     coat: { primary: '#9a9aa6', secondary: '#63636f', iris: '#e0a94e' },
@@ -115,3 +119,6 @@ export const PRESETS = [
     coat: { primary: '#e89250', white: '#f6ecd8', iris: '#7bb35a' },
     personality: { energy: 0.6, sleepiness: 0.4, affection: 0.85, mischief: 0.4, curiosity: 0.6, independence: 0.3 } }
 ]
+
+/** The currently active desktop pet. */
+export const DEFAULT_PET: Pet = PETS.find((p) => p.id === 'ash') as Pet
