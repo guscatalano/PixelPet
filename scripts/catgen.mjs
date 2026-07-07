@@ -37,7 +37,7 @@ export function defaultGeom() {
   return {
     headCx: 22, headCy: 16, headRx: 11, headRy: 10,
     bodyCx: 22, bodyCy: 33, bodyRx: 12, bodyRy: 11,
-    earW: 7.5, earH: 8.5, earSpread: 7.5, earLean: 1.5,
+    earW: 7.5, earH: 8.5, earSpread: 7.5, earLean: 1.5, earStyle: 'pointy',
     eyeDX: 5.2, eyeY: 17, eyeRx: 2.5, eyeRy: 3.0, eyeStyle: 'round',
     noseY: 22,
     hasTail: true, tailSide: 1, cheekFluff: 0
@@ -106,7 +106,13 @@ function buildFur(g, state) {
   for (const s of [-1, 1]) {
     const bx = g.headCx + s * g.earSpread
     const half = g.earW / 2
-    triangle(set, bx - half, earBaseY + 1, bx + half, earBaseY + 1, bx + s * g.earLean, earBaseY - g.earH + (s > 0 ? twitch : 0))
+    const tipX = bx + s * g.earLean
+    const tipY = earBaseY - g.earH + (s > 0 ? twitch : 0)
+    triangle(set, bx - half, earBaseY + 1, bx + half, earBaseY + 1, tipX, tipY)
+    if (g.earStyle === 'tufted') {
+      // lynx tuft sprouting from the ear tip
+      triangle(set, tipX - 1, tipY + 1, tipX + 1, tipY + 1, tipX + s * 1.6, tipY - 3.2)
+    }
   }
   return fur
 }
