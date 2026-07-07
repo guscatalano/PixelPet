@@ -89,6 +89,9 @@
       open.push(makeFrame(preset, { eyeOpen: true, tailPhase: tp, earPhase: ep }))
     }
     const blink = makeFrame(preset, { eyeOpen: false, tailPhase: 0 })
+    const glanceL = makeFrame(preset, { eyeOpen: true, tailPhase: 0, look: -1 })
+    const glanceR = makeFrame(preset, { eyeOpen: true, tailPhase: 0, look: 1 })
+    const twitch = makeFrame(preset, { eyeOpen: true, tailPhase: 0.2, earPhase: 1 })
 
     const card = document.createElement('button')
     card.className = 'card'
@@ -123,10 +126,10 @@
     grid.appendChild(card)
 
     const cat = {
-      preset, open, blink, stage, sctx: stage.getContext('2d'),
+      preset, open, blink, glanceL, glanceR, twitch, stage, sctx: stage.getContext('2d'),
       cssW: 0, cssH: 176, scale: 3.4,
       phase: i * 3, breath: i * 1.3,
-      nextBlink: 700 + i * 260, blinkEvery: 2500 + (i % 6) * 720, blinkUntil: 0,
+      nextEvent: 700 + i * 260, ev: '', evUntil: 0,
       selected: false, card, heart
     }
     return cat
@@ -205,13 +208,26 @@
     cx.fill()
     cx.restore()
 
-    // frame selection
+    // frame selection: idle tail-sway, punctuated by brief events
     let frame = cat.open[0]
     if (!reduce) {
-      if (now > cat.nextBlink) { cat.blinkUntil = now + 130; cat.nextBlink = now + cat.blinkEvery }
-      const blinking = now < cat.blinkUntil
-      const idx = ((Math.floor(now / 235 + cat.phase) % TAIL_FRAMES) + TAIL_FRAMES) % TAIL_FRAMES
-      frame = blinking ? cat.blink : cat.open[idx]
+      if (now > cat.nextEvent) {
+        const r = Math.random()
+        if (r < 0.5) { cat.ev = 'blink'; cat.evUntil = now + 130 }
+        else if (r < 0.68) { cat.ev = 'glL'; cat.evUntil = now + 720 }
+        else if (r < 0.86) { cat.ev = 'glR'; cat.evUntil = now + 720 }
+        else { cat.ev = 'twitch'; cat.evUntil = now + 190 }
+        cat.nextEvent = cat.evUntil + 1300 + Math.random() * 2800
+      }
+      if (now < cat.evUntil) {
+        frame = cat.ev === 'blink' ? cat.blink
+          : cat.ev === 'glL' ? cat.glanceL
+          : cat.ev === 'glR' ? cat.glanceR
+          : cat.twitch
+      } else {
+        const fi = ((Math.floor(now / 235 + cat.phase) % TAIL_FRAMES) + TAIL_FRAMES) % TAIL_FRAMES
+        frame = cat.open[fi]
+      }
     }
 
     const drawH = catH * sy

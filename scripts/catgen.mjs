@@ -133,17 +133,29 @@ function applyMarking(region, fur, g, kind) {
     return dx * dx + dy * dy <= 1
   }
   switch (kind) {
-    case 'tabby':
+    case 'tabby': {
       forEachFur((x, y) => {
-        const v = y * 1.05 + Math.sin(x * 0.7 + y * 0.1) * 2.2
-        if (((v % 4.6) + 4.6) % 4.6 < 1.7) region[idx(x, y)] = S
-      })
-      // forehead M + brow
-      forEachFur((x, y) => {
-        if (y < g.headCy - 2 && y > g.headCy - 7 && Math.abs(x - g.headCx) < 5 && (x + y) % 2 === 0)
+        if (inEllipse(x, y, g.bodyCx, g.bodyCy, g.bodyRx, g.bodyRy)) {
+          // mackerel stripes: vertical bands that follow the body curve
+          const v = (x - g.bodyCx) + Math.sin((y - g.bodyCy) * 0.45) * 2.6
+          if (((Math.round(v) % 5) + 5) % 5 === 0) region[idx(x, y)] = S
+        } else if (inEllipse(x, y, g.headCx, g.headCy, g.headRx, g.headRy)) {
+          // temple stripes on the upper sides of the head
+          if (y < g.headCy - 1 && Math.abs(x - g.headCx) > 3 && (((y - g.headCy) % 2) + 2) % 2 === 0)
+            region[idx(x, y)] = S
+        } else if (((Math.round(y) % 3) + 3) % 3 === 0) {
+          // tail rings
           region[idx(x, y)] = S
+        }
       })
+      // forehead "M" dashes above the eyes
+      for (let yy = Math.round(g.headCy - 6); yy <= Math.round(g.headCy - 2); yy++)
+        for (const xx of [g.headCx - 2, g.headCx, g.headCx + 2]) {
+          const rx = Math.round(xx)
+          if (inB(rx, yy) && fur[idx(rx, yy)]) region[idx(rx, yy)] = S
+        }
       break
+    }
     case 'tuxedo':
       // start all primary(black); paint white bib, chin, paws
       forEachFur((x, y) => {
@@ -229,6 +241,14 @@ export function generateGrid(preset, state = {}) {
       if (fur[idx(x, y)] && overlay[idx(x, y + 1)] === O.OUTLINE && shade[idx(x, y)] === BASE)
         shade[idx(x, y)] = SHADOW
 
+  // Soft lighter chest/belly for form.
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!fur[idx(x, y)]) continue
+      const dx = (x - g.bodyCx) / 5.5, dy = (y - (g.bodyCy + 2)) / 7.5
+      if (dx * dx + dy * dy <= 1 && shade[idx(x, y)] > HI) shade[idx(x, y)] -= 1
+    }
+
   applyMarking(region, fur, g, marking)
   drawFace(overlay, fur, g, state)
 
@@ -259,8 +279,9 @@ function drawFace(overlay, fur, g, state) {
         put(overlay, x, ey - Math.round(g.eyeRy), O.OUTLINE)
       }
     const pupRy = g.eyeStyle === 'round' ? g.eyeRy * 0.72 : g.eyeRy * 0.9
-    ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex, ey + 0.3, Math.max(0.85, g.eyeRx * 0.45), pupRy)
-    put(overlay, Math.round(ex - g.eyeRx * 0.4), Math.round(ey - g.eyeRy * 0.4), O.GLINT)
+    const look = (state.look || 0) * (g.eyeRx * 0.5) // horizontal glance
+    ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex + look, ey + 0.3, Math.max(0.85, g.eyeRx * 0.45), pupRy)
+    put(overlay, Math.round(ex + look - g.eyeRx * 0.35), Math.round(ey - g.eyeRy * 0.4), O.GLINT)
   }
 
   const nx = g.headCx, ny = g.noseY
