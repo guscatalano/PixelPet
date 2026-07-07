@@ -1,0 +1,11 @@
+node_modules/
+out/
+dist/
+release/
+*.log
+.DS_Store
+
+# Generated icon assets (produced by `npm run gen:icons`)
+assets/icon.png
+assets/tray.png
+assets/icon.ico

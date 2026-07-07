@@ -1,0 +1,64 @@
+{
+  "name": "pixelpet",
+  "version": "0.1.0",
+  "description": "A customizable 8-bit pixel-art desktop pet.",
+  "main": "./out/main/index.js",
+  "author": "guscatalano",
+  "license": "MIT",
+  "scripts": {
+    "gen:icons": "node scripts/genIcons.mjs",
+    "predev": "npm run gen:icons",
+    "dev": "electron-vite dev",
+    "prebuild": "npm run gen:icons",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "dist": "npm run build && electron-builder --win"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.7.0",
+    "vite": "^5.4.0"
+  },
+  "build": {
+    "appId": "com.guscatalano.pixelpet",
+    "productName": "PixelPet",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "PixelPet"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "guscatalano",
+        "repo": "PixelPet"
+      }
+    ]
+  }
+}

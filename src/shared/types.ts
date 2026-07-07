@@ -1,0 +1,33 @@
+// Types shared across main, preload, and renderer.
+
+/** Animation clips the renderer knows how to play. */
+export type ClipName = 'idle' | 'sit' | 'walk' | 'sleep' | 'react'
+
+/** Which way the pet faces (affects horizontal flip). */
+export type Facing = 'left' | 'right'
+
+/** Main -> renderer: play this animation state. */
+export interface PlayCommand {
+  clip: ClipName
+  facing: Facing
+}
+
+/** Renderer -> main: something happened that a trigger may care about. */
+export interface TriggerEvent {
+  type: string
+  payload?: unknown
+}
+
+/**
+ * Personality: 0..1 trait axes that bias behavior selection. Two pets with the
+ * same look can behave very differently. Inferred from photos in M4; for now the
+ * default white cat uses DEFAULT_PERSONALITY.
+ */
+export interface Personality {
+  energy: number
+  sleepiness: number
+  affection: number
+  mischief: number
+  curiosity: number
+  independence: number
+}
