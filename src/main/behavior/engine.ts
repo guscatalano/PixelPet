@@ -3,8 +3,9 @@ import type { ClipName, Facing, Personality, PlayCommand, TriggerEvent } from '.
 import { PET_W } from '../../shared/constants'
 import { weightedPick } from './personality'
 
-const MOVE_TICK_MS = 30
-const WALK_SPEED = 1.6 // px per tick while wandering
+const MOVE_TICK_MS = 16
+const WALK_SPEED = 1.2 // px per tick while wandering
+const MIN_WANDER = 90 // don't bother wandering shorter than this
 const REACT_SAFETY_MS = 650 // force-end a react if the renderer never reports it
 
 /**
@@ -23,6 +24,8 @@ export class PetEngine {
   private dragging = false
   private busy = false // a one-shot reaction (react) is playing
   private wanderTarget: number | null = null
+  private curX = 0 // internal float position while walking (avoids get/set round-trip jitter)
+  private curY = 0
   private moveTimer: ReturnType<typeof setInterval> | null = null
   private ambientTimer: ReturnType<typeof setTimeout> | null = null
   private reactTimer: ReturnType<typeof setTimeout> | null = null
@@ -107,30 +110,37 @@ export class PetEngine {
   private startWander(): void {
     if (this.dragging || this.win.isDestroyed()) return
     const wa = screen.getDisplayMatching(this.win.getBounds()).workArea
-    const [x] = this.win.getPosition()
+    const [x, y] = this.win.getPosition()
     const minX = wa.x
     const maxX = wa.x + wa.width - PET_W
-    if (maxX <= minX) {
+    if (maxX - minX < MIN_WANDER) {
       this.finishWander()
       return
     }
-    const target = Math.round(minX + Math.random() * (maxX - minX))
-    this.wanderTarget = Math.max(minX, Math.min(maxX, target))
-    this.facing = this.wanderTarget < x ? 'left' : 'right'
+    // Pick a target that's a worthwhile distance away, clamped on-screen.
+    let target = Math.round(minX + Math.random() * (maxX - minX))
+    if (Math.abs(target - x) < MIN_WANDER) {
+      target = x + (target >= x ? 1 : -1) * (MIN_WANDER + Math.random() * 140)
+      target = Math.round(Math.max(minX, Math.min(maxX, target)))
+    }
+    this.wanderTarget = target
+    this.curX = x
+    this.curY = y
+    this.facing = target < x ? 'left' : 'right'
     this.setClip('walk', this.facing)
     if (!this.moveTimer) this.moveTimer = setInterval(() => this.moveTick(), MOVE_TICK_MS)
   }
 
   private moveTick(): void {
     if (this.wanderTarget === null || this.dragging || this.win.isDestroyed()) return
-    const [x, y] = this.win.getPosition()
-    const dx = this.wanderTarget - x
+    const dx = this.wanderTarget - this.curX
     if (Math.abs(dx) <= WALK_SPEED) {
-      this.win.setPosition(this.wanderTarget, y)
+      this.win.setPosition(this.wanderTarget, this.curY)
       this.finishWander()
       return
     }
-    this.win.setPosition(Math.round(x + Math.sign(dx) * WALK_SPEED), y)
+    this.curX += Math.sign(dx) * WALK_SPEED
+    this.win.setPosition(Math.round(this.curX), this.curY)
   }
 
   private finishWander(): void {

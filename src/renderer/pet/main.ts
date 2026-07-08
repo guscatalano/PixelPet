@@ -1,5 +1,5 @@
 import { PET_H, PET_W, SCALE, SPRITE_H, SPRITE_TOP, SPRITE_W } from '../../shared/constants'
-import { generateGrid, render as renderPet, type AnimState } from '../../shared/catgen'
+import { generateGrid, generateWalkGrid, render as renderPet, type AnimState } from '../../shared/catgen'
 import { DEFAULT_PET } from '../../shared/pets'
 import type { ClipName, Facing, PlayCommand, TriggerEvent } from '../../shared/types'
 
@@ -49,6 +49,18 @@ function getFrame(eyeOpen: boolean, tailPhase: number, look: number, earPhase: n
   return c
 }
 const tailAt = (now: number, speed: number): number => Math.sin(now / speed)
+
+// Side-profile walk frames, cached by quantized step of the gait cycle.
+const walkCache = new Map<number, HTMLCanvasElement>()
+function getWalkFrame(step: number): HTMLCanvasElement {
+  const s = ((Math.round(step * 12) % 12) + 12) % 12
+  let c = walkCache.get(s)
+  if (!c) {
+    c = rgbaToCanvas(renderPet(generateWalkGrid(DEFAULT_PET, s / 12), DEFAULT_PET.coat))
+    walkCache.set(s, c)
+  }
+  return c
+}
 
 // Per-pixel hit mask from a neutral frame's opaque pixels.
 const baseRGBA = frameRGBA({ eyeOpen: true, tailPhase: 0 })
@@ -116,7 +128,7 @@ function computeAnim(now: number): Anim {
   const elapsed = now - clipStart
   switch (clip) {
     case 'walk':
-      return { frame: getFrame(true, tailAt(now, 900), 0, 0), overlay: 'none' }
+      return { frame: getWalkFrame((now / 560) % 1), overlay: 'none' }
     case 'sleep':
       return { frame: getFrame(false, tailAt(now, 2600), 0, 0), overlay: 'zzz' }
     case 'react': {

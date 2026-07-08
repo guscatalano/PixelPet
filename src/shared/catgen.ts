@@ -324,6 +324,94 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
   }
 }
 
+// ---- side-profile walk pose ------------------------------------------------
+// A separate pose used while the pet travels: a side view with four legs doing a
+// walk cycle (driven by `step` 0..1). Faces right; the renderer flips for left.
+// Returns the same shade/region/overlay output so render() works unchanged.
+export function generateWalkGrid(_preset: Pet, step = 0): Parts {
+  const fur = new Uint8Array(W * H)
+  const legTag = new Uint8Array(W * H) // 1 = near leg, 2 = far leg
+  const set: SetFn = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
+
+  const groundY = 43
+  const bodyCx = 18, bodyCy = 30, bodyRx = 11.5, bodyRy = 7.4
+  const headCx = 32, headCy = 24, headR = 7
+  const bodyBottom = bodyCy + bodyRy * 0.5
+
+  const legs = [
+    { x: 13, ph: 0.5, near: false },
+    { x: 30, ph: 0.0, near: false },
+    { x: 16, ph: 0.0, near: true },
+    { x: 33, ph: 0.5, near: true }
+  ]
+  const drawLeg = (lg: { x: number; ph: number; near: boolean }): void => {
+    const a = (step + lg.ph) * Math.PI * 2
+    const footX = lg.x + Math.sin(a) * 2.6
+    const footY = groundY - Math.max(0, Math.sin(a)) * 3.2
+    const tag = lg.near ? 1 : 2
+    const paint: SetFn = (x, y) => { set(x, y); if (inB(x, y)) legTag[idx(x, y)] = tag }
+    for (let t = 0; t <= 1.0001; t += 1 / 9) {
+      ellipse(paint, lg.x + (footX - lg.x) * t, bodyBottom + (footY - bodyBottom) * t, 1.8, 1.7)
+    }
+    ellipse(paint, footX, footY, 2.2, 1.6)
+  }
+  legs.filter((l) => !l.near).forEach(drawLeg)
+
+  ellipse(set, bodyCx, bodyCy, bodyRx, bodyRy)
+  ellipse(set, (bodyCx + headCx) / 2 + 2, (bodyCy + headCy) / 2 + 1, 6, 5)
+  ellipse(set, headCx, headCy, headR, headR)
+
+  triangle(set, headCx - 4, headCy - headR + 2, headCx, headCy - headR + 2, headCx - 4.5, headCy - headR - 4)
+  triangle(set, headCx + 1, headCy - headR + 2, headCx + 5, headCy - headR + 2, headCx + 4, headCy - headR - 4)
+
+  {
+    const p0 = [bodyCx - bodyRx * 0.7, bodyCy], p1 = [bodyCx - bodyRx - 3, bodyCy - 2], p2 = [bodyCx - bodyRx + 1, bodyCy - 10]
+    for (let t = 0; t <= 1.0001; t += 0.06) {
+      const it = 1 - t
+      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], 2.4 - t, 2.4 - t)
+    }
+  }
+
+  legs.filter((l) => l.near).forEach(drawLeg)
+
+  const shade = new Uint8Array(W * H)
+  const region = new Uint8Array(W * H)
+  const overlay = new Uint8Array(W * H)
+
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (fur[idx(x, y)]) continue
+      let near = false
+      for (let dy = -1; dy <= 1 && !near; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (inB(x + dx, y + dy) && fur[idx(x + dx, y + dy)]) { near = true; break }
+      if (near) overlay[idx(x, y)] = O.OUTLINE
+    }
+
+  const inHead = (x: number, y: number): boolean => ((x - headCx) / (headR + 0.5)) ** 2 + ((y - headCy) / (headR + 0.5)) ** 2 <= 1.05
+  const inBody = (x: number, y: number): boolean => ((x - bodyCx) / (bodyRx + 0.5)) ** 2 + ((y - bodyCy) / (bodyRy + 0.5)) ** 2 <= 1.05
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!fur[idx(x, y)]) continue
+      const tag = legTag[idx(x, y)]
+      if (tag === 2) shade[idx(x, y)] = DEEP
+      else if (tag === 1) shade[idx(x, y)] = SHADOW
+      else if (inHead(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, headCx, headCy, headR, headR))
+      else if (inBody(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, bodyCx, bodyCy, bodyRx, bodyRy))
+      else shade[idx(x, y)] = BASE
+    }
+
+  triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
+    headCx + 1.5, headCy - headR + 2, headCx + 4, headCy - headR + 2, headCx + 3.5, headCy - headR - 1.5)
+  ellipse((x, y) => put(overlay, x, y, O.IRIS), headCx + 1.6, headCy - 0.5, 1.7, 2)
+  ellipse((x, y) => put(overlay, x, y, O.PUPIL), headCx + 2, headCy - 0.3, 0.9, 1.4)
+  put(overlay, Math.round(headCx + 1.2), Math.round(headCy - 1.3), O.GLINT)
+  triangle((x, y) => put(overlay, x, y, O.NOSE), headCx + headR - 1.5, headCy + 1, headCx + headR + 0.5, headCy + 1, headCx + headR - 0.5, headCy + 2.4)
+  put(overlay, Math.round(headCx + headR - 0.5), Math.round(headCy + 3), O.MOUTH)
+
+  return { shade, region, overlay, geom: defaultGeom(), fur }
+}
+
 function hexToRgb(h: string): [number, number, number] {
   h = h.replace('#', '')
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]

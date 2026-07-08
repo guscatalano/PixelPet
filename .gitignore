@@ -13,3 +13,5 @@ assets/icon.ico
 
 # Gallery build outputs
 .gallery*
+.walk.png
+.ash-big.png
