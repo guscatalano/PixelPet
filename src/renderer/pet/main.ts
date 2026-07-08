@@ -1,5 +1,5 @@
 import { PET_H, PET_W, SCALE, SPRITE_H, SPRITE_TOP, SPRITE_W } from '../../shared/constants'
-import { generateGrid, render as renderPet } from '../../shared/catgen'
+import { generateGrid, render as renderPet, type AnimState } from '../../shared/catgen'
 import { DEFAULT_PET } from '../../shared/pets'
 import type { ClipName, Facing, PlayCommand, TriggerEvent } from '../../shared/types'
 
@@ -22,9 +22,6 @@ const DRAG_THRESHOLD = 4 // px of movement before a press becomes a drag
 const REACT_MS = 450 // duration of the one-shot "react" pop
 
 // ---- Frame bitmaps (generated from the active pet) -------------------------
-const openRGBA = renderPet(generateGrid(DEFAULT_PET, { eyeOpen: true }), DEFAULT_PET.coat)
-const blinkRGBA = renderPet(generateGrid(DEFAULT_PET, { eyeOpen: false }), DEFAULT_PET.coat)
-
 function rgbaToCanvas(rgba: Uint8ClampedArray): HTMLCanvasElement {
   const c = document.createElement('canvas')
   c.width = SPRITE_W
@@ -35,12 +32,24 @@ function rgbaToCanvas(rgba: Uint8ClampedArray): HTMLCanvasElement {
   cx.putImageData(img, 0, 0)
   return c
 }
-const idleCanvas = rgbaToCanvas(openRGBA)
-const blinkCanvas = rgbaToCanvas(blinkRGBA)
+const frameRGBA = (state: AnimState): Uint8ClampedArray =>
+  renderPet(generateGrid(DEFAULT_PET, state), DEFAULT_PET.coat)
 
-// Per-pixel hit mask from the open frame's opaque pixels.
+// A slow tail-sway cycle plus a few expression frames.
+const TAIL_FRAMES = 16
+const baseRGBA = frameRGBA({ eyeOpen: true, tailPhase: 0 })
+const openFrames: HTMLCanvasElement[] = []
+for (let k = 0; k < TAIL_FRAMES; k++) {
+  openFrames.push(rgbaToCanvas(frameRGBA({ eyeOpen: true, tailPhase: Math.sin((k / TAIL_FRAMES) * Math.PI * 2) })))
+}
+const blinkCanvas = rgbaToCanvas(frameRGBA({ eyeOpen: false, tailPhase: 0 }))
+const glanceLCanvas = rgbaToCanvas(frameRGBA({ eyeOpen: true, look: -1, tailPhase: 0 }))
+const glanceRCanvas = rgbaToCanvas(frameRGBA({ eyeOpen: true, look: 1, tailPhase: 0 }))
+const earCanvas = rgbaToCanvas(frameRGBA({ eyeOpen: true, earPhase: 1, tailPhase: 0.25 }))
+
+// Per-pixel hit mask from the base frame's opaque pixels.
 const hitMask: boolean[] = new Array(SPRITE_W * SPRITE_H)
-for (let i = 0; i < SPRITE_W * SPRITE_H; i++) hitMask[i] = openRGBA[i * 4 + 3] > 0
+for (let i = 0; i < SPRITE_W * SPRITE_H; i++) hitMask[i] = baseRGBA[i * 4 + 3] > 0
 
 // ---- Main canvas setup -----------------------------------------------------
 const canvas = document.getElementById('pet') as HTMLCanvasElement
@@ -68,70 +77,71 @@ window.pet.onPlay((cmd: PlayCommand) => {
   facing = cmd.facing
 })
 
-// ---- Blink scheduler (applied only to calm clips) --------------------------
-let blinking = false
-let nextBlinkAt = performance.now() + 2500
-let blinkUntil = 0
-function updateBlink(now: number): void {
-  if (!blinking && now >= nextBlinkAt) {
-    blinking = true
-    blinkUntil = now + 110
+// ---- Idle micro-behavior: blinks, glances, ear-twitches, slow tail-sway ----
+let ev = ''
+let evUntil = 0
+let nextEvent = performance.now() + 1400
+
+function idleFrame(now: number): HTMLCanvasElement {
+  if (now > nextEvent) {
+    const r = Math.random()
+    if (r < 0.55) { ev = 'blink'; evUntil = now + 130 }
+    else if (r < 0.72) { ev = 'glL'; evUntil = now + 900 }
+    else if (r < 0.89) { ev = 'glR'; evUntil = now + 900 }
+    else { ev = 'ear'; evUntil = now + 230 }
+    nextEvent = evUntil + 1600 + Math.random() * 3200
   }
-  if (blinking && now >= blinkUntil) {
-    blinking = false
-    nextBlinkAt = now + 2500 + Math.random() * 3500
+  if (now < evUntil) {
+    if (ev === 'blink') return blinkCanvas
+    if (ev === 'glL') return glanceLCanvas
+    if (ev === 'glR') return glanceRCanvas
+    return earCanvas
   }
+  const idx = ((Math.floor(now / 260) % TAIL_FRAMES) + TAIL_FRAMES) % TAIL_FRAMES
+  return openFrames[idx]
 }
 
 // ---- Per-clip animation ----------------------------------------------------
 interface Anim {
-  frame: 'base' | 'blink'
-  sy: number // vertical offset in native px (negative = up)
+  frame: HTMLCanvasElement
   scaleX: number
   scaleY: number
   overlay: 'none' | 'zzz'
+}
+
+// Subtle breathing: the body gently expands from the paws (no bouncing).
+function breathe(now: number, amt: number): { scaleX: number; scaleY: number } {
+  const br = Math.sin(now / 2600)
+  return { scaleX: 1 - br * amt * 0.6, scaleY: 1 + br * amt }
 }
 
 function computeAnim(now: number): Anim {
   const elapsed = now - clipStart
   switch (clip) {
     case 'walk': {
-      // Bouncy hop-walk: the cat springs up and squashes on landing.
-      const bounce = Math.abs(Math.sin(now / 110))
-      return {
-        frame: 'base',
-        sy: -Math.round(bounce * 2),
-        scaleX: 1.03 - bounce * 0.08,
-        scaleY: 0.94 + bounce * 0.1,
-        overlay: 'none'
-      }
+      // Smooth glide: the window moves the cat; it stays level and sways its tail.
+      const idx = ((Math.floor(now / 150) % TAIL_FRAMES) + TAIL_FRAMES) % TAIL_FRAMES
+      return { frame: openFrames[idx], scaleX: 1, scaleY: 1, overlay: 'none' }
     }
     case 'sleep': {
-      // Slow breathing + floating Zzz, eyes closed.
-      const br = Math.sin(now / 1100)
-      return { frame: 'blink', sy: 0, scaleX: 1 - br * 0.03, scaleY: 1 + br * 0.03, overlay: 'zzz' }
+      const b = breathe(now, 0.028)
+      return { frame: blinkCanvas, scaleX: b.scaleX, scaleY: b.scaleY, overlay: 'zzz' }
     }
     case 'react': {
+      // A gentle "noticed you": quick blink, then a glance + faint perk. No hop.
       if (elapsed >= REACT_MS) return idleAnim(now)
-      const pop = Math.sin((elapsed / REACT_MS) * Math.PI) // 0 -> 1 -> 0
-      return {
-        frame: elapsed < 130 ? 'blink' : 'base',
-        sy: -Math.round(pop * 3),
-        scaleX: 1 - pop * 0.12,
-        scaleY: 1 + pop * 0.18,
-        overlay: 'none'
-      }
+      const pop = Math.sin((elapsed / REACT_MS) * Math.PI)
+      const frame = elapsed < 120 ? blinkCanvas : facing === 'left' ? glanceLCanvas : glanceRCanvas
+      return { frame, scaleX: 1 - pop * 0.03, scaleY: 1 + pop * 0.05, overlay: 'none' }
     }
-    case 'sit':
-      return { frame: blinking ? 'blink' : 'base', sy: 0, scaleX: 1, scaleY: 1, overlay: 'none' }
     default:
       return idleAnim(now)
   }
 }
 
 function idleAnim(now: number): Anim {
-  const bob = Math.round(Math.sin(now / 600) * 2)
-  return { frame: blinking ? 'blink' : 'base', sy: bob, scaleX: 1, scaleY: 1, overlay: 'none' }
+  const b = breathe(now, 0.016)
+  return { frame: idleFrame(now), scaleX: b.scaleX, scaleY: b.scaleY, overlay: 'none' }
 }
 
 // ---- Rendering -------------------------------------------------------------
@@ -153,7 +163,6 @@ function drawZzz(now: number): void {
 }
 
 function render(now: number): void {
-  updateBlink(now)
   const a = computeAnim(now)
 
   // Signal one-shot completion once.
@@ -164,23 +173,12 @@ function render(now: number): void {
 
   ctx.clearRect(0, 0, PET_W, PET_H)
 
-  const img = a.frame === 'blink' ? blinkCanvas : idleCanvas
   const flip = facing === 'left' ? -1 : 1
   ctx.save()
-  // Scale/flip around the feet anchor so squash-stretch keeps the paws planted.
-  ctx.translate(FEET_X, FEET_Y + a.sy * SCALE)
+  // Scale/flip around the feet anchor so breathing keeps the paws planted.
+  ctx.translate(FEET_X, FEET_Y)
   ctx.scale(flip * a.scaleX, a.scaleY)
-  ctx.drawImage(
-    img,
-    0,
-    0,
-    SPRITE_W,
-    SPRITE_H,
-    -(SPRITE_W / 2) * SCALE,
-    -SPRITE_H * SCALE,
-    SPRITE_W * SCALE,
-    SPRITE_H * SCALE
-  )
+  ctx.drawImage(a.frame, 0, 0, SPRITE_W, SPRITE_H, -(SPRITE_W / 2) * SCALE, -SPRITE_H * SCALE, SPRITE_W * SCALE, SPRITE_H * SCALE)
   ctx.restore()
 
   if (a.overlay === 'zzz') drawZzz(now)
