@@ -27,6 +27,7 @@ export class PetEngine {
   private wanderTarget: number | null = null
   private curX = 0 // internal float position while walking (avoids get/set round-trip jitter)
   private curY = 0
+  private lastX = 0 // last integer position sent (avoid redundant setPosition calls)
   private walkDist = 0 // px travelled this wander, drives the gait phase
   private moveTimer: ReturnType<typeof setInterval> | null = null
   private ambientTimer: ReturnType<typeof setTimeout> | null = null
@@ -128,6 +129,7 @@ export class PetEngine {
     this.wanderTarget = target
     this.curX = x
     this.curY = y
+    this.lastX = x
     this.walkDist = 0
     this.facing = target < x ? 'left' : 'right'
     this.setClip('walk', this.facing)
@@ -136,6 +138,12 @@ export class PetEngine {
 
   private moveTick(): void {
     if (this.wanderTarget === null || this.dragging || this.win.isDestroyed()) return
+    // Safety: the pet must never translate outside the walk clip (e.g. it must
+    // not drift while sleeping/idle). If the clip changed, stop moving.
+    if (this.clip !== 'walk') {
+      this.cancelWander()
+      return
+    }
     const dx = this.wanderTarget - this.curX
     if (Math.abs(dx) <= WALK_SPEED) {
       this.win.setPosition(this.wanderTarget, this.curY)
@@ -144,8 +152,12 @@ export class PetEngine {
     }
     this.curX += Math.sign(dx) * WALK_SPEED
     this.walkDist += WALK_SPEED
-    this.win.setPosition(Math.round(this.curX), this.curY)
-    if (!this.win.isDestroyed()) this.win.webContents.send('pet:walk-step', (this.walkDist / STRIDE) % 1)
+    const rx = Math.round(this.curX)
+    if (rx !== this.lastX) {
+      this.win.setPosition(rx, this.curY)
+      this.lastX = rx
+    }
+    this.win.webContents.send('pet:walk-step', (this.walkDist / STRIDE) % 1)
   }
 
   private finishWander(): void {

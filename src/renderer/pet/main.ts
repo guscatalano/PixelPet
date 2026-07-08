@@ -52,7 +52,8 @@ function getFrame(eyeOpen: boolean, tailPhase: number, look: number, earPhase: n
 const tailAt = (now: number, speed: number): number => Math.sin(now / speed)
 
 // Side-profile walk frames, cached by quantized step of the gait cycle.
-const WALK_QUANT = 24 // gait frames per cycle (more = smoother leg motion)
+const WALK_QUANT = 8 // gait frames per cycle. Pixel-art walks use ~4-8 crisp
+// frames; too many finely-sampled frames make leg pixels shimmer (reads glitchy).
 const walkCache = new Map<number, HTMLCanvasElement>()
 function getWalkFrame(step: number): HTMLCanvasElement {
   const s = ((Math.round(step * WALK_QUANT) % WALK_QUANT) + WALK_QUANT) % WALK_QUANT
