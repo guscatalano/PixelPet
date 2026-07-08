@@ -358,9 +358,9 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
   // 4-beat LATERAL-SEQUENCE walk (real cat gait): RH -> RF -> LH -> LF.
   const legs = [
     { x: 14, ph: 0.0, near: false, back: true }, // RH (back far)
-    { x: 30, ph: 0.25, near: false, back: false }, // RF (front far)
+    { x: 26, ph: 0.25, near: false, back: false }, // RF (front far) — under the chest, not the head
     { x: 16, ph: 0.5, near: true, back: true }, // LH (back near)
-    { x: 33, ph: 0.75, near: true, back: false } // LF (front near)
+    { x: 28, ph: 0.75, near: true, back: false } // LF (front near)
   ]
   const seg = (paint, x0, y0, x1, y1, r0, r1) => {
     const n = 7

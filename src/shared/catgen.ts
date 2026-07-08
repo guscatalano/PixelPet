@@ -346,9 +346,9 @@ export function generateWalkGrid(_preset: Pet, step = 0, motion = 1): Parts {
   // spaced a quarter-cycle apart, so only one paw is off the ground at a time.
   const legs = [
     { x: 14, ph: 0.0, near: false, back: true }, // RH (back far)
-    { x: 30, ph: 0.25, near: false, back: false }, // RF (front far)
+    { x: 26, ph: 0.25, near: false, back: false }, // RF (front far) — under the chest, not the head
     { x: 16, ph: 0.5, near: true, back: true }, // LH (back near)
-    { x: 33, ph: 0.75, near: true, back: false } // LF (front near)
+    { x: 28, ph: 0.75, near: true, back: false } // LF (front near)
   ]
   const seg = (paint: SetFn, x0: number, y0: number, x1: number, y1: number, r0: number, r1: number): void => {
     const n = 7
