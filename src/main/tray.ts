@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 export interface TrayCallbacks {
   onToggleVisible: () => void
+  onResetPosition: () => void
   onQuit: () => void
 }
 
@@ -24,6 +25,7 @@ export function createTray(cb: TrayCallbacks): Tray {
     { label: 'PixelPet', enabled: false },
     { type: 'separator' },
     { label: 'Show / Hide Pet', click: () => cb.onToggleVisible() },
+    { label: 'Reset Position', click: () => cb.onResetPosition() },
     // Placeholder until the settings window lands in a later milestone.
     { label: 'Settings…', enabled: false },
     { type: 'separator' },
