@@ -334,8 +334,11 @@ export function generateWalkGrid(_preset: Pet, step = 0): Parts {
   const set: SetFn = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
 
   const groundY = 43
-  const bodyCx = 18, bodyCy = 30, bodyRx = 11.5, bodyRy = 7.4
-  const headCx = 32, headCy = 24, headR = 7
+  // The torso oscillates vertically with the gait (two dips per stride) while the
+  // feet stay planted — the legs stretch/compress, so the body doesn't look static.
+  const bob = Math.sin(step * Math.PI * 4) * 1.3
+  const bodyCx = 18, bodyCy = 30 + bob, bodyRx = 11.5, bodyRy = 7.4
+  const headCx = 32, headCy = 24 + bob * 1.25, headR = 7 // head bobs a touch more
   const bodyBottom = bodyCy + bodyRy * 0.5
 
   // 4-beat LATERAL-SEQUENCE walk (real cat gait): footfalls RH -> RF -> LH -> LF,
@@ -382,7 +385,8 @@ export function generateWalkGrid(_preset: Pet, step = 0): Parts {
   triangle(set, headCx + 1, headCy - headR + 2, headCx + 5, headCy - headR + 2, headCx + 4, headCy - headR - 4)
 
   {
-    const p0 = [bodyCx - bodyRx * 0.7, bodyCy], p1 = [bodyCx - bodyRx - 3, bodyCy - 2], p2 = [bodyCx - bodyRx + 1, bodyCy - 10]
+    const tailSway = Math.sin(step * Math.PI * 2) * 2
+    const p0 = [bodyCx - bodyRx * 0.7, bodyCy], p1 = [bodyCx - bodyRx - 3, bodyCy - 2], p2 = [bodyCx - bodyRx + 1 + tailSway, bodyCy - 10]
     for (let t = 0; t <= 1.0001; t += 0.06) {
       const it = 1 - t
       ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], 2.4 - t, 2.4 - t)
