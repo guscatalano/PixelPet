@@ -35,19 +35,23 @@ function rgbaToCanvas(rgba: Uint8ClampedArray): HTMLCanvasElement {
 const frameRGBA = (state: AnimState): Uint8ClampedArray =>
   renderPet(generateGrid(DEFAULT_PET, state), DEFAULT_PET.coat)
 
-// A slow tail-sway cycle plus a few expression frames.
-const TAIL_FRAMES = 16
-const baseRGBA = frameRGBA({ eyeOpen: true, tailPhase: 0 })
-const openFrames: HTMLCanvasElement[] = []
-for (let k = 0; k < TAIL_FRAMES; k++) {
-  openFrames.push(rgbaToCanvas(frameRGBA({ eyeOpen: true, tailPhase: Math.sin((k / TAIL_FRAMES) * Math.PI * 2) })))
+// Frames are generated on demand and cached by quantized state, so the tail can
+// sway continuously while eye/ear expressions layer on top without ever snapping.
+const frameCache = new Map<string, HTMLCanvasElement>()
+function getFrame(eyeOpen: boolean, tailPhase: number, look: number, earPhase: number): HTMLCanvasElement {
+  const tailStep = Math.round(tailPhase * 8) // ~17 positions across the sway
+  const key = `${eyeOpen ? 1 : 0}|${tailStep}|${look}|${earPhase}`
+  let c = frameCache.get(key)
+  if (!c) {
+    c = rgbaToCanvas(frameRGBA({ eyeOpen, tailPhase: tailStep / 8, look, earPhase }))
+    frameCache.set(key, c)
+  }
+  return c
 }
-const blinkCanvas = rgbaToCanvas(frameRGBA({ eyeOpen: false, tailPhase: 0 }))
-const glanceLCanvas = rgbaToCanvas(frameRGBA({ eyeOpen: true, look: -1, tailPhase: 0 }))
-const glanceRCanvas = rgbaToCanvas(frameRGBA({ eyeOpen: true, look: 1, tailPhase: 0 }))
-const earCanvas = rgbaToCanvas(frameRGBA({ eyeOpen: true, earPhase: 1, tailPhase: 0.25 }))
+const tailAt = (now: number, speed: number): number => Math.sin(now / speed)
 
-// Per-pixel hit mask from the base frame's opaque pixels.
+// Per-pixel hit mask from a neutral frame's opaque pixels.
+const baseRGBA = frameRGBA({ eyeOpen: true, tailPhase: 0 })
 const hitMask: boolean[] = new Array(SPRITE_W * SPRITE_H)
 for (let i = 0; i < SPRITE_W * SPRITE_H; i++) hitMask[i] = baseRGBA[i * 4 + 3] > 0
 
@@ -77,33 +81,32 @@ window.pet.onPlay((cmd: PlayCommand) => {
   facing = cmd.facing
 })
 
-// ---- Idle micro-behavior: blinks, glances, ear-twitches, slow tail-sway ----
+// ---- Idle micro-behavior: occasional blinks, glances, ear-twitches ---------
 let ev = ''
 let evUntil = 0
 let nextEvent = performance.now() + 1400
 
-function idleFrame(now: number): HTMLCanvasElement {
+function idleExpr(now: number): { eyeOpen: boolean; look: number; earPhase: number } {
   if (now > nextEvent) {
     const r = Math.random()
-    if (r < 0.55) { ev = 'blink'; evUntil = now + 130 }
-    else if (r < 0.72) { ev = 'glL'; evUntil = now + 900 }
-    else if (r < 0.89) { ev = 'glR'; evUntil = now + 900 }
+    if (r < 0.5) { ev = 'blink'; evUntil = now + 130 }
+    else if (r < 0.68) { ev = 'glL'; evUntil = now + 850 }
+    else if (r < 0.86) { ev = 'glR'; evUntil = now + 850 }
     else { ev = 'ear'; evUntil = now + 230 }
     nextEvent = evUntil + 1600 + Math.random() * 3200
   }
   if (now < evUntil) {
-    if (ev === 'blink') return blinkCanvas
-    if (ev === 'glL') return glanceLCanvas
-    if (ev === 'glR') return glanceRCanvas
-    return earCanvas
+    if (ev === 'blink') return { eyeOpen: false, look: 0, earPhase: 0 }
+    if (ev === 'glL') return { eyeOpen: true, look: -1, earPhase: 0 }
+    if (ev === 'glR') return { eyeOpen: true, look: 1, earPhase: 0 }
+    return { eyeOpen: true, look: 0, earPhase: 1 }
   }
-  const idx = ((Math.floor(now / 260) % TAIL_FRAMES) + TAIL_FRAMES) % TAIL_FRAMES
-  return openFrames[idx]
+  return { eyeOpen: true, look: 0, earPhase: 0 }
 }
 
 // ---- Per-clip animation ----------------------------------------------------
-// Everything is driven by frame swaps (like the walk), never by sub-pixel canvas
-// scaling — scaling nearest-neighbor pixel art each frame makes it shimmer/vibrate.
+// The tail sways continuously; eye/ear expressions layer on top. No canvas
+// scaling (which would shimmer nearest-neighbor pixels), so nothing vibrates.
 interface Anim {
   frame: HTMLCanvasElement
   overlay: 'none' | 'zzz'
@@ -112,17 +115,16 @@ interface Anim {
 function computeAnim(now: number): Anim {
   const elapsed = now - clipStart
   switch (clip) {
-    case 'walk': {
-      const idx = ((Math.floor(now / 150) % TAIL_FRAMES) + TAIL_FRAMES) % TAIL_FRAMES
-      return { frame: openFrames[idx], overlay: 'none' }
-    }
+    case 'walk':
+      return { frame: getFrame(true, tailAt(now, 900), 0, 0), overlay: 'none' }
     case 'sleep':
-      return { frame: blinkCanvas, overlay: 'zzz' }
+      return { frame: getFrame(false, tailAt(now, 2600), 0, 0), overlay: 'zzz' }
     case 'react': {
       // A gentle "noticed you": quick blink, then a glance toward you.
       if (elapsed >= REACT_MS) return idleAnim(now)
-      const frame = elapsed < 130 ? blinkCanvas : facing === 'left' ? glanceLCanvas : glanceRCanvas
-      return { frame, overlay: 'none' }
+      const open = elapsed >= 130
+      const look = facing === 'left' ? -1 : 1
+      return { frame: getFrame(open, tailAt(now, 1400), open ? look : 0, 0), overlay: 'none' }
     }
     default:
       return idleAnim(now)
@@ -130,9 +132,8 @@ function computeAnim(now: number): Anim {
 }
 
 function idleAnim(now: number): Anim {
-  // Calm and still, like the walk: a slow tail-sway with occasional blinks,
-  // glances, and ear-twitches. No scaling, so no vibration.
-  return { frame: idleFrame(now), overlay: 'none' }
+  const e = idleExpr(now)
+  return { frame: getFrame(e.eyeOpen, tailAt(now, 1600), e.look, e.earPhase), overlay: 'none' }
 }
 
 // ---- Rendering -------------------------------------------------------------

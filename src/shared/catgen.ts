@@ -98,8 +98,17 @@ function buildFur(g: Geom, state: AnimState): Uint8Array {
     }
   }
 
-  ellipse(set, g.bodyCx - g.bodyRx * 0.42, g.bodyCy + g.bodyRy * 0.72, 3.2, 2.6)
-  ellipse(set, g.bodyCx + g.bodyRx * 0.42, g.bodyCy + g.bodyRy * 0.72, 3.2, 2.6)
+  // Front legs + paws, sitting close together at the front.
+  {
+    const legDX = g.bodyRx * 0.3
+    const legTop = g.bodyCy + g.bodyRy * 0.32
+    const pawY = g.bodyCy + g.bodyRy * 0.98
+    for (const s of [-1, 1]) {
+      const lx = g.bodyCx + s * legDX
+      for (let y = legTop; y <= pawY; y += 0.5) ellipse(set, lx, y, 2.3, 1.6)
+      ellipse(set, lx, pawY, 3, 2.3)
+    }
+  }
 
   ellipse(set, g.headCx, (g.headCy + g.bodyCy) / 2 + 1, g.headRx * 0.78, (g.bodyCy - g.headCy) * 0.55)
 
@@ -245,6 +254,24 @@ export function generateGrid(preset: Pet, state: AnimState = {}): Parts {
       const dx = (x - g.bodyCx) / 5.5, dy = (y - (g.bodyCy + 2)) / 7.5
       if (dx * dx + dy * dy <= 1 && shade[idx(x, y)] > HI) shade[idx(x, y)] -= 1
     }
+
+  // Front-leg definition: a shadow crease down the middle separates the two
+  // front legs, and toe ticks hint at paws.
+  {
+    const legDX = g.bodyRx * 0.3
+    const legTop = Math.round(g.bodyCy + g.bodyRy * 0.42)
+    const pawY = Math.round(g.bodyCy + g.bodyRy * 0.98)
+    const cxp = Math.round(g.bodyCx)
+    for (let y = legTop; y <= pawY; y++) {
+      if (inB(cxp, y) && fur[idx(cxp, y)]) shade[idx(cxp, y)] = DEEP
+      if (inB(cxp - 1, y) && fur[idx(cxp - 1, y)] && shade[idx(cxp - 1, y)] < SHADOW) shade[idx(cxp - 1, y)] = SHADOW
+    }
+    for (const s of [-1, 1]) {
+      const px = Math.round(g.bodyCx + s * legDX)
+      if (inB(px, pawY) && fur[idx(px, pawY)]) shade[idx(px, pawY)] = DEEP
+      if (inB(px, pawY - 1) && fur[idx(px, pawY - 1)] && shade[idx(px, pawY - 1)] < SHADOW) shade[idx(px, pawY - 1)] = SHADOW
+    }
+  }
 
   applyMarking(region, fur, g, marking)
   drawFace(overlay, fur, g, state)
