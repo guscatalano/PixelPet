@@ -368,7 +368,7 @@ export function generateWalkGrid(preset, step = 0) {
   const drawLeg = (lg) => {
     const p = (((step + lg.ph) % 1) + 1) % 1
     let offX, lift, flex
-    if (p < SWING) { const s = p / SWING; offX = -A + s * 2 * A; flex = Math.sin(s * Math.PI); lift = flex * LIFT * (lg.back ? 1.15 : 0.85) }
+    if (p < SWING) { const s = p / SWING; offX = -A + s * 2 * A; flex = Math.sin(s * Math.PI); lift = flex * LIFT * (lg.back ? 0.95 : 0.85) }
     else { const s = (p - SWING) / (1 - SWING); offX = A - s * 2 * A; flex = 0; lift = 0 }
     const tag = lg.near ? 1 : 2
     const paint = (x, y) => { set(x, y); if (inB(x, y)) legTag[idx(x, y)] = tag }
@@ -376,10 +376,10 @@ export function generateWalkGrid(preset, step = 0) {
     const hipY = bodyBottom
     const footX = lg.x + offX
     const footY = groundY - lift
-    // The joint folds up during swing (knee/hock flexes to lift the paw); the
-    // hind hock kicks backward, the front carpus tucks slightly forward.
-    const midY = hipY + (footY - hipY) * 0.5 - flex * 2
-    const jointX = lg.back ? hipX - 2.2 - flex * 1.8 : hipX + offX * 0.2 + 0.5 + flex * 1.0
+    // The joint folds up a little during swing (knee/hock flexes to lift the paw);
+    // kept modest so the step doesn't jump across the few frames.
+    const midY = hipY + (footY - hipY) * 0.5 - flex * 1.3
+    const jointX = lg.back ? hipX - 2.2 - flex * 0.8 : hipX + offX * 0.2 + 0.5 + flex * 0.7
     seg(paint, hipX, hipY, jointX, midY, 2.2, 1.5) // upper (thigh / upper-arm)
     seg(paint, jointX, midY, footX, footY, 1.5, 1.0) // lower (shank)
     ellipse(paint, footX, footY + 0.2, 1.8, 1.2) // paw

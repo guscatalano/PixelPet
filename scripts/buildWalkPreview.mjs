@@ -16,7 +16,7 @@ const out = resolve(process.argv[2] || resolve(__dirname, '../.walk-preview.html
 const client = `
 const ash = PRESETS.find(p => p.id === 'ash')
 const STRIDE = 12
-const QUANT = 24
+let QUANT = 8
 const SCALE = 6
 const cache = new Map()
 function toCanvas(rgba) {
@@ -25,7 +25,8 @@ function toCanvas(rgba) {
 }
 function walkFrame(step) {
   const s = ((Math.round(step * QUANT) % QUANT) + QUANT) % QUANT
-  let c = cache.get(s); if (!c) { c = toCanvas(render(generateWalkGrid(ash, s / QUANT), ash.coat)); cache.set(s, c) }
+  const key = QUANT + ':' + s
+  let c = cache.get(key); if (!c) { c = toCanvas(render(generateWalkGrid(ash, s / QUANT), ash.coat)); cache.set(key, c) }
   return c
 }
 const idle = toCanvas(render(generateGrid(ash, { eyeOpen: true }), ash.coat))
@@ -39,9 +40,11 @@ const ctx = stage.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.
 
 let speed = 22
 const slider = document.getElementById('speed')
+const framesSlider = document.getElementById('frames')
 const readout = document.getElementById('readout')
-function updateReadout() { readout.textContent = speed + ' px/s  ·  ' + (speed / STRIDE).toFixed(1) + ' strides/s' }
+function updateReadout() { readout.textContent = speed + ' px/s · ' + (speed / STRIDE).toFixed(1) + ' str/s · ' + QUANT + ' frames' }
 slider.addEventListener('input', () => { speed = +slider.value; updateReadout() })
+framesSlider.addEventListener('input', () => { QUANT = +framesSlider.value; updateReadout() })
 updateReadout()
 
 const catW = W * SCALE, catH = H * SCALE
@@ -92,6 +95,10 @@ const html = `<title>Ash — Walk Preview</title>
     <div class="controls">
       <label for="speed">Speed</label>
       <input id="speed" type="range" min="8" max="70" value="22" />
+    </div>
+    <div class="controls">
+      <label for="frames">Frames</label>
+      <input id="frames" type="range" min="4" max="24" value="8" />
       <span id="readout"></span>
     </div>
   </div>
