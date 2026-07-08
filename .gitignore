@@ -16,3 +16,5 @@ assets/icon.ico
 .walk.png
 .ash-big.png
 *.tsbuildinfo
+.walk*
+.walkprev.png
