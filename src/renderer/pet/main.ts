@@ -102,37 +102,27 @@ function idleFrame(now: number): HTMLCanvasElement {
 }
 
 // ---- Per-clip animation ----------------------------------------------------
+// Everything is driven by frame swaps (like the walk), never by sub-pixel canvas
+// scaling — scaling nearest-neighbor pixel art each frame makes it shimmer/vibrate.
 interface Anim {
   frame: HTMLCanvasElement
-  scaleX: number
-  scaleY: number
   overlay: 'none' | 'zzz'
-}
-
-// Subtle breathing: the body gently expands from the paws (no bouncing).
-function breathe(now: number, amt: number): { scaleX: number; scaleY: number } {
-  const br = Math.sin(now / 2600)
-  return { scaleX: 1 - br * amt * 0.6, scaleY: 1 + br * amt }
 }
 
 function computeAnim(now: number): Anim {
   const elapsed = now - clipStart
   switch (clip) {
     case 'walk': {
-      // Smooth glide: the window moves the cat; it stays level and sways its tail.
       const idx = ((Math.floor(now / 150) % TAIL_FRAMES) + TAIL_FRAMES) % TAIL_FRAMES
-      return { frame: openFrames[idx], scaleX: 1, scaleY: 1, overlay: 'none' }
+      return { frame: openFrames[idx], overlay: 'none' }
     }
-    case 'sleep': {
-      const b = breathe(now, 0.028)
-      return { frame: blinkCanvas, scaleX: b.scaleX, scaleY: b.scaleY, overlay: 'zzz' }
-    }
+    case 'sleep':
+      return { frame: blinkCanvas, overlay: 'zzz' }
     case 'react': {
-      // A gentle "noticed you": quick blink, then a glance + faint perk. No hop.
+      // A gentle "noticed you": quick blink, then a glance toward you.
       if (elapsed >= REACT_MS) return idleAnim(now)
-      const pop = Math.sin((elapsed / REACT_MS) * Math.PI)
-      const frame = elapsed < 120 ? blinkCanvas : facing === 'left' ? glanceLCanvas : glanceRCanvas
-      return { frame, scaleX: 1 - pop * 0.03, scaleY: 1 + pop * 0.05, overlay: 'none' }
+      const frame = elapsed < 130 ? blinkCanvas : facing === 'left' ? glanceLCanvas : glanceRCanvas
+      return { frame, overlay: 'none' }
     }
     default:
       return idleAnim(now)
@@ -140,8 +130,9 @@ function computeAnim(now: number): Anim {
 }
 
 function idleAnim(now: number): Anim {
-  const b = breathe(now, 0.016)
-  return { frame: idleFrame(now), scaleX: b.scaleX, scaleY: b.scaleY, overlay: 'none' }
+  // Calm and still, like the walk: a slow tail-sway with occasional blinks,
+  // glances, and ear-twitches. No scaling, so no vibration.
+  return { frame: idleFrame(now), overlay: 'none' }
 }
 
 // ---- Rendering -------------------------------------------------------------
@@ -175,9 +166,9 @@ function render(now: number): void {
 
   const flip = facing === 'left' ? -1 : 1
   ctx.save()
-  // Scale/flip around the feet anchor so breathing keeps the paws planted.
+  // Only an integer horizontal flip for facing — no fractional scaling.
   ctx.translate(FEET_X, FEET_Y)
-  ctx.scale(flip * a.scaleX, a.scaleY)
+  ctx.scale(flip, 1)
   ctx.drawImage(a.frame, 0, 0, SPRITE_W, SPRITE_H, -(SPRITE_W / 2) * SCALE, -SPRITE_H * SCALE, SPRITE_W * SCALE, SPRITE_H * SCALE)
   ctx.restore()
 
