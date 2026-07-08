@@ -6,7 +6,7 @@ import { weightedPick } from './personality'
 const MOVE_TICK_MS = 16
 const WALK_SPEED = 1.2 // px per tick while wandering
 const MIN_WANDER = 90 // don't bother wandering shorter than this
-const STRIDE = 20 // px travelled per full gait cycle; must equal 4*A in the walk pose
+const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
 const REACT_SAFETY_MS = 650 // force-end a react if the renderer never reports it
 
 /**

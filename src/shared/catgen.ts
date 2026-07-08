@@ -338,37 +338,39 @@ export function generateWalkGrid(_preset: Pet, step = 0): Parts {
   const headCx = 32, headCy = 24, headR = 7
   const bodyBottom = bodyCy + bodyRy * 0.5
 
-  // Each leg is two tapered segments with a joint so it reads as a cat leg
-  // (back legs kick the hock backward; front legs stay near-straight).
+  // 4-beat LATERAL-SEQUENCE walk (real cat gait): footfalls RH -> RF -> LH -> LF,
+  // spaced a quarter-cycle apart, so only one paw is off the ground at a time.
   const legs = [
-    { x: 13, ph: 0.5, near: false, back: true },
-    { x: 31, ph: 0.0, near: false, back: false },
-    { x: 15, ph: 0.0, near: true, back: true },
-    { x: 33, ph: 0.5, near: true, back: false }
+    { x: 14, ph: 0.0, near: false, back: true }, // RH (back far)
+    { x: 30, ph: 0.25, near: false, back: false }, // RF (front far)
+    { x: 16, ph: 0.5, near: true, back: true }, // LH (back near)
+    { x: 33, ph: 0.75, near: true, back: false } // LF (front near)
   ]
   const seg = (paint: SetFn, x0: number, y0: number, x1: number, y1: number, r0: number, r1: number): void => {
     const n = 7
     for (let t = 0; t <= 1.0001; t += 1 / n) ellipse(paint, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, r0 + (r1 - r0) * t, r0 + (r1 - r0) * t)
   }
-  // A = STRIDE/4 so the planted (stance) foot slides backward exactly as fast as
-  // the body moves forward -> feet stay put on the ground. (STRIDE=20 in engine.)
-  const A = 5, LIFT = 3
+  // Stance = 75% of the cycle. A sets the horizontal foot range so a planted foot
+  // slides back exactly as fast as the body advances: STRIDE = 2*A/0.75. (=12.)
+  const A = 4.5, LIFT = 3.4, SWING = 0.25
   const drawLeg = (lg: { x: number; ph: number; near: boolean; back: boolean }): void => {
     const p = (((step + lg.ph) % 1) + 1) % 1
-    let offX: number, lift: number
-    if (p < 0.5) { const s = p / 0.5; offX = -A + s * 2 * A; lift = Math.sin(s * Math.PI) * LIFT }
-    else { const s = (p - 0.5) / 0.5; offX = A - s * 2 * A; lift = 0 }
+    let offX: number, lift: number, flex: number
+    if (p < SWING) { const s = p / SWING; offX = -A + s * 2 * A; flex = Math.sin(s * Math.PI); lift = flex * LIFT * (lg.back ? 1.15 : 0.85) }
+    else { const s = (p - SWING) / (1 - SWING); offX = A - s * 2 * A; flex = 0; lift = 0 }
     const tag = lg.near ? 1 : 2
     const paint: SetFn = (x, y) => { set(x, y); if (inB(x, y)) legTag[idx(x, y)] = tag }
     const hipX = lg.x
     const hipY = bodyBottom
     const footX = lg.x + offX
     const footY = groundY - lift
-    const midY = hipY + (footY - hipY) * 0.52
-    const jointX = lg.back ? hipX - 2.6 : hipX + offX * 0.25 + 0.4
+    // The joint folds up during swing (knee/hock flexes to lift the paw); the
+    // hind hock kicks backward, the front carpus tucks slightly forward.
+    const midY = hipY + (footY - hipY) * 0.5 - flex * 2
+    const jointX = lg.back ? hipX - 2.2 - flex * 1.8 : hipX + offX * 0.2 + 0.5 + flex * 1.0
     seg(paint, hipX, hipY, jointX, midY, 2.2, 1.5)
-    seg(paint, jointX, midY, footX, footY, 1.5, 1.1)
-    ellipse(paint, footX, footY + 0.2, 1.9, 1.2)
+    seg(paint, jointX, midY, footX, footY, 1.5, 1.0)
+    ellipse(paint, footX, footY + 0.2, 1.8, 1.2)
   }
   legs.filter((l) => !l.near).forEach(drawLeg)
 
