@@ -4,7 +4,7 @@ import { PET_W } from '../../shared/constants'
 import { weightedPick } from './personality'
 
 const MOVE_TICK_MS = 16
-const WALK_SPEED = 1.2 // px per tick while wandering
+const WALK_SPEED = 0.35 // px per tick (~22 px/s) — a calm walking pace, not a scramble
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
 const REACT_SAFETY_MS = 650 // force-end a react if the renderer never reports it

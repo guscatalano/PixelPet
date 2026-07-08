@@ -52,12 +52,13 @@ function getFrame(eyeOpen: boolean, tailPhase: number, look: number, earPhase: n
 const tailAt = (now: number, speed: number): number => Math.sin(now / speed)
 
 // Side-profile walk frames, cached by quantized step of the gait cycle.
+const WALK_QUANT = 24 // gait frames per cycle (more = smoother leg motion)
 const walkCache = new Map<number, HTMLCanvasElement>()
 function getWalkFrame(step: number): HTMLCanvasElement {
-  const s = ((Math.round(step * 12) % 12) + 12) % 12
+  const s = ((Math.round(step * WALK_QUANT) % WALK_QUANT) + WALK_QUANT) % WALK_QUANT
   let c = walkCache.get(s)
   if (!c) {
-    c = rgbaToCanvas(renderPet(generateWalkGrid(DEFAULT_PET, s / 12), DEFAULT_PET.coat))
+    c = rgbaToCanvas(renderPet(generateWalkGrid(DEFAULT_PET, s / WALK_QUANT), DEFAULT_PET.coat))
     walkCache.set(s, c)
   }
   return c

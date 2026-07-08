@@ -351,9 +351,7 @@ export function generateWalkGrid(preset, step = 0) {
   // Legs: two pairs in a diagonal gait. Draw far pair first (behind the body).
   // Each leg is two tapered segments with a joint so it reads as a cat leg
   // (back legs kick the hock backward; front legs stay near-straight).
-  // 4-beat LATERAL-SEQUENCE walk (real cat gait): footfalls RH -> RF -> LH -> LF,
-  // spaced a quarter-cycle apart, so only one paw is off the ground at a time and
-  // the other three stay planted (a walk, not a trot).
+  // 4-beat LATERAL-SEQUENCE walk (real cat gait): RH -> RF -> LH -> LF.
   const legs = [
     { x: 14, ph: 0.0, near: false, back: true }, // RH (back far)
     { x: 30, ph: 0.25, near: false, back: false }, // RF (front far)
