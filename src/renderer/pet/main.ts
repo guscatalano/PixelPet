@@ -11,6 +11,7 @@ interface PetApi {
   sendTrigger: (ev: TriggerEvent) => void
   clipEnded: (clip: string) => void
   onPlay: (handler: (cmd: PlayCommand) => void) => void
+  onWalkStep: (handler: (step: number) => void) => void
 }
 declare global {
   interface Window {
@@ -93,6 +94,13 @@ window.pet.onPlay((cmd: PlayCommand) => {
   facing = cmd.facing
 })
 
+// Gait phase (0..1), driven by how far the pet has actually travelled, so the
+// legs stay in sync with movement instead of running on wall-clock time.
+let walkStep = 0
+window.pet.onWalkStep((step: number) => {
+  walkStep = step
+})
+
 // ---- Idle micro-behavior: occasional blinks, glances, ear-twitches ---------
 let ev = ''
 let evUntil = 0
@@ -128,7 +136,7 @@ function computeAnim(now: number): Anim {
   const elapsed = now - clipStart
   switch (clip) {
     case 'walk':
-      return { frame: getWalkFrame((now / 560) % 1), overlay: 'none' }
+      return { frame: getWalkFrame(walkStep), overlay: 'none' }
     case 'sleep':
       return { frame: getFrame(false, tailAt(now, 2600), 0, 0), overlay: 'zzz' }
     case 'react': {

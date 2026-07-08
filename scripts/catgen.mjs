@@ -349,23 +349,37 @@ export function generateWalkGrid(preset, step = 0) {
   const bodyBottom = bodyCy + bodyRy * 0.5
 
   // Legs: two pairs in a diagonal gait. Draw far pair first (behind the body).
+  // Each leg is two tapered segments with a joint so it reads as a cat leg
+  // (back legs kick the hock backward; front legs stay near-straight).
   const legs = [
-    { x: 13, ph: 0.5, near: false }, // back far
-    { x: 30, ph: 0.0, near: false }, // front far
-    { x: 16, ph: 0.0, near: true }, // back near
-    { x: 33, ph: 0.5, near: true } // front near
+    { x: 13, ph: 0.5, near: false, back: true }, // back far
+    { x: 31, ph: 0.0, near: false, back: false }, // front far
+    { x: 15, ph: 0.0, near: true, back: true }, // back near
+    { x: 33, ph: 0.5, near: true, back: false } // front near
   ]
+  const seg = (paint, x0, y0, x1, y1, r0, r1) => {
+    const n = 7
+    for (let t = 0; t <= 1.0001; t += 1 / n) ellipse(paint, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, r0 + (r1 - r0) * t, r0 + (r1 - r0) * t)
+  }
+  // A = STRIDE/4 so the planted (stance) foot slides backward exactly as fast as
+  // the body moves forward -> feet stay put on the ground. (STRIDE=20 in engine.)
+  const A = 5, LIFT = 3
   const drawLeg = (lg) => {
-    const a = (step + lg.ph) * Math.PI * 2
-    const footX = lg.x + Math.sin(a) * 2.6
-    const footY = groundY - Math.max(0, Math.sin(a)) * 3.2
+    const p = (((step + lg.ph) % 1) + 1) % 1
+    let offX, lift
+    if (p < 0.5) { const s = p / 0.5; offX = -A + s * 2 * A; lift = Math.sin(s * Math.PI) * LIFT } // swing forward, lifted
+    else { const s = (p - 0.5) / 0.5; offX = A - s * 2 * A; lift = 0 } // stance: planted, slides back
     const tag = lg.near ? 1 : 2
-    for (let t = 0; t <= 1.0001; t += 1 / 9) {
-      const px = lg.x + (footX - lg.x) * t
-      const py = bodyBottom + (footY - bodyBottom) * t
-      ellipse((x, y) => { set(x, y); if (inB(x, y)) legTag[idx(x, y)] = tag }, px, py, 1.8, 1.7)
-    }
-    ellipse((x, y) => { set(x, y); if (inB(x, y)) legTag[idx(x, y)] = tag }, footX, footY, 2.2, 1.6)
+    const paint = (x, y) => { set(x, y); if (inB(x, y)) legTag[idx(x, y)] = tag }
+    const hipX = lg.x
+    const hipY = bodyBottom
+    const footX = lg.x + offX
+    const footY = groundY - lift
+    const midY = hipY + (footY - hipY) * 0.52
+    const jointX = lg.back ? hipX - 2.6 : hipX + offX * 0.25 + 0.4
+    seg(paint, hipX, hipY, jointX, midY, 2.2, 1.5) // upper (thigh / upper-arm)
+    seg(paint, jointX, midY, footX, footY, 1.5, 1.1) // lower (shank)
+    ellipse(paint, footX, footY + 0.2, 1.9, 1.2) // paw
   }
   legs.filter((l) => !l.near).forEach(drawLeg)
 

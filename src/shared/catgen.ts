@@ -338,22 +338,37 @@ export function generateWalkGrid(_preset: Pet, step = 0): Parts {
   const headCx = 32, headCy = 24, headR = 7
   const bodyBottom = bodyCy + bodyRy * 0.5
 
+  // Each leg is two tapered segments with a joint so it reads as a cat leg
+  // (back legs kick the hock backward; front legs stay near-straight).
   const legs = [
-    { x: 13, ph: 0.5, near: false },
-    { x: 30, ph: 0.0, near: false },
-    { x: 16, ph: 0.0, near: true },
-    { x: 33, ph: 0.5, near: true }
+    { x: 13, ph: 0.5, near: false, back: true },
+    { x: 31, ph: 0.0, near: false, back: false },
+    { x: 15, ph: 0.0, near: true, back: true },
+    { x: 33, ph: 0.5, near: true, back: false }
   ]
-  const drawLeg = (lg: { x: number; ph: number; near: boolean }): void => {
-    const a = (step + lg.ph) * Math.PI * 2
-    const footX = lg.x + Math.sin(a) * 2.6
-    const footY = groundY - Math.max(0, Math.sin(a)) * 3.2
+  const seg = (paint: SetFn, x0: number, y0: number, x1: number, y1: number, r0: number, r1: number): void => {
+    const n = 7
+    for (let t = 0; t <= 1.0001; t += 1 / n) ellipse(paint, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, r0 + (r1 - r0) * t, r0 + (r1 - r0) * t)
+  }
+  // A = STRIDE/4 so the planted (stance) foot slides backward exactly as fast as
+  // the body moves forward -> feet stay put on the ground. (STRIDE=20 in engine.)
+  const A = 5, LIFT = 3
+  const drawLeg = (lg: { x: number; ph: number; near: boolean; back: boolean }): void => {
+    const p = (((step + lg.ph) % 1) + 1) % 1
+    let offX: number, lift: number
+    if (p < 0.5) { const s = p / 0.5; offX = -A + s * 2 * A; lift = Math.sin(s * Math.PI) * LIFT }
+    else { const s = (p - 0.5) / 0.5; offX = A - s * 2 * A; lift = 0 }
     const tag = lg.near ? 1 : 2
     const paint: SetFn = (x, y) => { set(x, y); if (inB(x, y)) legTag[idx(x, y)] = tag }
-    for (let t = 0; t <= 1.0001; t += 1 / 9) {
-      ellipse(paint, lg.x + (footX - lg.x) * t, bodyBottom + (footY - bodyBottom) * t, 1.8, 1.7)
-    }
-    ellipse(paint, footX, footY, 2.2, 1.6)
+    const hipX = lg.x
+    const hipY = bodyBottom
+    const footX = lg.x + offX
+    const footY = groundY - lift
+    const midY = hipY + (footY - hipY) * 0.52
+    const jointX = lg.back ? hipX - 2.6 : hipX + offX * 0.25 + 0.4
+    seg(paint, hipX, hipY, jointX, midY, 2.2, 1.5)
+    seg(paint, jointX, midY, footX, footY, 1.5, 1.1)
+    ellipse(paint, footX, footY + 0.2, 1.9, 1.2)
   }
   legs.filter((l) => !l.near).forEach(drawLeg)
 

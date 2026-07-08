@@ -6,6 +6,7 @@ import { weightedPick } from './personality'
 const MOVE_TICK_MS = 16
 const WALK_SPEED = 1.2 // px per tick while wandering
 const MIN_WANDER = 90 // don't bother wandering shorter than this
+const STRIDE = 20 // px travelled per full gait cycle; must equal 4*A in the walk pose
 const REACT_SAFETY_MS = 650 // force-end a react if the renderer never reports it
 
 /**
@@ -26,6 +27,7 @@ export class PetEngine {
   private wanderTarget: number | null = null
   private curX = 0 // internal float position while walking (avoids get/set round-trip jitter)
   private curY = 0
+  private walkDist = 0 // px travelled this wander, drives the gait phase
   private moveTimer: ReturnType<typeof setInterval> | null = null
   private ambientTimer: ReturnType<typeof setTimeout> | null = null
   private reactTimer: ReturnType<typeof setTimeout> | null = null
@@ -126,6 +128,7 @@ export class PetEngine {
     this.wanderTarget = target
     this.curX = x
     this.curY = y
+    this.walkDist = 0
     this.facing = target < x ? 'left' : 'right'
     this.setClip('walk', this.facing)
     if (!this.moveTimer) this.moveTimer = setInterval(() => this.moveTick(), MOVE_TICK_MS)
@@ -140,7 +143,9 @@ export class PetEngine {
       return
     }
     this.curX += Math.sign(dx) * WALK_SPEED
+    this.walkDist += WALK_SPEED
     this.win.setPosition(Math.round(this.curX), this.curY)
+    if (!this.win.isDestroyed()) this.win.webContents.send('pet:walk-step', (this.walkDist / STRIDE) % 1)
   }
 
   private finishWander(): void {

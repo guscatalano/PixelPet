@@ -17,6 +17,10 @@ const api = {
   /** Subscribe to animation-state commands from the behavior engine. */
   onPlay: (handler: (cmd: PlayCommand) => void): void => {
     ipcRenderer.on('pet:play', (_e, cmd: PlayCommand) => handler(cmd))
+  },
+  /** Subscribe to the walk gait phase (0..1), driven by distance travelled. */
+  onWalkStep: (handler: (step: number) => void): void => {
+    ipcRenderer.on('pet:walk-step', (_e, step: number) => handler(step))
   }
 }
 
