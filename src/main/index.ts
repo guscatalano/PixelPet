@@ -56,6 +56,9 @@ function createPetWindow(): BrowserWindow {
   })
 
   win.webContents.on('did-finish-load', () => {
+    // The renderer can reload (HMR, or navigation); dispose the previous engine
+    // so orphaned timers don't keep running and fighting over the window.
+    engine?.dispose()
     engine = new PetEngine(win, { ...DEFAULT_PERSONALITY })
     engine.start()
   })
