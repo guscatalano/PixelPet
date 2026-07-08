@@ -338,7 +338,7 @@ function drawFace(overlay, fur, g, state) {
 // A separate pose used while the pet travels: a side view with four legs doing a
 // walk cycle (driven by `step` 0..1). Faces right; the renderer flips for left.
 // Uses the same shade/region/overlay output so render() works unchanged.
-export function generateWalkGrid(preset, step = 0) {
+export function generateWalkGrid(preset, step = 0, motion = 1) {
   const fur = new Uint8Array(W * H)
   const legTag = new Uint8Array(W * H) // 1 = near leg, 2 = far leg
   const set = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
@@ -346,9 +346,10 @@ export function generateWalkGrid(preset, step = 0) {
   const groundY = 43
   // The torso oscillates vertically with the gait (two dips per stride) while the
   // feet stay planted — the legs stretch/compress, so the body doesn't look static.
-  const bob = Math.sin(step * Math.PI * 4) * 1.3
+  // Head and body move as one unit. `motion` (0..) scales the whole effect.
+  const bob = Math.sin(step * Math.PI * 4) * 1.3 * motion
   const bodyCx = 18, bodyCy = 30 + bob, bodyRx = 11.5, bodyRy = 7.4
-  const headCx = 32, headCy = 24 + bob * 1.25, headR = 7 // head bobs a touch more
+  const headCx = 32, headCy = 24 + bob, headR = 7
   const bodyBottom = bodyCy + bodyRy * 0.5
 
   // Legs: two pairs in a diagonal gait. Draw far pair first (behind the body).
@@ -400,7 +401,7 @@ export function generateWalkGrid(preset, step = 0) {
 
   // Tail sweeping up from the rear.
   {
-    const tailSway = Math.sin(step * Math.PI * 2) * 2
+    const tailSway = Math.sin(step * Math.PI * 2) * 2 * motion
     const p0 = [bodyCx - bodyRx * 0.7, bodyCy], p1 = [bodyCx - bodyRx - 3, bodyCy - 2], p2 = [bodyCx - bodyRx + 1 + tailSway, bodyCy - 10]
     for (let t = 0; t <= 1.0001; t += 0.06) {
       const it = 1 - t

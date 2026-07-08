@@ -328,7 +328,7 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
 // A separate pose used while the pet travels: a side view with four legs doing a
 // walk cycle (driven by `step` 0..1). Faces right; the renderer flips for left.
 // Returns the same shade/region/overlay output so render() works unchanged.
-export function generateWalkGrid(_preset: Pet, step = 0): Parts {
+export function generateWalkGrid(_preset: Pet, step = 0, motion = 1): Parts {
   const fur = new Uint8Array(W * H)
   const legTag = new Uint8Array(W * H) // 1 = near leg, 2 = far leg
   const set: SetFn = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
@@ -336,9 +336,10 @@ export function generateWalkGrid(_preset: Pet, step = 0): Parts {
   const groundY = 43
   // The torso oscillates vertically with the gait (two dips per stride) while the
   // feet stay planted — the legs stretch/compress, so the body doesn't look static.
-  const bob = Math.sin(step * Math.PI * 4) * 1.3
+  // Head and body move as one unit. `motion` (0..) scales the whole effect.
+  const bob = Math.sin(step * Math.PI * 4) * 1.3 * motion
   const bodyCx = 18, bodyCy = 30 + bob, bodyRx = 11.5, bodyRy = 7.4
-  const headCx = 32, headCy = 24 + bob * 1.25, headR = 7 // head bobs a touch more
+  const headCx = 32, headCy = 24 + bob, headR = 7
   const bodyBottom = bodyCy + bodyRy * 0.5
 
   // 4-beat LATERAL-SEQUENCE walk (real cat gait): footfalls RH -> RF -> LH -> LF,
@@ -385,7 +386,7 @@ export function generateWalkGrid(_preset: Pet, step = 0): Parts {
   triangle(set, headCx + 1, headCy - headR + 2, headCx + 5, headCy - headR + 2, headCx + 4, headCy - headR - 4)
 
   {
-    const tailSway = Math.sin(step * Math.PI * 2) * 2
+    const tailSway = Math.sin(step * Math.PI * 2) * 2 * motion
     const p0 = [bodyCx - bodyRx * 0.7, bodyCy], p1 = [bodyCx - bodyRx - 3, bodyCy - 2], p2 = [bodyCx - bodyRx + 1 + tailSway, bodyCy - 10]
     for (let t = 0; t <= 1.0001; t += 0.06) {
       const it = 1 - t

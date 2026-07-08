@@ -17,6 +17,7 @@ const client = `
 const ash = PRESETS.find(p => p.id === 'ash')
 const STRIDE = 12
 let QUANT = 8
+let motion = 1
 const SCALE = 6
 const cache = new Map()
 function toCanvas(rgba) {
@@ -25,8 +26,8 @@ function toCanvas(rgba) {
 }
 function walkFrame(step) {
   const s = ((Math.round(step * QUANT) % QUANT) + QUANT) % QUANT
-  const key = QUANT + ':' + s
-  let c = cache.get(key); if (!c) { c = toCanvas(render(generateWalkGrid(ash, s / QUANT), ash.coat)); cache.set(key, c) }
+  const key = QUANT + ':' + motion.toFixed(2) + ':' + s
+  let c = cache.get(key); if (!c) { c = toCanvas(render(generateWalkGrid(ash, s / QUANT, motion), ash.coat)); cache.set(key, c) }
   return c
 }
 const idle = toCanvas(render(generateGrid(ash, { eyeOpen: true }), ash.coat))
@@ -41,10 +42,12 @@ const ctx = stage.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.
 let speed = 22
 const slider = document.getElementById('speed')
 const framesSlider = document.getElementById('frames')
+const motionSlider = document.getElementById('motion')
 const readout = document.getElementById('readout')
-function updateReadout() { readout.textContent = speed + ' px/s · ' + (speed / STRIDE).toFixed(1) + ' str/s · ' + QUANT + ' frames' }
+function updateReadout() { readout.textContent = speed + ' px/s · ' + QUANT + ' fr · ' + Math.round(motion * 100) + '% body' }
 slider.addEventListener('input', () => { speed = +slider.value; updateReadout() })
 framesSlider.addEventListener('input', () => { QUANT = +framesSlider.value; updateReadout() })
+motionSlider.addEventListener('input', () => { motion = +motionSlider.value / 100; updateReadout() })
 updateReadout()
 
 const catW = W * SCALE, catH = H * SCALE
@@ -99,6 +102,10 @@ const html = `<title>Ash — Walk Preview</title>
     <div class="controls">
       <label for="frames">Frames</label>
       <input id="frames" type="range" min="4" max="24" value="8" />
+    </div>
+    <div class="controls">
+      <label for="motion">Body</label>
+      <input id="motion" type="range" min="0" max="200" value="100" />
       <span id="readout"></span>
     </div>
   </div>
