@@ -456,32 +456,43 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
 // tail wrapped around the front, eyes closed. `breath` (radians) drives a slow
 // belly rise/fall (the ball's bottom stays on the ground).
 export function generateCurlGrid(preset, breath = 0) {
+  // Side profile of a curled sleeping cat (ref: a cat curled nose-to-paws).
+  // Head lowered on the LEFT resting by the front paws, back arching up behind,
+  // tail wrapping the base to close the loop. One coherent viewing angle.
   const fur = new Uint8Array(W * H)
-  const set = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
+  const head = new Uint8Array(W * H), tail = new Uint8Array(W * H), paw = new Uint8Array(W * H)
+  const stamp = (mask) => (x, y) => { if (inB(x, y)) { fur[idx(x, y)] = 1; if (mask) mask[idx(x, y)] = 1 } }
+  const body = stamp(null)
 
-  const groundY = 42
+  const g = 41
   const br = Math.sin(breath)
-  const rx = 13, ry = 10.6 + br * 0.5
-  const cx = 20, cy = groundY - ry // bottom rests on the ground; top breathes
-  const hx = 31, hr = 6.2, hy = cy + 3.5 // head tucked low at the front
+  const brx = 13.5, bry = 11 + br * 0.5
+  const bcx = 25, bcy = g - bry                  // rounded body mound
+  const hx = 14, hy = g - 9, hr = 7.2            // head lowered, front-left
 
-  // Tail wraps around the front (drawn first, behind the body).
+  // Tail wraps the base from the right haunch around to the front paws (drawn under).
   {
-    const p0 = [cx - rx * 0.5, cy + ry * 0.4], p1 = [cx - 1, groundY + 1.5], p2 = [hx - 3, cy + 4]
-    for (let t = 0; t <= 1.0001; t += 0.05) {
+    const p0 = [36, bcy + 5], p1 = [27, g + 1], p2 = [18, g - 1]
+    for (let t = 0; t <= 1.0001; t += 0.04) {
       const it = 1 - t
-      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], 2.7 - t, 2.7 - t)
+      ellipse(stamp(tail), it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], 2.3, 2.3)
     }
   }
-  ellipse(set, cx, cy, rx, ry) // body ball
-  ellipse(set, hx, hy, hr, hr) // tucked head
-  triangle(set, hx - 2.5, hy - hr + 2, hx + 0.5, hy - hr + 2, hx - 1.5, hy - hr - 3.5) // near ear
-  triangle(set, hx + 1.5, hy - hr + 2, hx + 4.5, hy - hr + 2, hx + 4, hy - hr - 2.5) // far ear
+  ellipse(body, bcx, bcy, brx, bry)
+  ellipse(body, 33, bcy + 2, 8.5, 9)             // haunch rising behind the head
+  ellipse(stamp(paw), 18, g - 1.2, 3, 2.3)       // front paws tucked under the chin
+  ellipse(stamp(paw), 22.5, g - 1, 3, 2.2)
+  ellipse(stamp(head), hx, hy, hr, hr * 0.94)    // head
+  ellipse(stamp(head), hx - 4.2, hy + 2.4, 3.2, 2.7) // muzzle/chin
+  triangle(stamp(head), hx - 5, hy - hr + 2, hx - 1, hy - hr + 2.5, hx - 5.5, hy - hr - 3.5) // near ear
+  triangle(stamp(head), hx + 1, hy - hr + 1, hx + 4.5, hy - hr + 1.5, hx + 4, hy - hr - 2.5) // far ear (behind)
 
   const shade = new Uint8Array(W * H)
   const region = new Uint8Array(W * H)
   const overlay = new Uint8Array(W * H)
+  const is = (mask, x, y) => inB(x, y) && mask[idx(x, y)]
 
+  // Outer outline (dilate the silhouette by 1px).
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (fur[idx(x, y)]) continue
@@ -492,21 +503,45 @@ export function generateCurlGrid(preset, breath = 0) {
       if (near) overlay[idx(x, y)] = O.OUTLINE
     }
 
-  const inBall = (x, y) => ((x - cx) / (rx + 0.5)) ** 2 + ((y - cy) / (ry + 0.5)) ** 2 <= 1.05
-  const inHead = (x, y) => ((x - hx) / (hr + 0.5)) ** 2 + ((y - hy) / (hr + 0.5)) ** 2 <= 1.05
+  const tailTop = new Int16Array(W).fill(999)
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (tail[idx(x, y)] && y < tailTop[x]) tailTop[x] = y
+
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
-      if (!fur[idx(x, y)]) continue
-      if (inHead(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, hx, hy, hr, hr))
-      else if (inBall(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, cx, cy, rx, ry))
-      else shade[idx(x, y)] = SHADOW // tail, tucked in shadow
+      const i = idx(x, y)
+      if (!fur[i]) continue
+      if (head[i]) shade[i] = shadeLevel(sphereBright(x, y, hx, hy, hr, hr))
+      else if (tail[i]) { const d = y - tailTop[x]; shade[i] = d <= 1 ? BASE : SHADOW } // soft curl, same fur
+      else if (paw[i]) shade[i] = BASE
+      else shade[i] = shadeLevel(sphereBright(x, y, bcx, bcy, brx, bry))
+      if (!head[i] && y >= g - 1) shade[i] = SHADOW // grounded base
     }
 
-  // Inner ears, closed eye (a short shadow line), nose.
-  triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
-    hx + 1.8, hy - hr + 2, hx + 4, hy - hr + 2, hx + 3.7, hy - hr - 1)
-  for (const dx of [-2, -1, 0, 1]) put(overlay, Math.round(hx + dx), Math.round(hy - 0.5 + (dx === -2 || dx === 1 ? 0 : -0.5)), O.OUTLINE)
-  triangle((x, y) => put(overlay, x, y, O.NOSE), hx + hr - 2, hy + 1.5, hx + hr, hy + 1.5, hx + hr - 1, hy + 3)
+  // Soft creases only where forms overlap — a light touch keeps it from looking busy.
+  const crease = (mask, aboveOnly) => {
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        if (!mask[idx(x, y)]) continue
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            if (aboveOnly && dy > 0) continue
+            const nx = x + dx, ny = y + dy
+            if (is(mask, nx, ny) || !inB(nx, ny) || !fur[idx(nx, ny)] || overlay[idx(nx, ny)] === O.OUTLINE) continue
+            if (mask === paw && is(tail, nx, ny)) continue
+            shade[idx(nx, ny)] = Math.max(shade[idx(nx, ny)], SHADOW) // shadow crease, not a hard line
+          }
+      }
+  }
+  crease(tail, true)  // shade the body just above the wrapping tail
+  crease(paw, true)   // shade above the tucked paws
+  put(overlay, 20.5 | 0, g - 3, O.OUTLINE) // hint of a gap between the two paws
+
+  // Closed eye (a short down-curved line), pink nose at the muzzle tip, inner near-ear.
+  put(overlay, hx - 4, hy, O.OUTLINE); put(overlay, hx - 3, hy + 1, O.OUTLINE)
+  put(overlay, hx - 2, hy + 1, O.OUTLINE); put(overlay, hx - 1, hy + 1, O.OUTLINE)
+  put(overlay, hx - 7, hy + 3, O.NOSE); put(overlay, hx - 6, hy + 3, O.NOSE); put(overlay, hx - 6, hy + 4, O.NOSE)
+  triangle((x, y) => { if (head[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
+    hx - 4.2, hy - hr + 2.5, hx - 2.8, hy - hr + 2.5, hx - 3.6, hy - hr)
 
   return { shade, region, overlay, geom: {}, fur }
 }
