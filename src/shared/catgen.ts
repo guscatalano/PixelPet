@@ -387,10 +387,10 @@ export function generateWalkGrid(_preset: Pet, step = 0, motion = 1): Parts {
 
   {
     const tailSway = Math.sin(step * Math.PI * 2) * 2 * motion
-    const p0 = [bodyCx - bodyRx * 0.7, bodyCy], p1 = [bodyCx - bodyRx - 3, bodyCy - 2], p2 = [bodyCx - bodyRx + 1 + tailSway, bodyCy - 10]
-    for (let t = 0; t <= 1.0001; t += 0.06) {
+    const p0 = [bodyCx - bodyRx * 0.7, bodyCy - 1], p1 = [bodyCx - bodyRx - 4, bodyCy - 9], p2 = [bodyCx - bodyRx + 3 + tailSway, bodyCy - 18]
+    for (let t = 0; t <= 1.0001; t += 0.05) {
       const it = 1 - t
-      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], 2.4 - t, 2.4 - t)
+      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], 2.6 - t * 1.1, 2.6 - t * 1.1)
     }
   }
 
@@ -416,8 +416,10 @@ export function generateWalkGrid(_preset: Pet, step = 0, motion = 1): Parts {
     for (let x = 0; x < W; x++) {
       if (!fur[idx(x, y)]) continue
       const tag = legTag[idx(x, y)]
-      if (tag === 2) shade[idx(x, y)] = DEEP
-      else if (tag === 1) shade[idx(x, y)] = SHADOW
+      // Legs are the same white fur as the body — only lightly shaded for depth,
+      // not a dark gray (which read as a different color on a white cat).
+      if (tag === 2) shade[idx(x, y)] = SHADOW // far legs a touch darker
+      else if (tag === 1) shade[idx(x, y)] = BASE // near legs = body tone
       else if (inHead(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, headCx, headCy, headR, headR))
       else if (inBody(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, bodyCx, bodyCy, bodyRx, bodyRy))
       else shade[idx(x, y)] = BASE
