@@ -104,7 +104,14 @@ function buildFur(g, state) {
 
   ellipse(set, g.headCx, (g.headCy + g.bodyCy) / 2 + 1, g.headRx * 0.78, (g.bodyCy - g.headCy) * 0.55)
 
-  ellipse(set, g.headCx, g.headCy, g.headRx, g.headRy)
+  // Head: a touch wider than tall with cheeks, so it reads as a cat's head
+  // rather than a perfect ball.
+  ellipse(set, g.headCx, g.headCy, g.headRx, g.headRy * 0.96)
+  {
+    const chR = g.headRx * 0.46
+    ellipse(set, g.headCx - g.headRx * 0.64, g.headCy + g.headRy * 0.3, chR, chR * 0.8)
+    ellipse(set, g.headCx + g.headRx * 0.64, g.headCy + g.headRy * 0.3, chR, chR * 0.8)
+  }
   if (g.cheekFluff > 0) {
     ellipse(set, g.headCx - g.headRx * 0.8, g.headCy + g.headRy * 0.4, g.cheekFluff, g.cheekFluff * 0.8)
     ellipse(set, g.headCx + g.headRx * 0.8, g.headCy + g.headRy * 0.4, g.cheekFluff, g.cheekFluff * 0.8)
@@ -294,8 +301,12 @@ function drawFace(overlay, fur, g, state) {
   const earBaseY = g.headCy - g.headRy * 0.55
   for (const s of [-1, 1]) {
     const bx = g.headCx + s * g.earSpread
+    // Inner ear: a smaller triangle nudged toward the face centre, leaving a
+    // white rim, so it reads as the ear's pink lining from the front.
+    const iw = g.earW * 0.26
+    const icx = bx - s * 0.5
     triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
-      bx - g.earW / 4, earBaseY, bx + g.earW / 4, earBaseY, bx + s * g.earLean, earBaseY - g.earH * 0.55)
+      icx - iw, earBaseY - 0.5, icx + iw, earBaseY - 0.5, icx + s * g.earLean * 0.4, earBaseY - g.earH * 0.5)
   }
 
   const eyeOpen = state.eyeOpen !== false
@@ -390,10 +401,11 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
   }
   legs.filter((l) => !l.near).forEach(drawLeg)
 
-  // Body + neck + head.
+  // Body + neck + head (with a muzzle pushing forward so it's not a plain ball).
   ellipse(set, bodyCx, bodyCy, bodyRx, bodyRy)
   ellipse(set, (bodyCx + headCx) / 2 + 2, (bodyCy + headCy) / 2 + 1, 6, 5)
-  ellipse(set, headCx, headCy, headR, headR)
+  ellipse(set, headCx, headCy, headR, headR * 0.98)
+  ellipse(set, headCx + headR * 0.72, headCy + 2, 3.3, 2.6)
 
   // Ears.
   triangle(set, headCx - 4, headCy - headR + 2, headCx, headCy - headR + 2, headCx - 4.5, headCy - headR - 4)
@@ -441,14 +453,14 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
       else shade[idx(x, y)] = BASE
     }
 
-  // Face (one side): inner ear, eye, nose, mouth.
+  // Face (one side): inner ear (smaller, white rim), eye, nose on the muzzle, mouth.
   triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
-    headCx + 1.5, headCy - headR + 2, headCx + 4, headCy - headR + 2, headCx + 3.5, headCy - headR - 1.5)
+    headCx + 2, headCy - headR + 1.5, headCx + 3.6, headCy - headR + 1.5, headCx + 3.2, headCy - headR - 1)
   ellipse((x, y) => put(overlay, x, y, O.IRIS), headCx + 1.6, headCy - 0.5, 1.7, 2)
   ellipse((x, y) => put(overlay, x, y, O.PUPIL), headCx + 2, headCy - 0.3, 0.9, 1.4)
   put(overlay, Math.round(headCx + 1.2), Math.round(headCy - 1.3), O.GLINT)
-  triangle((x, y) => put(overlay, x, y, O.NOSE), headCx + headR - 1.5, headCy + 1, headCx + headR + 0.5, headCy + 1, headCx + headR - 0.5, headCy + 2.4)
-  put(overlay, Math.round(headCx + headR - 0.5), Math.round(headCy + 3), O.MOUTH)
+  triangle((x, y) => put(overlay, x, y, O.NOSE), headCx + headR + 0.3, headCy + 1.4, headCx + headR + 2.1, headCy + 1.4, headCx + headR + 1.2, headCy + 2.8)
+  put(overlay, Math.round(headCx + headR + 0.6), Math.round(headCy + 3.4), O.MOUTH)
 
   return { shade, region, overlay, geom: {}, fur }
 }
