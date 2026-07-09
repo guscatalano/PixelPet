@@ -1,6 +1,5 @@
 import { BrowserWindow, screen } from 'electron'
 import type { ClipName, Facing, Personality, PlayCommand, TriggerEvent } from '../../shared/types'
-import { PET_W } from '../../shared/constants'
 import { weightedPick } from './personality'
 
 const MOVE_TICK_MS = 16
@@ -115,7 +114,7 @@ export class PetEngine {
     const wa = screen.getDisplayMatching(this.win.getBounds()).workArea
     const [x, y] = this.win.getPosition()
     const minX = wa.x
-    const maxX = wa.x + wa.width - PET_W
+    const maxX = wa.x + wa.width - this.win.getBounds().width
     if (maxX - minX < MIN_WANDER) {
       this.finishWander()
       return

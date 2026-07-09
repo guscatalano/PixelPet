@@ -21,6 +21,10 @@ const api = {
   /** Subscribe to the walk gait phase (0..1), driven by distance travelled. */
   onWalkStep: (handler: (step: number) => void): void => {
     ipcRenderer.on('pet:walk-step', (_e, step: number) => handler(step))
+  },
+  /** Switch the active pet at runtime; handler receives the new pet's id. */
+  onSetPet: (handler: (petId: string) => void): void => {
+    ipcRenderer.on('pet:set-pet', (_e, petId: string) => handler(petId))
   }
 }
 

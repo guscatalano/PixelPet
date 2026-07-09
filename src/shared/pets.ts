@@ -6,6 +6,14 @@
 // mackerel tabby is "Snowbell" (names were swapped per the user's request).
 
 import type { Pet } from './catgen'
+import type { Personality } from './types'
+
+/**
+ * A fully-specified roster pet. The generator's `Pet` keeps most fields optional
+ * (it only needs `coat`), but every pet in the app has identity + personality, so
+ * app code (settings, behavior) can rely on them.
+ */
+export type AppPet = Pet & { id: string; name: string; blurb: string; personality: Personality }
 
 const NORMAL = {}
 const CHONKY = { bodyRx: 15, bodyRy: 12.5, headRx: 11.5, headRy: 10.5, earSpread: 8 }
@@ -16,7 +24,7 @@ const BIGEARS = { earH: 12.5, earW: 8.5, earSpread: 8 }
 
 const g = (arch: object, extra: object = {}): object => ({ ...arch, ...extra })
 
-export const PETS: Pet[] = [
+export const PETS: AppPet[] = [
   // The user's pet: the white solid cat, named "Ash", with yellow eyes.
   { id: 'ash', name: 'Ash', blurb: 'A serene, cloud-soft house cat.',
     geom: g(NORMAL), marking: 'solid',
@@ -120,5 +128,5 @@ export const PETS: Pet[] = [
     personality: { energy: 0.6, sleepiness: 0.4, affection: 0.85, mischief: 0.4, curiosity: 0.6, independence: 0.3 } }
 ]
 
-/** The currently active desktop pet. */
-export const DEFAULT_PET: Pet = PETS.find((p) => p.id === 'ash') as Pet
+/** The default desktop pet (used until the user picks another in Settings). */
+export const DEFAULT_PET: AppPet = PETS.find((p) => p.id === 'ash') as AppPet

@@ -31,3 +31,19 @@ export interface Personality {
   curiosity: number
   independence: number
 }
+
+/** The six personality axes, in display order. */
+export const TRAIT_KEYS: Array<keyof Personality> = [
+  'energy', 'sleepiness', 'affection', 'mischief', 'curiosity', 'independence'
+]
+
+/**
+ * Persisted app settings (written to userData/settings.json). `overrides` holds
+ * per-pet personality tweaks the user made in Settings; the effective personality
+ * of a pet is its preset traits merged with its overrides.
+ */
+export interface AppSettings {
+  activePetId: string
+  scale: number
+  overrides: Record<string, Partial<Personality>>
+}

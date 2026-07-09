@@ -2,7 +2,7 @@ import { resolve } from 'node:path'
 import { defineConfig } from 'electron-vite'
 
 // Multi-window renderer: each HTML entry is one BrowserWindow.
-// `pet` is the desktop pet overlay. `settings` will be added in a later milestone.
+// `pet` is the desktop pet overlay; `settings` is the pet-picker/tuning window.
 export default defineConfig({
   main: {
     build: {
@@ -14,7 +14,10 @@ export default defineConfig({
   preload: {
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/preload/index.ts') }
+        input: {
+          index: resolve(__dirname, 'src/preload/index.ts'),
+          settings: resolve(__dirname, 'src/preload/settings.ts')
+        }
       }
     }
   },
@@ -23,7 +26,8 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          pet: resolve(__dirname, 'src/renderer/pet.html')
+          pet: resolve(__dirname, 'src/renderer/pet.html'),
+          settings: resolve(__dirname, 'src/renderer/settings.html')
         }
       }
     }

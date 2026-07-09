@@ -1,6 +1,6 @@
-import { PET_H, PET_W, SCALE, SPRITE_H, SPRITE_TOP, SPRITE_W } from '../../shared/constants'
-import { generateGrid, generateWalkGrid, generateCurlGrid, render as renderPet, type AnimState } from '../../shared/catgen'
-import { DEFAULT_PET } from '../../shared/pets'
+import { SPRITE_H, SPRITE_TOP, SPRITE_W } from '../../shared/constants'
+import { generateGrid, generateWalkGrid, generateCurlGrid, render as renderPet, type AnimState, type Pet } from '../../shared/catgen'
+import { DEFAULT_PET, PETS } from '../../shared/pets'
 import type { ClipName, Facing, PlayCommand, TriggerEvent } from '../../shared/types'
 
 // ---- Bridge typing (exposed by preload) ------------------------------------
@@ -12,6 +12,7 @@ interface PetApi {
   clipEnded: (clip: string) => void
   onPlay: (handler: (cmd: PlayCommand) => void) => void
   onWalkStep: (handler: (step: number) => void) => void
+  onSetPet: (handler: (petId: string) => void) => void
 }
 declare global {
   interface Window {
@@ -33,8 +34,10 @@ function rgbaToCanvas(rgba: Uint8ClampedArray): HTMLCanvasElement {
   cx.putImageData(img, 0, 0)
   return c
 }
+// The active pet is mutable: Settings can swap it at runtime (see onSetPet).
+let activePet: Pet = DEFAULT_PET
 const frameRGBA = (state: AnimState): Uint8ClampedArray =>
-  renderPet(generateGrid(DEFAULT_PET, state), DEFAULT_PET.coat)
+  renderPet(generateGrid(activePet, state), activePet.coat)
 
 // Frames are generated on demand and cached by quantized state, so the tail can
 // sway continuously while eye/ear expressions layer on top without ever snapping.
@@ -58,7 +61,7 @@ function getCurlFrame(breath: number): HTMLCanvasElement {
   const s = ((Math.round((breath / (Math.PI * 2)) * CURL_QUANT) % CURL_QUANT) + CURL_QUANT) % CURL_QUANT
   let c = curlCache.get(s)
   if (!c) {
-    c = rgbaToCanvas(renderPet(generateCurlGrid(DEFAULT_PET, (s / CURL_QUANT) * Math.PI * 2), DEFAULT_PET.coat))
+    c = rgbaToCanvas(renderPet(generateCurlGrid(activePet, (s / CURL_QUANT) * Math.PI * 2), activePet.coat))
     curlCache.set(s, c)
   }
   return c
@@ -72,27 +75,60 @@ function getWalkFrame(step: number): HTMLCanvasElement {
   const s = ((Math.round(step * WALK_QUANT) % WALK_QUANT) + WALK_QUANT) % WALK_QUANT
   let c = walkCache.get(s)
   if (!c) {
-    c = rgbaToCanvas(renderPet(generateWalkGrid(DEFAULT_PET, s / WALK_QUANT), DEFAULT_PET.coat))
+    c = rgbaToCanvas(renderPet(generateWalkGrid(activePet, s / WALK_QUANT), activePet.coat))
     walkCache.set(s, c)
   }
   return c
 }
 
-// Per-pixel hit mask from a neutral frame's opaque pixels.
-const baseRGBA = frameRGBA({ eyeOpen: true, tailPhase: 0 })
-const hitMask: boolean[] = new Array(SPRITE_W * SPRITE_H)
-for (let i = 0; i < SPRITE_W * SPRITE_H; i++) hitMask[i] = baseRGBA[i * 4 + 3] > 0
+// Per-pixel hit mask from a neutral frame's opaque pixels. Rebuilt when the pet
+// swaps, since a different pet has a different silhouette.
+let hitMask: boolean[] = buildHitMask()
+function buildHitMask(): boolean[] {
+  const base = frameRGBA({ eyeOpen: true, tailPhase: 0 })
+  const mask = new Array<boolean>(SPRITE_W * SPRITE_H)
+  for (let i = 0; i < SPRITE_W * SPRITE_H; i++) mask[i] = base[i * 4 + 3] > 0
+  return mask
+}
 
 // ---- Main canvas setup -----------------------------------------------------
+// SCALE is runtime: the pet window can be resized in Settings. We derive the
+// current scale from the window size (main owns it), and recompute on resize.
 const canvas = document.getElementById('pet') as HTMLCanvasElement
 const dpr = window.devicePixelRatio || 1
-canvas.style.width = `${PET_W}px`
-canvas.style.height = `${PET_H}px`
-canvas.width = Math.round(PET_W * dpr)
-canvas.height = Math.round(PET_H * dpr)
 const ctx = canvas.getContext('2d')!
-ctx.scale(dpr, dpr)
-ctx.imageSmoothingEnabled = false
+let scale = 4
+let petW = 0
+let petH = 0
+let FEET_X = 0
+let FEET_Y = 0
+
+function applyScale(): void {
+  scale = Math.max(1, Math.round(window.innerWidth / SPRITE_W))
+  petW = SPRITE_W * scale
+  petH = (SPRITE_H + SPRITE_TOP * 2) * scale
+  canvas.style.width = `${petW}px`
+  canvas.style.height = `${petH}px`
+  canvas.width = Math.round(petW * dpr)
+  canvas.height = Math.round(petH * dpr)
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.imageSmoothingEnabled = false
+  FEET_X = (SPRITE_W / 2) * scale
+  FEET_Y = (SPRITE_TOP + SPRITE_H) * scale
+}
+applyScale()
+window.addEventListener('resize', applyScale)
+
+// Swap the active pet at runtime: regenerate frames + hit mask from the new pet.
+window.pet.onSetPet((petId: string) => {
+  const next = PETS.find((p) => p.id === petId)
+  if (!next || next === activePet) return
+  activePet = next
+  frameCache.clear()
+  curlCache.clear()
+  walkCache.clear()
+  hitMask = buildHitMask()
+})
 
 // ---- Play state (driven by the main-process behavior engine) ---------------
 let clip: ClipName = 'idle'
@@ -172,18 +208,15 @@ function idleAnim(now: number): Anim {
 }
 
 // ---- Rendering -------------------------------------------------------------
-const FEET_X = (SPRITE_W / 2) * SCALE
-const FEET_Y = (SPRITE_TOP + SPRITE_H) * SCALE
-
 function drawZzz(now: number): void {
   const chars = ['z', 'z', 'Z']
   for (let i = 0; i < chars.length; i++) {
     const t = (now / 750 + i * 0.4) % 1
-    const px = (SPRITE_W * 0.62 + i * 1.5) * SCALE + t * 4 * SCALE * 0.4
-    const py = (SPRITE_TOP + 6 - t * 9) * SCALE
+    const px = (SPRITE_W * 0.62 + i * 1.5) * scale + t * 4 * scale * 0.4
+    const py = (SPRITE_TOP + 6 - t * 9) * scale
     ctx.globalAlpha = 1 - t
     ctx.fillStyle = '#9aa8c8'
-    ctx.font = `${(3 + i) * SCALE * 0.55}px monospace`
+    ctx.font = `${(3 + i) * scale * 0.55}px monospace`
     ctx.fillText(chars[i], px, py)
   }
   ctx.globalAlpha = 1
@@ -198,14 +231,14 @@ function render(now: number): void {
     window.pet.clipEnded('react')
   }
 
-  ctx.clearRect(0, 0, PET_W, PET_H)
+  ctx.clearRect(0, 0, petW, petH)
 
   const flip = facing === 'left' ? -1 : 1
   ctx.save()
   // Only an integer horizontal flip for facing — no fractional scaling.
   ctx.translate(FEET_X, FEET_Y)
   ctx.scale(flip, 1)
-  ctx.drawImage(a.frame, 0, 0, SPRITE_W, SPRITE_H, -(SPRITE_W / 2) * SCALE, -SPRITE_H * SCALE, SPRITE_W * SCALE, SPRITE_H * SCALE)
+  ctx.drawImage(a.frame, 0, 0, SPRITE_W, SPRITE_H, -(SPRITE_W / 2) * scale, -SPRITE_H * scale, SPRITE_W * scale, SPRITE_H * scale)
   ctx.restore()
 
   if (a.overlay === 'zzz') drawZzz(now)
@@ -217,8 +250,8 @@ requestAnimationFrame(render)
 // ---- Hit testing: is (clientX, clientY) over an opaque cat pixel? -----------
 // Uses the nominal (un-transformed) silhouette; good enough for hover/click.
 function isOverCat(clientX: number, clientY: number): boolean {
-  const nx = Math.floor(clientX / SCALE)
-  const ny = Math.floor(clientY / SCALE) - SPRITE_TOP
+  const nx = Math.floor(clientX / scale)
+  const ny = Math.floor(clientY / scale) - SPRITE_TOP
   if (nx < 0 || nx >= SPRITE_W || ny < 0 || ny >= SPRITE_H) return false
   return hitMask[ny * SPRITE_W + nx] === true
 }
