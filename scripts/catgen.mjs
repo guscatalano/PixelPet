@@ -451,6 +451,66 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
   return { shade, region, overlay, geom: {}, fur }
 }
 
+// ---- curled-up sleep pose --------------------------------------------------
+// A cat curled into a ball: a rounded body, head tucked at the front, ears up,
+// tail wrapped around the front, eyes closed. `breath` (radians) drives a slow
+// belly rise/fall (the ball's bottom stays on the ground).
+export function generateCurlGrid(preset, breath = 0) {
+  const fur = new Uint8Array(W * H)
+  const set = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
+
+  const groundY = 42
+  const br = Math.sin(breath)
+  const rx = 13, ry = 10.6 + br * 0.5
+  const cx = 20, cy = groundY - ry // bottom rests on the ground; top breathes
+  const hx = 31, hr = 6.2, hy = cy + 3.5 // head tucked low at the front
+
+  // Tail wraps around the front (drawn first, behind the body).
+  {
+    const p0 = [cx - rx * 0.5, cy + ry * 0.4], p1 = [cx - 1, groundY + 1.5], p2 = [hx - 3, cy + 4]
+    for (let t = 0; t <= 1.0001; t += 0.05) {
+      const it = 1 - t
+      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], 2.7 - t, 2.7 - t)
+    }
+  }
+  ellipse(set, cx, cy, rx, ry) // body ball
+  ellipse(set, hx, hy, hr, hr) // tucked head
+  triangle(set, hx - 2.5, hy - hr + 2, hx + 0.5, hy - hr + 2, hx - 1.5, hy - hr - 3.5) // near ear
+  triangle(set, hx + 1.5, hy - hr + 2, hx + 4.5, hy - hr + 2, hx + 4, hy - hr - 2.5) // far ear
+
+  const shade = new Uint8Array(W * H)
+  const region = new Uint8Array(W * H)
+  const overlay = new Uint8Array(W * H)
+
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (fur[idx(x, y)]) continue
+      let near = false
+      for (let dy = -1; dy <= 1 && !near; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (inB(x + dx, y + dy) && fur[idx(x + dx, y + dy)]) { near = true; break }
+      if (near) overlay[idx(x, y)] = O.OUTLINE
+    }
+
+  const inBall = (x, y) => ((x - cx) / (rx + 0.5)) ** 2 + ((y - cy) / (ry + 0.5)) ** 2 <= 1.05
+  const inHead = (x, y) => ((x - hx) / (hr + 0.5)) ** 2 + ((y - hy) / (hr + 0.5)) ** 2 <= 1.05
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!fur[idx(x, y)]) continue
+      if (inHead(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, hx, hy, hr, hr))
+      else if (inBall(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, cx, cy, rx, ry))
+      else shade[idx(x, y)] = SHADOW // tail, tucked in shadow
+    }
+
+  // Inner ears, closed eye (a short shadow line), nose.
+  triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
+    hx + 1.8, hy - hr + 2, hx + 4, hy - hr + 2, hx + 3.7, hy - hr - 1)
+  for (const dx of [-2, -1, 0, 1]) put(overlay, Math.round(hx + dx), Math.round(hy - 0.5 + (dx === -2 || dx === 1 ? 0 : -0.5)), O.OUTLINE)
+  triangle((x, y) => put(overlay, x, y, O.NOSE), hx + hr - 2, hy + 1.5, hx + hr, hy + 1.5, hx + hr - 1, hy + 3)
+
+  return { shade, region, overlay, geom: {}, fur }
+}
+
 // ---- color -----------------------------------------------------------------
 function hexToRgb(h) { h = h.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)] }
 function mix(a, b, t) { return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)] }

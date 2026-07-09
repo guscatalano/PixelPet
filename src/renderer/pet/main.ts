@@ -1,5 +1,5 @@
 import { PET_H, PET_W, SCALE, SPRITE_H, SPRITE_TOP, SPRITE_W } from '../../shared/constants'
-import { generateGrid, generateWalkGrid, render as renderPet, type AnimState } from '../../shared/catgen'
+import { generateGrid, generateWalkGrid, generateCurlGrid, render as renderPet, type AnimState } from '../../shared/catgen'
 import { DEFAULT_PET } from '../../shared/pets'
 import type { ClipName, Facing, PlayCommand, TriggerEvent } from '../../shared/types'
 
@@ -50,6 +50,19 @@ function getFrame(eyeOpen: boolean, tailPhase: number, look: number, earPhase: n
   return c
 }
 const tailAt = (now: number, speed: number): number => Math.sin(now / speed)
+
+// Curled-up sleep frames, cached by quantized breathing phase.
+const CURL_QUANT = 12
+const curlCache = new Map<number, HTMLCanvasElement>()
+function getCurlFrame(breath: number): HTMLCanvasElement {
+  const s = ((Math.round((breath / (Math.PI * 2)) * CURL_QUANT) % CURL_QUANT) + CURL_QUANT) % CURL_QUANT
+  let c = curlCache.get(s)
+  if (!c) {
+    c = rgbaToCanvas(renderPet(generateCurlGrid(DEFAULT_PET, (s / CURL_QUANT) * Math.PI * 2), DEFAULT_PET.coat))
+    curlCache.set(s, c)
+  }
+  return c
+}
 
 // Side-profile walk frames, cached by quantized step of the gait cycle.
 const WALK_QUANT = 8 // gait frames per cycle. Pixel-art walks use ~4-8 crisp
@@ -140,7 +153,7 @@ function computeAnim(now: number): Anim {
     case 'walk':
       return { frame: getWalkFrame(walkStep), overlay: 'none' }
     case 'sleep':
-      return { frame: getFrame(false, tailAt(now, 2600), 0, 0), overlay: 'zzz' }
+      return { frame: getCurlFrame((now / 1800) % (Math.PI * 2)), overlay: 'zzz' }
     case 'react': {
       // A gentle "noticed you": quick blink, then a glance toward you.
       if (elapsed >= REACT_MS) return idleAnim(now)
