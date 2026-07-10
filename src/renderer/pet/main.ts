@@ -136,8 +136,20 @@ let facing: Facing = 'right'
 let clipStart = performance.now()
 let reactEndedSent = false
 
+// Cross-fade between poses so clip changes (idle↔walk↔sleep↔react) dissolve
+// instead of snapping. On a clip change we snapshot the last drawn frame and
+// fade it out as the new pose fades in.
+const TRANS_MS = 180
+let lastFrame: HTMLCanvasElement | null = null
+let prevFrame: HTMLCanvasElement | null = null
+let prevFacing: Facing = 'right'
+let transStart = -Infinity
+
 window.pet.onPlay((cmd: PlayCommand) => {
   if (cmd.clip !== clip) {
+    prevFrame = lastFrame // fade the pose we were just showing out
+    prevFacing = facing
+    transStart = performance.now()
     clip = cmd.clip
     clipStart = performance.now()
     reactEndedSent = false
@@ -222,8 +234,20 @@ function drawZzz(now: number): void {
   ctx.globalAlpha = 1
 }
 
+// Draw one sprite frame at the feet anchor, flipped for facing, at `alpha`.
+function drawSprite(frame: HTMLCanvasElement, fc: Facing, alpha: number): void {
+  ctx.save()
+  ctx.globalAlpha = alpha
+  ctx.translate(FEET_X, FEET_Y)
+  ctx.scale(fc === 'left' ? -1 : 1, 1) // integer flip only — no fractional scaling
+  ctx.drawImage(frame, 0, 0, SPRITE_W, SPRITE_H, -(SPRITE_W / 2) * scale, -SPRITE_H * scale, SPRITE_W * scale, SPRITE_H * scale)
+  ctx.restore()
+  ctx.globalAlpha = 1
+}
+
 function render(now: number): void {
   const a = computeAnim(now)
+  lastFrame = a.frame // remember for the next clip-change cross-fade
 
   // Signal one-shot completion once.
   if (clip === 'react' && now - clipStart >= REACT_MS && !reactEndedSent) {
@@ -233,13 +257,14 @@ function render(now: number): void {
 
   ctx.clearRect(0, 0, petW, petH)
 
-  const flip = facing === 'left' ? -1 : 1
-  ctx.save()
-  // Only an integer horizontal flip for facing — no fractional scaling.
-  ctx.translate(FEET_X, FEET_Y)
-  ctx.scale(flip, 1)
-  ctx.drawImage(a.frame, 0, 0, SPRITE_W, SPRITE_H, -(SPRITE_W / 2) * scale, -SPRITE_H * scale, SPRITE_W * scale, SPRITE_H * scale)
-  ctx.restore()
+  const t = (now - transStart) / TRANS_MS
+  if (prevFrame && t < 1) {
+    drawSprite(prevFrame, prevFacing, 1 - t) // outgoing pose fades out
+    drawSprite(a.frame, facing, t) // incoming pose fades in
+  } else {
+    prevFrame = null
+    drawSprite(a.frame, facing, 1)
+  }
 
   if (a.overlay === 'zzz') drawZzz(now)
 

@@ -1,5 +1,5 @@
-import { generateGrid, render as renderPet } from '../../shared/catgen'
-import { PETS } from '../../shared/pets'
+import { generateGrid, generateWalkGrid, generateCurlGrid, render as renderPet, type AnimState } from '../../shared/catgen'
+import { PETS, type AppPet } from '../../shared/pets'
 import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
 import { TRAIT_KEYS, type AppSettings, type Personality } from '../../shared/types'
 
@@ -19,8 +19,65 @@ const SIZE_LABELS: Record<number, string> = { 3: 'S', 4: 'M', 5: 'L', 6: 'XL', 7
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T
 const grid = $('grid'), sizes = $('sizes'), rows = $('rows'), who = $('who'), resetBtn = $<HTMLButtonElement>('reset')
+const posesEl = $('poses'), poseWho = $('poseWho')
 
 let state: AppSettings
+
+// ---- Pose previews: the active pet animated in each clip --------------------
+// A blit target per pose; a single rAF loop redraws them (throttled) from the
+// generator, so you can see how a pet looks idling, walking, sleeping, reacting.
+function idleState(t: number): AnimState {
+  const blink = t % 3200 < 140
+  return { eyeOpen: !blink, tailPhase: Math.sin(t / 1600), look: 0, earPhase: 0 }
+}
+function reactState(t: number): AnimState {
+  const p = t % 2000
+  if (p < 140) return { eyeOpen: false, tailPhase: 0.2, look: 0, earPhase: 1 }
+  if (p < 950) return { eyeOpen: true, tailPhase: 0.3, look: 1, earPhase: 0 }
+  return { eyeOpen: true, tailPhase: Math.sin(t / 1400), look: 0, earPhase: 0 }
+}
+const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) => Uint8ClampedArray }> = [
+  { key: 'idle', label: 'Idle', rgba: (pet, t) => renderPet(generateGrid(pet, idleState(t)), pet.coat) },
+  { key: 'walk', label: 'Walk', rgba: (pet, t) => renderPet(generateWalkGrid(pet, (t / 900) % 1), pet.coat) },
+  { key: 'sleep', label: 'Sleep', rgba: (pet, t) => renderPet(generateCurlGrid(pet, (t / 1500) % (Math.PI * 2)), pet.coat) },
+  { key: 'react', label: 'React', rgba: (pet, t) => renderPet(generateGrid(pet, reactState(t)), pet.coat) }
+]
+const poseCanvases: CanvasRenderingContext2D[] = []
+
+function buildPoses(): void {
+  posesEl.innerHTML = ''
+  poseCanvases.length = 0
+  for (const pose of POSES) {
+    const tile = document.createElement('div')
+    tile.className = 'pose'
+    const c = document.createElement('canvas')
+    c.width = SPRITE_W
+    c.height = SPRITE_H
+    const label = document.createElement('div')
+    label.className = 'pl'
+    label.textContent = pose.label
+    tile.append(c, label)
+    posesEl.append(tile)
+    poseCanvases.push(c.getContext('2d')!)
+  }
+}
+
+let poseLast = 0
+function animatePoses(t: number): void {
+  requestAnimationFrame(animatePoses)
+  if (t - poseLast < 66) return // ~15fps is plenty for these gentle loops
+  poseLast = t
+  const pet = PETS.find((p) => p.id === state?.activePetId)
+  if (!pet) return
+  POSES.forEach((pose, i) => {
+    const cx = poseCanvases[i]
+    if (!cx) return
+    const img = cx.createImageData(SPRITE_W, SPRITE_H)
+    img.data.set(pose.rgba(pet, t))
+    cx.clearRect(0, 0, SPRITE_W, SPRITE_H)
+    cx.putImageData(img, 0, 0)
+  })
+}
 
 /** A pet's effective traits: preset defaults merged with the user's overrides. */
 function effective(petId: string): Personality {
@@ -108,6 +165,7 @@ function selectPet(petId: string): void {
   state.activePetId = petId
   window.settings.setPet(petId)
   for (const card of grid.children) card.classList.toggle('active', (card as HTMLElement).dataset.id === petId)
+  poseWho.textContent = PETS.find((p) => p.id === petId)?.name ?? ''
   buildTraits()
 }
 
@@ -119,8 +177,11 @@ resetBtn.addEventListener('click', () => {
 
 async function init(): Promise<void> {
   state = await window.settings.get()
+  poseWho.textContent = PETS.find((p) => p.id === state.activePetId)?.name ?? ''
   buildGrid()
+  buildPoses()
   buildSizes()
   buildTraits()
+  requestAnimationFrame(animatePoses)
 }
 init()

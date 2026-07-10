@@ -86,6 +86,18 @@
       .traits-head .who b { color: var(--accent); }
       .link { background: none; border: 0; color: var(--faint); font-size: 12px; cursor: pointer; font-family: var(--sans); }
       .link:hover { color: var(--accent); text-decoration: underline; }
+
+      /* Pose previews */
+      .poses { display: flex; gap: 12px; flex-wrap: wrap; }
+      .pose {
+        background: var(--panel); border: 1px solid var(--hair); border-radius: 12px;
+        padding: 10px 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 7px; flex: 1; min-width: 104px;
+      }
+      .pose canvas {
+        width: 104px; height: 104px; image-rendering: pixelated;
+        background: radial-gradient(60% 60% at 50% 55%, #30323f, #23252f); border-radius: 8px;
+      }
+      .pose .pl { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
     </style>
   </head>
   <body>
@@ -96,6 +108,11 @@
       <section>
         <div class="label">Your pet</div>
         <div class="grid" id="grid"></div>
+      </section>
+
+      <section>
+        <div class="label">Poses &middot; <span id="poseWho">Ash</span></div>
+        <div class="poses" id="poses"></div>
       </section>
 
       <section>
