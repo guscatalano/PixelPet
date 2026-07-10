@@ -19,9 +19,26 @@ const SIZE_LABELS: Record<number, string> = { 3: 'S', 4: 'M', 5: 'L', 6: 'XL', 7
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T
 const grid = $('grid'), sizes = $('sizes'), rows = $('rows'), who = $('who'), resetBtn = $<HTMLButtonElement>('reset')
-const posesEl = $('poses'), poseWho = $('poseWho')
+const posesEl = $('poses'), poseWho = $('poseWho'), petid = $('petid'), mod = $('mod')
 
 let state: AppSettings
+
+/** True if the active pet has any user-customized traits. */
+function isCustomized(petId: string): boolean {
+  const ov = state.overrides[petId]
+  return !!ov && Object.keys(ov).length > 0
+}
+
+/** Reflect the active pet's identity + whether its traits are customized. */
+function refreshMeta(): void {
+  const pet = PETS.find((p) => p.id === state.activePetId)!
+  petid.replaceChildren(Object.assign(document.createElement('b'), { textContent: pet.name }),
+    document.createTextNode(` — ${pet.blurb}`))
+  poseWho.textContent = pet.name
+  const custom = isCustomized(pet.id)
+  mod.textContent = custom ? '· customized' : ''
+  resetBtn.disabled = !custom
+}
 
 // ---- Pose previews: the active pet animated in each clip --------------------
 // A blit target per pose; a single rAF loop redraws them (throttled) from the
@@ -106,12 +123,18 @@ function buildGrid(): void {
     card.className = 'card' + (pet.id === state.activePetId ? ' active' : '')
     card.dataset.id = pet.id
     card.title = pet.blurb
+    card.tabIndex = 0 // keyboard focusable
+    card.setAttribute('role', 'button')
+    card.setAttribute('aria-label', `${pet.name} — ${pet.blurb}`)
     card.append(thumbnail(pet.id))
     const nm = document.createElement('div')
     nm.className = 'nm'
     nm.textContent = pet.name
     card.append(nm)
     card.addEventListener('click', () => selectPet(pet.id))
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPet(pet.id) }
+    })
     grid.append(card)
   }
 }
@@ -154,6 +177,7 @@ function buildTraits(): void {
       const v = Number(slider.value) / 100
       ;(state.overrides[pet.id] ??= {})[key] = v
       window.settings.setTrait(pet.id, key, v)
+      refreshMeta()
     })
     row.append(name, slider, val)
     rows.append(row)
@@ -165,23 +189,27 @@ function selectPet(petId: string): void {
   state.activePetId = petId
   window.settings.setPet(petId)
   for (const card of grid.children) card.classList.toggle('active', (card as HTMLElement).dataset.id === petId)
-  poseWho.textContent = PETS.find((p) => p.id === petId)?.name ?? ''
   buildTraits()
+  refreshMeta()
 }
 
 resetBtn.addEventListener('click', () => {
+  if (resetBtn.disabled) return
   delete state.overrides[state.activePetId]
   window.settings.resetTraits(state.activePetId)
   buildTraits()
+  refreshMeta()
 })
 
 async function init(): Promise<void> {
   state = await window.settings.get()
-  poseWho.textContent = PETS.find((p) => p.id === state.activePetId)?.name ?? ''
   buildGrid()
   buildPoses()
   buildSizes()
   buildTraits()
+  refreshMeta()
+  // Make sure the current cat is visible even if it's far down the grid.
+  grid.querySelector('.card.active')?.scrollIntoView({ block: 'nearest' })
   requestAnimationFrame(animatePoses)
 }
 init()

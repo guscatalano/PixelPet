@@ -53,6 +53,7 @@
         gap: 6px; cursor: pointer; transition: border-color 0.12s, background 0.12s, transform 0.08s;
       }
       .card:hover { border-color: var(--faint); transform: translateY(-1px); }
+      .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
       .card.active { border-color: var(--accent); background: var(--accent-soft); }
       .card canvas {
         width: 72px; height: 72px; image-rendering: pixelated;
@@ -86,6 +87,13 @@
       .traits-head .who b { color: var(--accent); }
       .link { background: none; border: 0; color: var(--faint); font-size: 12px; cursor: pointer; font-family: var(--sans); }
       .link:hover { color: var(--accent); text-decoration: underline; }
+      .link:disabled { opacity: 0.4; cursor: default; }
+      .link:disabled:hover { color: var(--faint); text-decoration: none; }
+
+      /* Selected-pet identity line */
+      .petid { margin-top: 13px; font-size: 13px; color: var(--dim); }
+      .petid b { color: var(--accent); font-weight: 600; }
+      .traits-head .mod { color: var(--accent); font-size: 11px; font-family: var(--mono); letter-spacing: 0.06em; margin-left: 6px; }
 
       /* Pose previews */
       .poses { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -108,6 +116,7 @@
       <section>
         <div class="label">Your pet</div>
         <div class="grid" id="grid"></div>
+        <div class="petid" id="petid"></div>
       </section>
 
       <section>
@@ -124,7 +133,7 @@
         <div class="label">Personality</div>
         <div class="traits">
           <div class="traits-head">
-            <div class="who">Tuning <b id="who">Ash</b></div>
+            <div class="who">Tuning <b id="who">Ash</b><span class="mod" id="mod"></span></div>
             <button class="link" id="reset">Reset to defaults</button>
           </div>
           <div id="rows"></div>
