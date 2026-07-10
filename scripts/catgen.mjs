@@ -459,10 +459,13 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
   ellipse((x, y) => put(overlay, x, y, O.IRIS), headCx + 1.6, headCy - 0.5, 1.7, 2)
   ellipse((x, y) => put(overlay, x, y, O.PUPIL), headCx + 2, headCy - 0.3, 0.9, 1.4)
   put(overlay, Math.round(headCx + 1.2), Math.round(headCy - 1.3), O.GLINT)
-  // Nose sits on the muzzle (guarded to fur so it can't float past the edge).
+  // A small pink nose at the muzzle's front tip, with a short mouth line curving
+  // back under it (guarded to fur so nothing floats off the muzzle).
   triangle((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) },
-    headCx + headR - 1.2, headCy + 1.4, headCx + headR + 0.4, headCy + 1.4, headCx + headR - 0.4, headCy + 2.6)
-  put(overlay, Math.round(headCx + headR - 0.4), Math.round(headCy + 3.2), O.MOUTH)
+    headCx + headR - 1.4, headCy + 0.4, headCx + headR + 0.2, headCy + 0.4, headCx + headR - 0.6, headCy + 1.7)
+  for (const [mx, my] of [[headCx + headR - 1.4, headCy + 2.2], [headCx + headR - 2.4, headCy + 2.4]]) {
+    if (fur[idx(Math.round(mx), Math.round(my))]) put(overlay, Math.round(mx), Math.round(my), O.MOUTH)
+  }
 
   return { shade, region, overlay, geom: {}, fur }
 }
