@@ -444,13 +444,10 @@ export function generateWalkGrid(_preset: Pet, step = 0, motion = 1): Parts {
   ellipse((x, y) => put(overlay, x, y, O.IRIS), headCx + 1.6, headCy - 0.5, 1.7, 2)
   ellipse((x, y) => put(overlay, x, y, O.PUPIL), headCx + 2, headCy - 0.3, 0.9, 1.4)
   put(overlay, Math.round(headCx + 1.2), Math.round(headCy - 1.3), O.GLINT)
-  // A tiny nose + short mouth at the front of the face. A dark mark (not a pink
-  // blob) reads as a nose/mouth on a white cat instead of a wart (ref study).
-  const nfx = headCx + headR - 1.2, nfy = headCy + 1.4
+  // Just a tiny nose at the front of the face (no mouth line — a dark trail on
+  // a white profile reads as a smudge, ref cats keep it to the nose).
+  const nfx = headCx + headR - 1, nfy = headCy + 0.8
   if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
-  for (const [mx, my] of [[nfx - 0.6, nfy + 1], [nfx - 1.6, nfy + 1.3]]) {
-    if (fur[idx(Math.round(mx), Math.round(my))]) put(overlay, Math.round(mx), Math.round(my), O.MOUTH)
-  }
 
   return { shade, region, overlay, geom: defaultGeom(), fur }
 }
