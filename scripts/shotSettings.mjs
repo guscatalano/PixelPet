@@ -20,7 +20,9 @@ app.whenReady().then(async () => {
     webPreferences: { preload: resolve(root, 'out/preload/settings.js'), sandbox: false }
   })
   win.webContents.on('console-message', (_e, lvl, msg, line, src) => console.log(`[console:${lvl}] ${msg} (${src}:${line})`))
-  await win.loadFile(resolve(root, 'out/renderer/settings.html'))
+  win.webContents.on('render-process-gone', (_e, d) => console.log('[gone] ' + d.reason))
+  if (process.env.DEVURL) await win.loadURL(process.env.DEVURL)
+  else await win.loadFile(resolve(root, 'out/renderer/settings.html'))
   await new Promise((r) => setTimeout(r, 900))
   if (process.env.SCROLLTO) await win.webContents.executeJavaScript(`document.getElementById('${process.env.SCROLLTO}').scrollIntoView({block:'center'})`)
   else if (process.env.SCROLL) await win.webContents.executeJavaScript('window.scrollTo(0, document.body.scrollHeight)')
