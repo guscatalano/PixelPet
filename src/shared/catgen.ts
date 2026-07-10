@@ -392,8 +392,9 @@ export function generateWalkGrid(_preset: Pet, step = 0, motion = 1): Parts {
   ellipse(set, bodyCx, bodyCy, bodyRx, bodyRy)
   ellipse(set, (bodyCx + headCx) / 2 + 2, (bodyCy + headCy) / 2 + 1, 6, 5)
   // Head with a muzzle pushing forward so it's not a plain ball.
-  ellipse(set, headCx, headCy, headR, headR * 0.98)
-  ellipse(set, headCx + headR * 0.6, headCy + 1.6, 3.1, 2.6) // gentle muzzle
+  // Round head, no protruding muzzle — pixel cats read better with a rounded
+  // head + a tiny nose near the eye than with a snout + a lone nose (ref study).
+  ellipse(set, headCx, headCy, headR * 1.02, headR * 0.98)
 
   triangle(set, headCx - 4, headCy - headR + 2, headCx, headCy - headR + 2, headCx - 4.5, headCy - headR - 4)
   triangle(set, headCx + 1, headCy - headR + 2, headCx + 5, headCy - headR + 2, headCx + 4, headCy - headR - 4)
@@ -443,10 +444,12 @@ export function generateWalkGrid(_preset: Pet, step = 0, motion = 1): Parts {
   ellipse((x, y) => put(overlay, x, y, O.IRIS), headCx + 1.6, headCy - 0.5, 1.7, 2)
   ellipse((x, y) => put(overlay, x, y, O.PUPIL), headCx + 2, headCy - 0.3, 0.9, 1.4)
   put(overlay, Math.round(headCx + 1.2), Math.round(headCy - 1.3), O.GLINT)
-  // A minimal 2px nose right at the muzzle's front point (mid-height), so it
-  // reads as a nose tip rather than a pink spot on the cheek.
-  for (const [nx, ny] of [[headCx + headR - 0.7, headCy + 1.1], [headCx + headR - 1.6, headCy + 1.2]]) {
-    if (fur[idx(Math.round(nx), Math.round(ny))]) put(overlay, Math.round(nx), Math.round(ny), O.NOSE)
+  // A tiny nose + short mouth at the front of the face. A dark mark (not a pink
+  // blob) reads as a nose/mouth on a white cat instead of a wart (ref study).
+  const nfx = headCx + headR - 1.2, nfy = headCy + 1.4
+  if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+  for (const [mx, my] of [[nfx - 0.6, nfy + 1], [nfx - 1.6, nfy + 1.3]]) {
+    if (fur[idx(Math.round(mx), Math.round(my))]) put(overlay, Math.round(mx), Math.round(my), O.MOUTH)
   }
 
   return { shade, region, overlay, geom: defaultGeom(), fur }
