@@ -367,7 +367,14 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
 // A separate pose used while the pet travels: a side view with four legs doing a
 // walk cycle (driven by `step` 0..1). Faces right; the renderer flips for left.
 // Returns the same shade/region/overlay output so render() works unchanged.
-export function generateWalkGrid(_preset: Pet, step = 0, motion = 1): Parts {
+export function generateWalkGrid(preset: Pet, step = 0, motion = 1): Parts {
+  // Fit the walk to the pet's build (see rigcat.adaptPose): the barrel grows
+  // around the fixed hip line, the head rides the body top and scales, and
+  // the stance widens with the body. Feet stay on the ground.
+  const g: Geom = { ...defaultGeom(), ...(preset.geom || {}) }
+  const kbx = g.bodyRx / 12, kby = g.bodyRy / 11, kh = g.headRx / 11
+  const eW = kh * (g.earW / 7.5), eH = kh * (g.earH / 8.5)
+  const kLeg = Math.min(1.2, Math.max(0.85, (kbx + kby) / 2))
   const fur = new Uint8Array(W * H)
   const legTag = new Uint8Array(W * H) // 1 = near leg, 2 = far leg
   const set: SetFn = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
@@ -377,9 +384,12 @@ export function generateWalkGrid(_preset: Pet, step = 0, motion = 1): Parts {
   // feet stay planted — the legs stretch/compress, so the body doesn't look static.
   // Head and body move as one unit. `motion` (0..) scales the whole effect.
   const bob = Math.sin(step * Math.PI * 4) * 1.3 * motion
-  const bodyCx = 18, bodyCy = 30 + bob, bodyRx = 11.5, bodyRy = 7.4
-  const headCx = 32, headCy = 24 + bob, headR = 7
+  const bodyRx = 11.5 * kbx, bodyRy = 7.4 * kby
+  const bodyCx = 18, bodyCy = 33.7 - bodyRy * 0.5 + bob // hip line fixed at 33.7
+  const dTop = (bodyCy - bodyRy) - (30 + bob - 7.4)
+  const headCx = 32, headCy = 24 + bob + dTop * 0.85, headR = 7 * kh
   const bodyBottom = bodyCy + bodyRy * 0.5
+  const sxw = (x: number): number => bodyCx + (x - bodyCx) * kbx
 
   // 4-beat LATERAL-SEQUENCE walk (real cat gait): footfalls RH -> RF -> LH -> LF,
   // spaced a quarter-cycle apart, so only one paw is off the ground at a time.
@@ -403,9 +413,9 @@ export function generateWalkGrid(_preset: Pet, step = 0, motion = 1): Parts {
     else { const s = (p - SWING) / (1 - SWING); offX = A - s * 2 * A; flex = 0; lift = 0 }
     const tag = lg.near ? 1 : 2
     const paint: SetFn = (x, y) => { set(x, y); if (inB(x, y)) legTag[idx(x, y)] = tag }
-    const hipX = lg.x
+    const hipX = sxw(lg.x)
     const hipY = bodyBottom
-    const footX = lg.x + offX
+    const footX = sxw(lg.x) + offX
     const footY = groundY - lift
     // The joint folds up a little during swing (knee/hock flexes to lift the paw);
     // kept modest so the step doesn't jump across the few frames.

@@ -370,18 +370,23 @@ function drawFace(overlay, fur, g, state) {
 // walk cycle (driven by `step` 0..1). Faces right; the renderer flips for left.
 // Uses the same shade/region/overlay output so render() works unchanged.
 export function generateWalkGrid(preset, step = 0, motion = 1) {
+  // Fit the walk to the pet's build (mirror of catgen.ts).
+  const g = { ...defaultGeom(), ...(preset.geom || {}) }
+  const kbx = g.bodyRx / 12, kby = g.bodyRy / 11, kh = g.headRx / 11
+  const eW = kh * (g.earW / 7.5), eH = kh * (g.earH / 8.5)
+  const kLeg = Math.min(1.2, Math.max(0.85, (kbx + kby) / 2))
   const fur = new Uint8Array(W * H)
   const legTag = new Uint8Array(W * H) // 1 = near leg, 2 = far leg
   const set = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
 
   const groundY = 43
-  // The torso oscillates vertically with the gait (two dips per stride) while the
-  // feet stay planted — the legs stretch/compress, so the body doesn't look static.
-  // Head and body move as one unit. `motion` (0..) scales the whole effect.
   const bob = Math.sin(step * Math.PI * 4) * 1.3 * motion
-  const bodyCx = 18, bodyCy = 30 + bob, bodyRx = 11.5, bodyRy = 7.4
-  const headCx = 32, headCy = 24 + bob, headR = 7
+  const bodyRx = 11.5 * kbx, bodyRy = 7.4 * kby
+  const bodyCx = 18, bodyCy = 33.7 - bodyRy * 0.5 + bob // hip line fixed
+  const dTop = (bodyCy - bodyRy) - (30 + bob - 7.4)
+  const headCx = 32, headCy = 24 + bob + dTop * 0.85, headR = 7 * kh
   const bodyBottom = bodyCy + bodyRy * 0.5
+  const sxw = (x) => bodyCx + (x - bodyCx) * kbx
 
   // Legs: two pairs in a diagonal gait. Draw far pair first (behind the body).
   // Each leg is two tapered segments with a joint so it reads as a cat leg
@@ -407,17 +412,17 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
     else { const s = (p - SWING) / (1 - SWING); offX = A - s * 2 * A; flex = 0; lift = 0 }
     const tag = lg.near ? 1 : 2
     const paint = (x, y) => { set(x, y); if (inB(x, y)) legTag[idx(x, y)] = tag }
-    const hipX = lg.x
+    const hipX = sxw(lg.x)
     const hipY = bodyBottom
-    const footX = lg.x + offX
+    const footX = sxw(lg.x) + offX
     const footY = groundY - lift
     // The joint folds up a little during swing (knee/hock flexes to lift the paw);
     // kept modest so the step doesn't jump across the few frames.
     const midY = hipY + (footY - hipY) * 0.5 - flex * 1.3
     const jointX = lg.back ? hipX - 2.2 - flex * 0.8 : hipX + offX * 0.2 + 0.5 + flex * 0.7
-    seg(paint, hipX, hipY, jointX, midY, 2.2, 1.5) // upper (thigh / upper-arm)
-    seg(paint, jointX, midY, footX, footY, 1.5, 1.0) // lower (shank)
-    ellipse(paint, footX, footY + 0.2, 1.8, 1.2) // paw
+    seg(paint, hipX, hipY, jointX, midY, 2.2 * kLeg, 1.5 * kLeg) // upper
+    seg(paint, jointX, midY, footX, footY, 1.5 * kLeg, 1.0 * kLeg) // lower
+    ellipse(paint, footX, footY + 0.2, 1.8 * kLeg, 1.2 * kLeg) // paw
   }
   legs.filter((l) => !l.near).forEach(drawLeg)
 
@@ -428,9 +433,15 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
   // head + a tiny nose near the eye than with a snout + a lone nose (ref study).
   ellipse(set, headCx, headCy, headR * 1.02, headR * 0.98)
 
-  // Ears.
-  triangle(set, headCx - 4, headCy - headR + 2, headCx, headCy - headR + 2, headCx - 4.5, headCy - headR - 4)
-  triangle(set, headCx + 1, headCy - headR + 2, headCx + 5, headCy - headR + 2, headCx + 4, headCy - headR - 4)
+  if (g.cheekFluff > 0) ellipse(set, headCx - headR * 0.72, headCy + headR * 0.42, g.cheekFluff * 0.45, g.cheekFluff * 0.35)
+  // Ears (scaled to the pet's, tufts for tufted styles).
+  const earTipY = headCy - headR - 4 * eH
+  triangle(set, headCx - 4 * eW, headCy - headR + 2, headCx, headCy - headR + 2, headCx - 4.5 * eW, earTipY)
+  triangle(set, headCx + 1 * eW, headCy - headR + 2, headCx + 5 * eW, headCy - headR + 2, headCx + 4 * eW, earTipY)
+  if (g.earStyle === 'tufted') {
+    triangle(set, headCx - 5 * eW, earTipY + 1.5, headCx - 3.5 * eW, earTipY + 1.5, headCx - 5 * eW, earTipY - 2.6)
+    triangle(set, headCx + 3.3 * eW, earTipY + 1.5, headCx + 4.8 * eW, earTipY + 1.5, headCx + 4.6 * eW, earTipY - 2.6)
+  }
 
   // Tail: a long tail held up and curving from the rear (cats walk tail-up).
   {
@@ -438,7 +449,7 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
     const p0 = [bodyCx - bodyRx * 0.7, bodyCy - 1], p1 = [bodyCx - bodyRx - 4, bodyCy - 9], p2 = [bodyCx - bodyRx + 3 + tailSway, bodyCy - 18]
     for (let t = 0; t <= 1.0001; t += 0.05) {
       const it = 1 - t
-      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], 2.6 - t * 1.1, 2.6 - t * 1.1)
+      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], (2.6 - t * 1.1) * kLeg, (2.6 - t * 1.1) * kLeg)
     }
   }
 
@@ -475,11 +486,12 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
     }
 
   // Face (one side): inner ear (smaller, white rim), eye, nose on the muzzle, mouth.
+  const kEyeW = g.eyeRx / 2.5
   triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
-    headCx + 2, headCy - headR + 1.5, headCx + 3.6, headCy - headR + 1.5, headCx + 3.2, headCy - headR - 1)
-  ellipse((x, y) => put(overlay, x, y, O.IRIS), headCx + 1.6, headCy - 0.5, 1.7, 2)
-  ellipse((x, y) => put(overlay, x, y, O.PUPIL), headCx + 2, headCy - 0.3, 0.9, 1.4)
-  put(overlay, Math.round(headCx + 1.2), Math.round(headCy - 1.3), O.GLINT)
+    headCx + 2 * eW, headCy - headR + 1.5, headCx + 3.6 * eW, headCy - headR + 1.5, headCx + 3.2 * eW, headCy - headR - 1)
+  ellipse((x, y) => put(overlay, x, y, O.IRIS), headCx + 1.6 * kh, headCy - 0.5, 1.7 * kEyeW, 2 * kEyeW)
+  ellipse((x, y) => put(overlay, x, y, O.PUPIL), headCx + 2 * kh, headCy - 0.3, 0.9 * kEyeW, 1.4 * kEyeW)
+  put(overlay, Math.round(headCx + 1.2 * kh), Math.round(headCy - 1.3), O.GLINT)
   // Just a tiny nose at the front of the face (no mouth line — a dark trail on
   // a white profile reads as a smudge, ref cats keep it to the nose).
   const nfx = headCx + headR - 1, nfy = headCy + 0.8

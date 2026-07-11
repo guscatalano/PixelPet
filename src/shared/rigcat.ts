@@ -46,7 +46,42 @@ function seg(cb: (x: number, y: number) => void, x0: number, y0: number, x1: num
   }
 }
 
-export function generateRigGrid(_pet: Pet, pose: RigPose): Parts {
+/**
+ * Fit a pose to the pet's build: body width/height scale about the GROUND
+ * anchor (feet stay planted, the mass changes), the head rides the new body
+ * top and scales with the pet's head size, hips/mids follow the body while
+ * anything at or below the old body bottom (paws) stays put.
+ */
+function adaptPose(p: RigPose, kbx: number, kby: number, kh: number): RigPose {
+  if (Math.abs(kbx - 1) < 0.02 && Math.abs(kby - 1) < 0.02 && Math.abs(kh - 1) < 0.02) return p
+  const [bcx, bcy, brx, bry] = p.body
+  const bottom = bcy + bry
+  const nbry = bry * kby
+  const dTop = (bottom - 2 * nbry) - (bcy - bry) // how far the body's top moved
+  const sx = (x: number): number => bcx + (x - bcx) * kbx
+  const sy = (y: number): number => (y >= bottom ? y : bottom - (bottom - y) * kby)
+  return {
+    ...p,
+    body: [bcx, bottom - nbry, brx * kbx, nbry],
+    body2: p.body2 ? [sx(p.body2[0]), sy(p.body2[1]), p.body2[2] * kbx, p.body2[3] * kby] : undefined,
+    head: [p.head[0], p.head[1] + dTop * 0.85, p.head[2] * kh],
+    neck: [p.neck[0], p.neck[1] + dTop * 0.7, p.neck[2] * (kbx + kh) / 2, p.neck[3] * (kby + kh) / 2],
+    tail: { root: [sx(p.tail.root[0]), sy(p.tail.root[1])], ctrl: p.tail.ctrl, tip: p.tail.tip },
+    tailR: (p.tailR ?? 2.6) * Math.min(1.2, Math.max(0.85, (kbx + kby) / 2)),
+    legs: p.legs.map((l) => ({
+      ...l,
+      hip: [sx(l.hip[0]), sy(l.hip[1])],
+      mid: [sx(l.mid[0]), sy(l.mid[1])],
+      foot: [sx(l.foot[0]), l.foot[1]] // stance widens with the build; feet stay grounded
+    }))
+  }
+}
+
+export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
+  const g = { ...defaultGeom(), ...(pet.geom || {}) }
+  const kbx = g.bodyRx / 12, kby = g.bodyRy / 11, kh = g.headRx / 11
+  const eW = kh * (g.earW / 7.5), eH = kh * (g.earH / 8.5)
+  pose = adaptPose(pose, kbx, kby, kh)
   const fur = new Uint8Array(W * H), legTag = new Uint8Array(W * H)
   const set = (x: number, y: number): void => { if (inB(x, y)) fur[idx(x, y)] = 1 }
   const [bcx, bcy, brx, bry] = pose.body
@@ -65,9 +100,17 @@ export function generateRigGrid(_pet: Pet, pose: RigPose): Parts {
   if (pose.body2) ellipse(set, pose.body2[0], pose.body2[1], pose.body2[2], pose.body2[3])
   ellipse(set, pose.neck[0], pose.neck[1], pose.neck[2], pose.neck[3]) // neck
   ellipse(set, hcx, hcy, hr * 1.02, hr * 0.98) // round head (our cat's head)
+  if (g.cheekFluff > 0) { // fluffy pets get a jowl tuft at the back of the head
+    ellipse(set, hcx - hr * 0.72, hcy + hr * 0.42, g.cheekFluff * 0.45, g.cheekFluff * 0.35)
+  }
   const perk = pose.earPerk ?? 0
-  triangle(set, hcx - 4, hcy - hr + 2, hcx, hcy - hr + 2, hcx - 4.5 + perk * 0.8, hcy - hr - 4 - perk * 3)
-  triangle(set, hcx + 1, hcy - hr + 2, hcx + 5, hcy - hr + 2, hcx + 4 - perk * 0.8, hcy - hr - 4 - perk * 3)
+  const earTipL = hcy - hr - (4 + perk * 3) * eH
+  triangle(set, hcx - 4 * eW, hcy - hr + 2, hcx, hcy - hr + 2, hcx + (-4.5 + perk * 0.8) * eW, earTipL)
+  triangle(set, hcx + 1 * eW, hcy - hr + 2, hcx + 5 * eW, hcy - hr + 2, hcx + (4 - perk * 0.8) * eW, earTipL)
+  if (g.earStyle === 'tufted') { // lynx tufts sprouting from the ear tips
+    triangle(set, hcx - 5 * eW, earTipL + 1.5, hcx - 3.5 * eW, earTipL + 1.5, hcx - 5 * eW, earTipL - 2.6)
+    triangle(set, hcx + 3.3 * eW, earTipL + 1.5, hcx + 4.8 * eW, earTipL + 1.5, hcx + 4.6 * eW, earTipL - 2.6)
+  }
   {
     const p0 = pose.tail.root, p1 = pose.tail.ctrl, p2 = pose.tail.tip
     const tr = pose.tailR ?? 2.6 // base tail radius; cranked up for the scared poof
@@ -103,44 +146,46 @@ export function generateRigGrid(_pet: Pet, pose: RigPose): Parts {
       else if (inBody2(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, b2![0], b2![1], b2![2], b2![3]))
       else shade[idx(x, y)] = BASE
     }
-  // Face. headFace turns the head to the viewer while the body stays side-on:
+  // Face (offsets scale with the head, eye sizes with the pet's eyes).
+  // headFace turns the head to the viewer while the body stays side-on:
   // profile (default) -> mid-turn blink (masks the pop) -> front face.
   const face = pose.headFace ?? 0
+  const kEye = g.eyeRx / 2.5
   const inear = (ax: number, bx: number, tx: number): void =>
     triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
       ax, hcy - hr + 1.5, bx, hcy - hr + 1.5, tx, hcy - hr - 1)
   if (face >= 0.75) {
     // Facing you: both eyes, centred pink nose, pink in both ears.
-    inear(hcx + 2, hcx + 3.6, hcx + 3.2)
-    inear(hcx - 3.6, hcx - 2, hcx - 3.2)
+    inear(hcx + 2 * eW, hcx + 3.6 * eW, hcx + 3.2 * eW)
+    inear(hcx - 3.6 * eW, hcx - 2 * eW, hcx - 3.2 * eW)
     for (const s of [-1, 1]) {
-      const ex = hcx + s * 2.6, ey = hcy - 0.4
+      const ex = hcx + s * 2.6 * kh, ey = hcy - 0.4
       if (pose.eye > 0.5) {
-        ellipse((x, y) => put(overlay, x, y, O.IRIS), ex, ey, 1.45, 1.75)
-        ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex, ey + 0.2, 0.8, 1.2)
+        ellipse((x, y) => put(overlay, x, y, O.IRIS), ex, ey, 1.45 * kEye, 1.75 * kEye)
+        ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex, ey + 0.2, 0.8 * kEye, 1.2 * kEye)
         put(overlay, Math.round(ex - 0.5), Math.round(ey - 0.9), O.GLINT)
       } else {
         for (const dx of [-1, 0, 1]) put(overlay, Math.round(ex + dx), Math.round(ey), O.OUTLINE)
       }
     }
-    triangle((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, hcx - 1.2, hcy + 1.6, hcx + 1.2, hcy + 1.6, hcx, hcy + 3)
+    triangle((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, hcx - 1.2 * kh, hcy + 1.6 * kh, hcx + 1.2 * kh, hcy + 1.6 * kh, hcx, hcy + 3 * kh)
   } else if (face >= 0.25) {
     // Mid-turn: eyes shut (the blink hides the eye-count change), nose sliding in.
-    inear(hcx + 2, hcx + 3.6, hcx + 3.2)
+    inear(hcx + 2 * eW, hcx + 3.6 * eW, hcx + 3.2 * eW)
     for (const s of [-1, 1]) {
-      const ex = hcx + s * 2.6
+      const ex = hcx + s * 2.6 * kh
       for (const dx of [-1, 0, 1]) put(overlay, Math.round(ex + dx), Math.round(hcy - 0.4), O.OUTLINE)
     }
-    put(overlay, Math.round(hcx + 2), Math.round(hcy + 1.6), O.NOSE)
+    put(overlay, Math.round(hcx + 2 * kh), Math.round(hcy + 1.6 * kh), O.NOSE)
   } else {
     // Side profile (matches the walk pose exactly).
-    inear(hcx + 2, hcx + 3.6, hcx + 3.2)
+    inear(hcx + 2 * eW, hcx + 3.6 * eW, hcx + 3.2 * eW)
     if (pose.eye > 0.5) {
-      ellipse((x, y) => put(overlay, x, y, O.IRIS), hcx + 1.6, hcy - 0.5, 1.7, 2)
-      ellipse((x, y) => put(overlay, x, y, O.PUPIL), hcx + 2, hcy - 0.3, 0.9, 1.4)
-      put(overlay, Math.round(hcx + 1.2), Math.round(hcy - 1.3), O.GLINT)
+      ellipse((x, y) => put(overlay, x, y, O.IRIS), hcx + 1.6 * kh, hcy - 0.5, 1.7 * kEye, 2 * kEye)
+      ellipse((x, y) => put(overlay, x, y, O.PUPIL), hcx + 2 * kh, hcy - 0.3, 0.9 * kEye, 1.4 * kEye)
+      put(overlay, Math.round(hcx + 1.2 * kh), Math.round(hcy - 1.3), O.GLINT)
     } else {
-      for (const dx of [0, 1, 2]) put(overlay, Math.round(hcx + 1 + dx), Math.round(hcy - 0.3), O.OUTLINE)
+      for (const dx of [0, 1, 2]) put(overlay, Math.round(hcx + 1 * kh + dx), Math.round(hcy - 0.3), O.OUTLINE)
     }
     const nfx = hcx + hr - 1, nfy = hcy + 0.8
     if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
