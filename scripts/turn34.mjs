@@ -60,16 +60,19 @@ export function generate34Grid(preset, t, state = {}) {
   const pawMask = new Uint8Array(W * H)
   const groundPawY = g.bodyCy + g.bodyRy * 0.98
   const pawH = state.pawH ?? 1, pawLx = state.pawLx || 0
+  const art = state.pawArt || 'beans' // visual style of the raised paw
+  const artScale = art === 'cartoon' ? 1.3 : art === 'dainty' ? 0.8 : 1
   const pawSide = (s) => {
     const amt = (s === 1 ? state.paw : state.paw2) || 0
     const stroke = (s === 1 ? state.pawX : state.paw2X) || 0
     const plantedX = bxBase + 0.9 * t + s * g.bodyRx * 0.3
     const targetY = g.bodyCy + g.bodyRy * 0.32 - 4.5 - 6 * (pawH - 1)
+    const rxB = (2.6 + 0.9 * amt) * artScale
     return {
       amt, stroke,
       px: plantedX + (bx + s * 6.2 + s * pawLx - plantedX) * amt,
       py: groundPawY + (targetY - groundPawY) * amt + stroke * 1.6,
-      rx: 2.6 + 0.9 * amt, ry: 2.1 + 1.0 * amt
+      rx: rxB, ry: art === 'button' ? rxB : (2.1 + 1.0 * amt) * artScale
     }
   }
   const pawR = pawSide(1)
@@ -86,6 +89,16 @@ export function generate34Grid(preset, t, state = {}) {
         // the lifting foreleg, pivoting up from where the foot stood
         for (let k = 0; k <= 1.001; k += 0.2) ellipse(setPaw, lx + (ps.px - s * 0.3 - lx) * k, legTop + 1.5 + (ps.py + 1.8 - (legTop + 1.5)) * k, 1.9 - k * 0.3, 1.7 - k * 0.2)
         ellipse(setPaw, ps.px, ps.py, ps.rx, ps.ry) // the pad
+        if ((art === 'splayed' || art === 'claws' || art === 'fluffy') && ps.amt > 0.6) {
+          // scalloped toe bumps along the pad's top edge
+          ellipse(setPaw, ps.px - ps.rx * 0.62, ps.py - ps.ry * 0.72, 1.15, 1.15)
+          ellipse(setPaw, ps.px, ps.py - ps.ry * 0.88, 1.15, 1.15)
+          ellipse(setPaw, ps.px + ps.rx * 0.62, ps.py - ps.ry * 0.72, 1.15, 1.15)
+        }
+        if (art === 'fluffy' && ps.amt > 0.6) {
+          for (const [fx, fy] of [[-0.95, 0.35], [0.98, 0.42], [-0.55, 0.9], [0.6, 0.86]])
+            ellipse(setPaw, ps.px + fx * ps.rx, ps.py + fy * ps.ry, 0.9, 0.9)
+        }
         continue
       }
       for (let y = legTop; y <= pawY; y += 0.5) ellipse(set, lx, y, 2.3, 1.6)
@@ -132,13 +145,15 @@ export function generate34Grid(preset, t, state = {}) {
       if (inB(px, pawY) && fur[idx(px, pawY)]) shade[idx(px, pawY)] = DEEP }
   }
   if (pawAmt > 0.05 || pawSide(-1).amt > 0.05) {
-    // A dark ring around the raised limb(s) where they overlap the body.
+    // Separation ring: a deep-fur crease (soft) — or full ink for the inkring style.
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       if (!pawMask[idx(x, y)]) continue
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const nx2 = x + dx, ny2 = y + dy
         if (!inB(nx2, ny2) || pawMask[idx(nx2, ny2)] || !fur[idx(nx2, ny2)]) continue
-        put(overlay, nx2, ny2, O.OUTLINE)
+        if (art === 'inkring') { put(overlay, nx2, ny2, O.OUTLINE); continue }
+        if (overlay[idx(nx2, ny2)] === O.OUTLINE) continue
+        shade[idx(nx2, ny2)] = DEEP
       }
     }
     // Toe beans — the "paw at the glass" signature — per raised pad.
@@ -146,15 +161,40 @@ export function generate34Grid(preset, t, state = {}) {
       const rx2 = Math.round(x), ry2 = Math.round(y)
       if (inB(rx2, ry2) && pawMask[idx(rx2, ry2)] && overlay[idx(rx2, ry2)] === O.NONE) put(overlay, rx2, ry2, O.NOSE)
     }
+    const padPink = (cx, cy, rx3, ry3) => ellipse((x, y) => { if (pawMask[idx(x, y)] && overlay[idx(x, y)] === O.NONE) put(overlay, x, y, O.NOSE) }, cx, cy, rx3, ry3)
     for (const s of [-1, 1]) {
       const ps = pawSide(s)
       if (ps.amt <= 0.6) continue
       const reach = 0.55 + 0.45 * ps.amt
-      bean(ps.px - 1.8 * reach, ps.py - 1.2 * reach)
-      bean(ps.px, ps.py - 1.8 * reach)
-      bean(ps.px + 1.8 * reach, ps.py - 1.2 * reach)
-      ellipse((x, y) => { if (pawMask[idx(x, y)] && overlay[idx(x, y)] === O.NONE) put(overlay, x, y, O.NOSE) },
-        ps.px, ps.py + 1.1 * reach, 1.3 * reach, 0.9 * reach)
+      if (art === 'beans' || art === 'inkring' || art === 'splayed' || art === 'fluffy' || art === 'claws') {
+        bean(ps.px - 1.8 * reach, ps.py - 1.2 * reach)
+        bean(ps.px, ps.py - 1.8 * reach)
+        bean(ps.px + 1.8 * reach, ps.py - 1.2 * reach)
+        padPink(ps.px, ps.py + 1.1 * reach, 1.3 * reach, 0.9 * reach)
+      } else if (art === 'cartoon') {
+        for (const [dx3, dy3] of [[-2.4, -1.6], [0, -2.5], [2.4, -1.6]]) {
+          bean(ps.px + dx3, ps.py + dy3); bean(ps.px + dx3 + 1, ps.py + dy3); bean(ps.px + dx3, ps.py + dy3 + 1)
+        }
+        padPink(ps.px, ps.py + 1.3, 1.8, 1.2)
+      } else if (art === 'dainty') {
+        padPink(ps.px, ps.py + 0.3, 1.0, 0.8)
+      } else if (art === 'button') {
+        padPink(ps.px, ps.py + 0.2, 1.5, 1.2)
+      } else if (art === 'mitten') {
+        for (const dx3 of [-1, 1]) { const x3 = Math.round(ps.px + dx3), y3 = Math.round(ps.py - ps.ry + 1); if (inB(x3, y3) && pawMask[idx(x3, y3)]) put(overlay, x3, y3, O.OUTLINE) }
+      } else if (art === 'toelines') {
+        for (const dx3 of [-1.2, 1.2]) for (let dy3 = 0; dy3 <= 1; dy3++) {
+          const x3 = Math.round(ps.px + dx3), y3 = Math.round(ps.py - ps.ry + 0.8 + dy3)
+          if (inB(x3, y3) && pawMask[idx(x3, y3)]) put(overlay, x3, y3, O.OUTLINE)
+        }
+      }
+      if (art === 'claws') {
+        // tiny claw ticks above each toe bump, against the background
+        for (const [cx3, cy3] of [[ps.px - ps.rx * 0.62, ps.py - ps.ry * 0.72 - 2], [ps.px, ps.py - ps.ry * 0.88 - 2], [ps.px + ps.rx * 0.62, ps.py - ps.ry * 0.72 - 2]]) {
+          const x3 = Math.round(cx3), y3 = Math.round(cy3)
+          if (inB(x3, y3) && !fur[idx(x3, y3)] && overlay[idx(x3, y3)] === O.NONE) put(overlay, x3, y3, O.WHISK)
+        }
+      }
     }
   }
 

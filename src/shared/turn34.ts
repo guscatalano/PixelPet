@@ -143,8 +143,9 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     }
   }
   if (pawAmt > 0.05) {
-    // A dark ring around the raised limb where it overlaps the body — a paw in
-    // front of the white chest needs a real edge, not just a soft shadow.
+    // A deep-fur crease around the raised limb where it overlaps the body —
+    // visible separation without the harshness of the ink outline (the pad's
+    // edge against the background still gets the normal outline).
     for (let y = 0; y < H; y++)
       for (let x = 0; x < W; x++) {
         if (!pawMask[idx(x, y)]) continue
@@ -152,7 +153,8 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
           for (let dx = -1; dx <= 1; dx++) {
             const nx2 = x + dx, ny2 = y + dy
             if (!inB(nx2, ny2) || pawMask[idx(nx2, ny2)] || !fur[idx(nx2, ny2)]) continue
-            put(overlay, nx2, ny2, O.OUTLINE)
+            if (overlay[idx(nx2, ny2)] === O.OUTLINE) continue
+            shade[idx(nx2, ny2)] = DEEP
           }
       }
     // Toe beans — the unmistakable "paw at the glass" signature: three pink
