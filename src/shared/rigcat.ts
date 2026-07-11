@@ -251,6 +251,29 @@ export const POSES: Record<string, RigPose> = {
       { hip: [28, 39], mid: [29, 41], foot: [27, 42], near: true }
     ]
   },
+  // A looser curl: not tucked into a tight ball — the head rests higher and
+  // forward, the body a touch longer, tail draped rather than wrapped tight.
+  curlLoose: {
+    body: [19, 35, 13, 7], head: [32.5, 34, 6], neck: [28, 35, 5, 4.2],
+    tail: { root: [7, 37], ctrl: [10, 44], tip: [24, 40] }, eye: 0,
+    legs: [
+      { hip: [15, 38], mid: [13, 41], foot: [17, 42], near: false },
+      { hip: [27, 38.5], mid: [30, 41], foot: [33, 42], near: false }, // front paw stretched out
+      { hip: [17, 38], mid: [15, 41], foot: [19, 42], near: true },
+      { hip: [29, 38.5], mid: [32, 41], foot: [35, 42], near: true }
+    ]
+  },
+  // Nose-to-tail donut: a very tight ball, head tucked right down into the side.
+  curlTight: {
+    body: [21, 36, 12, 6.8], head: [29, 38.5, 5.6], neck: [25.5, 37.5, 4.2, 3.6],
+    tail: { root: [9, 35], ctrl: [17, 45], tip: [31, 38] }, eye: 0,
+    legs: [
+      { hip: [17, 39], mid: [15, 41.5], foot: [20, 42], near: false },
+      { hip: [25, 39.5], mid: [26, 41.5], foot: [24, 42], near: false },
+      { hip: [19, 39], mid: [17, 41.5], foot: [22, 42], near: true },
+      { hip: [27, 39.5], mid: [28, 41.5], foot: [26, 42], near: true }
+    ]
+  },
   // The bread loaf: a smooth rounded mound with all four paws tucked underneath
   // (the legs are posed fully inside the body silhouette, so they vanish). The
   // head sits LOW with the chin resting on the mound, tail wrapped along the base.

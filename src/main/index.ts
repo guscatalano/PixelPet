@@ -296,8 +296,11 @@ let dreamImmichAt = 0 // when the Immich list was last fetched
 let dreamIdx = 0
 let dreamLastSwap = 0
 let dreamShowing = false
+let dreamWasSleeping = false // edge-detect sleep sessions
+let dreamThisSession = false // did this nap roll a dream?
 
 const IMMICH_TTL = 30 * 60_000 // re-fetch the album list every 30 min
+const DREAM_CHANCE = 0.55 // not every nap dreams
 
 /** Refresh the Immich asset-id list if configured (fire-and-forget). */
 async function refreshImmich(): Promise<void> {
@@ -355,8 +358,12 @@ async function showDreamPhoto(): Promise<void> {
 }
 
 function dreamTick(): void {
+  const sleeping = !!engine?.isSleeping()
+  // Each time the cat drops off to sleep, roll whether this nap dreams at all.
+  if (sleeping && !dreamWasSleeping) dreamThisSession = Math.random() < DREAM_CHANCE
+  dreamWasSleeping = sleeping
   const hasPhotos = dreamPool.length + dreamImmichIds.length > 0
-  const active = settings.dreamMode && !!engine?.isSleeping() && hasPhotos && !!petWindow
+  const active = settings.dreamMode && sleeping && dreamThisSession && hasPhotos && !!petWindow
   // Keep the Immich list fresh while dreaming.
   if (settings.dreamMode && settings.immich.albumId && hasImmichKey() && Date.now() - dreamImmichAt > IMMICH_TTL) {
     void refreshImmich()

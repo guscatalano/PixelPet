@@ -174,8 +174,9 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
     case 'sphinx>sit': return seqFrames(key, () => rigLerpFrames(POSES.sphinx, POSES.sit, 6, 105))
     case 'loaf>sphinx': return seqFrames(key, () => rigLerpFrames(POSES.loaf, POSES.sphinx, 5, 110)) // paws slide out of the bread
     case 'sphinx>loaf': return seqFrames(key, () => rigLerpFrames(POSES.sphinx, POSES.loaf, 5, 110))
-    case 'sit>sleep': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.curl, 7, 105))
-    case 'sleep>sit': return seqFrames(key, () => rigLerpFrames(POSES.curl, POSES.sit, 7, 105))
+    // Not seqFrames-cached: the sleep pose varies per nap (sleepBase), so build fresh.
+    case 'sit>sleep': return rigLerpFrames(POSES.sit, sleepBase, 7, 105)
+    case 'sleep>sit': return rigLerpFrames(sleepBase, POSES.sit, 7, 105)
     case 'sit>groom': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.groom, 4, 110))
     case 'groom>sit': return seqFrames(key, () => rigLerpFrames(POSES.groom, POSES.sit, 4, 110))
     case 'stand>walk': case 'walk>stand': return [] // same base pose
@@ -391,6 +392,13 @@ let headCur = 0
 let headLast = 0
 // Loaf settling: eases toward the dozy low-head loaf when left alone.
 let relaxCur = 0
+// The cat curls up differently each nap — a random sleep pose is chosen when a
+// new sleep begins (see onPlay), used for both the tuck-in transition and the
+// held, breathing sleep.
+const SLEEP_POSES: RigPose[] = [POSES.curl, POSES.curlLoose, POSES.curlTight, POSES.loafLow]
+let sleepIdx = 0
+let sleepBase: RigPose = POSES.curl
+
 function sleepFrame(now: number): HTMLCanvasElement {
   const dt = Math.min(100, now - perkLast)
   perkLast = now
@@ -399,8 +407,8 @@ function sleepFrame(now: number): HTMLCanvasElement {
   perkCur = target > perkCur ? Math.min(target, perkCur + speed) : Math.max(target, perkCur - speed)
   const b = Math.round(((Math.sin(now / 900) + 1) / 2) * 5) // breath 0..5
   const p = Math.round(perkCur * 4) // perk 0..4
-  return getRigFrame(`sleep|${b}|${p}`, () => {
-    const pose = lerpPose(POSES.curl, POSES.curl, 0)
+  return getRigFrame(`sleep|${sleepIdx}|${b}|${p}`, () => {
+    const pose = lerpPose(sleepBase, sleepBase, 0)
     const br = (b / 5) * 2 - 1
     pose.body = [pose.body[0], pose.body[1] - br * 0.25, pose.body[2], pose.body[3] + br * 0.5]
     pose.earPerk = p / 4
@@ -493,6 +501,11 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
 window.pet.onPlay((cmd: PlayCommand) => {
   facing = cmd.facing
   if (cmd.clip === targetClip) return
+  // A new nap: pick which way the cat curls up this time (eyes shut).
+  if (cmd.clip === 'sleep') {
+    sleepIdx = Math.floor(Math.random() * SLEEP_POSES.length)
+    sleepBase = { ...SLEEP_POSES[sleepIdx], eye: 0 }
+  }
   targetClip = cmd.clip
   reachedSent = false
   if (ONE_SHOT_NODE[cmd.clip]) pendingOneShot = cmd.clip
