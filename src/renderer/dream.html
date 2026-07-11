@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <title>PixelPet Dream</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+      .wrap { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; }
+      .bubble {
+        position: relative; margin-top: 12px; background: #eef1f8; border: 3px solid #2a2c38;
+        border-radius: 14px; padding: 5px; box-shadow: 0 5px 16px rgba(0, 0, 0, 0.4);
+        width: 104px; height: 84px; opacity: 0; transform: translateY(6px) scale(0.95);
+        transition: opacity 0.5s ease, transform 0.5s ease;
+      }
+      .bubble.show { opacity: 1; transform: none; }
+      .bubble img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 9px; }
+      .zzz { position: absolute; top: -15px; right: -4px; color: #7f86a0; font: 700 14px 'Cascadia Code', monospace; text-shadow: 0 1px 0 #fff; }
+      .tail { position: absolute; bottom: -10px; left: 50%; margin-left: -7px; width: 0; height: 0; border: 7px solid transparent; border-top-color: #2a2c38; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="bubble" id="b">
+        <img id="p" alt="" />
+        <div class="zzz">z</div>
+        <div class="tail"></div>
+      </div>
+    </div>
+    <script type="module" src="./dream/main.ts"></script>
+  </body>
+</html>

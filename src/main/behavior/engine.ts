@@ -178,6 +178,11 @@ export class PetEngine {
     return { enabled: this.careMode, needs, state: careState(needs) }
   }
 
+  /** Whether the cat is currently asleep (drives Dream Mode). */
+  isSleeping(): boolean {
+    return this.clip === 'sleep'
+  }
+
   private persistNeeds(): void {
     if (this.needs && this.saver) this.saver(this.needs)
   }

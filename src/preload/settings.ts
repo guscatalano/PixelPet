@@ -21,6 +21,8 @@ const api = {
   setFrontScale: (k: number): void => ipcRenderer.send('settings:set-frontscale', k),
   /** Toggle time-of-day pupil dilation. */
   setPupilsByTime: (v: boolean): void => ipcRenderer.send('settings:set-pupils', v),
+  /** Toggle dream bubbles while the cat sleeps. */
+  setDreamMode: (v: boolean): void => ipcRenderer.send('settings:set-dreammode', v),
 
   // ---- Care Mode ----
   /** Turn Care ("Tamagotchi") mode on/off. */

@@ -13,7 +13,11 @@ import type { Personality } from './types'
  * (it only needs `coat`), but every pet in the app has identity + personality, so
  * app code (settings, behavior) can rely on them.
  */
-export type AppPet = Pet & { id: string; name: string; blurb: string; personality: Personality }
+export type AppPet = Pet & {
+  id: string; name: string; blurb: string; personality: Personality
+  /** File paths of the photos this cat was generated from (Dream Mode). */
+  dreamPhotos?: string[]
+}
 
 const NORMAL = {}
 const CHONKY = { bodyRx: 15, bodyRy: 12.5, headRx: 11.5, headRy: 10.5, earSpread: 8 }

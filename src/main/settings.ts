@@ -34,7 +34,7 @@ function defaultAi(): AiConfig {
 function defaults(): AppSettings {
   return {
     activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS,
-    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, careMode: false, difficulty: 'normal', disabledAnims: [],
+    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, careMode: false, difficulty: 'normal', dreamMode: false, disabledAnims: [],
     ai: defaultAi(), userPets: [], overrides: {}
   }
 }
@@ -62,7 +62,8 @@ function sanitizeUserPet(raw: unknown): AppPet | null {
     geom: (r.geom && typeof r.geom === 'object' ? r.geom : {}) as AppPet['geom'],
     marking,
     coat: coat as unknown as AppPet['coat'], // coat.primary hex-validated above
-    personality: personality as Record<string, number> & Personality
+    personality: personality as Record<string, number> & Personality,
+    dreamPhotos: Array.isArray(r.dreamPhotos) ? (r.dreamPhotos as unknown[]).filter((p): p is string => typeof p === 'string') : undefined
   }
 }
 
@@ -100,6 +101,7 @@ function sanitize(raw: unknown): AppSettings {
   if (typeof r.stayPut === 'boolean') s.stayPut = r.stayPut
   if (typeof r.pupilsByTime === 'boolean') s.pupilsByTime = r.pupilsByTime
   if (typeof r.careMode === 'boolean') s.careMode = r.careMode
+  if (typeof r.dreamMode === 'boolean') s.dreamMode = r.dreamMode
   if (typeof r.difficulty === 'string' && (DIFFICULTIES as string[]).includes(r.difficulty)) s.difficulty = r.difficulty as AppSettings['difficulty']
   if (typeof r.frontScale === 'number' && Number.isFinite(r.frontScale)) {
     s.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, r.frontScale))

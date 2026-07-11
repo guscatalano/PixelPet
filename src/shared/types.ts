@@ -67,6 +67,8 @@ export interface AppSettings {
   careMode: boolean
   /** How fast needs decay in Care Mode. */
   difficulty: Difficulty
+  /** Dream mode: a sleeping cat shows a floating photo thumbnail it dreams of. */
+  dreamMode: boolean
   /** Animations the user turned off (subset of TOGGLEABLE_ANIMS). */
   disabledAnims: ClipName[]
   /** Non-secret AI config (provider/model/endpoint). The API key lives elsewhere (safeStorage). */

@@ -20,7 +20,8 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/preload/index.ts'),
           settings: resolve(__dirname, 'src/preload/settings.ts'),
-          item: resolve(__dirname, 'src/preload/item.ts')
+          item: resolve(__dirname, 'src/preload/item.ts'),
+          dream: resolve(__dirname, 'src/preload/dream.ts')
         }
       }
     }
@@ -32,7 +33,8 @@ export default defineConfig({
         input: {
           pet: resolve(__dirname, 'src/renderer/pet.html'),
           settings: resolve(__dirname, 'src/renderer/settings.html'),
-          item: resolve(__dirname, 'src/renderer/item.html')
+          item: resolve(__dirname, 'src/renderer/item.html'),
+          dream: resolve(__dirname, 'src/renderer/dream.html')
         }
       }
     }

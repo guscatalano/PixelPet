@@ -17,6 +17,7 @@ interface SettingsApi {
   setStayPut: (v: boolean) => void
   setFrontScale: (k: number) => void
   setPupilsByTime: (v: boolean) => void
+  setDreamMode: (v: boolean) => void
   setCareMode: (v: boolean) => void
   setDifficulty: (d: Difficulty) => void
   careStatus: () => Promise<CareStatus | null>
@@ -396,6 +397,19 @@ function buildAnimation(): void {
     state.pupilsByTime = !state.pupilsByTime
     paintPupils(state.pupilsByTime)
     window.settings.setPupilsByTime(state.pupilsByTime)
+  })
+
+  const dream = $<HTMLButtonElement>('dream')
+  const paintDream = (on: boolean): void => {
+    dream.classList.toggle('on', on)
+    dream.setAttribute('aria-pressed', String(on))
+    dream.textContent = on ? 'On — dreams while sleeping' : 'Off — no dreams'
+  }
+  paintDream(state.dreamMode ?? false)
+  dream.addEventListener('click', () => {
+    state.dreamMode = !state.dreamMode
+    paintDream(state.dreamMode)
+    window.settings.setDreamMode(state.dreamMode)
   })
 }
 

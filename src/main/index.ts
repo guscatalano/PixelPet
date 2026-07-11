@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, screen, Menu, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality, TriggerEvent } from '../shared/types'
 import { MIN_SCALE, MAX_SCALE, petWindowSize } from '../shared/constants'
 import { createTray } from './tray'
@@ -14,6 +15,7 @@ import { generatePetFromPhotos, dataUrlToImage } from './ai/petGenerator'
 import { saveApiKey, loadApiKey, hasApiKey, clearApiKey, encryptionAvailable } from './ai/secrets'
 import { loadNeeds, saveNeeds } from './care/needs'
 import { DIFFICULTIES, type CareAction, type Difficulty } from '../shared/care'
+import { saveSourcePhotos, readPhotoDataUrl, deletePetPhotos } from './dream/store'
 
 let petWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
@@ -279,6 +281,77 @@ function showPetMenu(): void {
   Menu.buildFromTemplate(items).popup()
 }
 
+// ---- dream mode: a sleeping cat dreams of its photos -----------------------
+
+let dreamWindow: BrowserWindow | null = null
+let dreamTimer: ReturnType<typeof setInterval> | null = null
+let dreamPool: string[] = []
+let dreamIdx = 0
+let dreamLastSwap = 0
+let dreamShowing = false
+
+function createDreamWindow(): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 120, height: 112, transparent: true, frame: false, resizable: false,
+    skipTaskbar: true, hasShadow: false, focusable: false, alwaysOnTop: true,
+    maximizable: false, fullscreenable: false,
+    webPreferences: { preload: join(__dirname, '../preload/dream.js'), sandbox: false }
+  })
+  win.setAlwaysOnTop(true, 'screen-saver')
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  win.setIgnoreMouseEvents(true, { forward: true }) // decorative, click-through
+  if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/dream.html`)
+  else win.loadFile(join(__dirname, '../renderer/dream.html'))
+  win.on('closed', () => { dreamWindow = null })
+  return win
+}
+
+/** Rebuild the active pet's dream photo pool (on pet swap / generate / delete). */
+function refreshDreamPool(): void {
+  const pet = findPet(settings, settings.activePetId)
+  dreamPool = (pet.dreamPhotos ?? []).filter((p) => existsSync(p))
+  dreamIdx = 0
+}
+
+function showDreamPhoto(): void {
+  if (!dreamWindow || !dreamPool.length) return
+  const url = readPhotoDataUrl(dreamPool[dreamIdx % dreamPool.length])
+  dreamIdx++
+  if (url) dreamWindow.webContents.send('dream:photo', url)
+}
+
+function dreamTick(): void {
+  const active = settings.dreamMode && !!engine?.isSleeping() && dreamPool.length > 0 && !!petWindow
+  if (active) {
+    if (!dreamWindow || dreamWindow.isDestroyed()) { dreamWindow = createDreamWindow(); dreamShowing = false }
+    const b = petWindow!.getBounds()
+    const s = dreamWindow.getBounds()
+    const wa = screen.getDisplayMatching(b).workArea
+    const y = Math.max(wa.y + 2, b.y - s.height + 10)
+    dreamWindow.setPosition(Math.round(b.x + b.width / 2 - s.width / 2), Math.round(y))
+    const now = Date.now()
+    if (!dreamShowing) {
+      dreamWindow.showInactive()
+      dreamShowing = true
+      dreamLastSwap = now
+      const send = (): void => showDreamPhoto()
+      if (dreamWindow.webContents.isLoading()) dreamWindow.webContents.once('did-finish-load', send)
+      else send()
+    } else if (now - dreamLastSwap > 9000) {
+      dreamLastSwap = now
+      showDreamPhoto()
+    }
+  } else if (dreamShowing && dreamWindow) {
+    dreamWindow.hide()
+    dreamShowing = false
+  }
+}
+
+function startDreamLoop(): void {
+  refreshDreamPool()
+  if (!dreamTimer) dreamTimer = setInterval(dreamTick, 2000)
+}
+
 // ---- applying settings changes ---------------------------------------------
 
 /** Swap the active pet: redraw in the renderer + retune the behavior engine. */
@@ -286,6 +359,7 @@ function applyActivePet(): void {
   petWindow?.webContents.send('pet:set-pet', findPet(settings, settings.activePetId))
   if (engine) engine.personality = effectivePersonality(settings, settings.activePetId)
   applyCare() // load the newly-active pet's needs
+  refreshDreamPool() // the new pet dreams of its own photos
 }
 
 /** (Re)configure Care Mode on the engine from settings + the active pet. */
@@ -421,6 +495,11 @@ function registerIpc(): void {
   ipcMain.on('pet:context-menu', () => showPetMenu())
   ipcMain.on('item:drag-start', () => startItemDrag())
   ipcMain.on('item:drag-end', () => onItemDropped())
+  ipcMain.on('settings:set-dreammode', (_e, v: boolean) => {
+    settings.dreamMode = !!v
+    saveSettings(settings)
+    dreamTick() // reflect promptly (hide if just turned off)
+  })
   ipcMain.on('settings:set-trait', (_e, p: { petId: string; key: keyof Personality; value: number }) => {
     const ov = settings.overrides[p.petId] ?? (settings.overrides[p.petId] = {})
     ov[p.key] = Math.max(0, Math.min(1, p.value))
@@ -459,8 +538,10 @@ function registerIpc(): void {
     if (!cfg) return { ok: false, error: 'Add an API key first (or set a local endpoint that needs none).' }
     if (!Array.isArray(dataUrls) || !dataUrls.length) return { ok: false, error: 'No photo provided.' }
     try {
-      const images = dataUrls.slice(0, 4).map(dataUrlToImage)
-      const pet = await generatePetFromPhotos(images, cfg)
+      const shots = dataUrls.slice(0, 4)
+      const pet = await generatePetFromPhotos(shots.map(dataUrlToImage), cfg)
+      const saved = saveSourcePhotos(pet.id, shots) // the cat dreams of these later
+      if (saved.length) pet.dreamPhotos = saved
       settings.userPets.push(pet)
       settings.activePetId = pet.id
       saveSettings(settings)
@@ -475,6 +556,7 @@ function registerIpc(): void {
     if (i < 0) return
     settings.userPets.splice(i, 1)
     delete settings.overrides[petId]
+    deletePetPhotos(petId) // remove its saved dream photos
     if (settings.activePetId === petId) settings.activePetId = 'ash'
     saveSettings(settings)
     applyActivePet()
@@ -507,6 +589,8 @@ if (!gotLock) {
       }
     })
 
+    startDreamLoop()
+
     // Keep the pet reachable when the monitor layout changes.
     screen.on('display-removed', clampPetOnScreen)
     screen.on('display-metrics-changed', clampPetOnScreen)
@@ -520,6 +604,8 @@ if (!gotLock) {
     stopDrag()
     stopItemDrag()
     itemWindow?.destroy()
+    if (dreamTimer) clearInterval(dreamTimer)
+    dreamWindow?.destroy()
     engine?.dispose()
     tray?.destroy()
   })
