@@ -1,4 +1,4 @@
-import { generateGrid, generateWalkGrid, render as renderPet, type AnimState } from '../../shared/catgen'
+import { generateGrid, generateWalkGrid, render as renderPet, setFrontScale, type AnimState } from '../../shared/catgen'
 import { generateRigGrid, lerpPose, POSES as RIG } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
 import { PETS, type AppPet } from '../../shared/pets'
@@ -12,6 +12,7 @@ interface SettingsApi {
   setScale: (scale: number) => void
   setTurnMs: (ms: number) => void
   setStayPut: (v: boolean) => void
+  setFrontScale: (k: number) => void
   setTrait: (petId: string, key: keyof Personality, value: number) => void
   resetTraits: (petId: string) => void
 }
@@ -105,7 +106,7 @@ const yawnK = (t: number): number => clamp01(Math.sin(((t % 3400) / 3400) * Math
 function pawState(t: number): { paw: number; pawX: number } {
   const ph = t % 2600
   if (ph < 400) return { paw: easeIn(ph / 400), pawX: 0 }
-  if (ph < 1800) return { paw: 1, pawX: Math.sin((ph - 400) / 170) }
+  if (ph < 1800) return { paw: 1, pawX: Math.max(0, Math.sin((ph - 400) / 145)) } // down-pats with recoveries
   if (ph < 2200) return { paw: 1 - easeIn((ph - 1800) / 400), pawX: 0 }
   return { paw: 0, pawX: 0 }
 }
@@ -275,6 +276,18 @@ function buildAnimation(): void {
   slider.addEventListener('input', () => {
     show()
     window.settings.setTurnMs(Number(slider.value))
+  })
+
+  const fs = $<HTMLInputElement>('frontscale'), fsLabel = $('frontscalev')
+  const showFs = (): void => { fsLabel.textContent = `${fs.value}%` }
+  fs.value = String(Math.round((state.frontScale ?? 0.8) * 100))
+  showFs()
+  setFrontScale(Number(fs.value) / 100) // previews match the pet
+  fs.addEventListener('input', () => {
+    showFs()
+    const k = Number(fs.value) / 100
+    setFrontScale(k)
+    window.settings.setFrontScale(k)
   })
 
   const stay = $<HTMLButtonElement>('stayput')

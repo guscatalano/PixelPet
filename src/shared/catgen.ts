@@ -225,9 +225,12 @@ function applyMarking(region: Uint8Array, fur: Uint8Array, g: Geom, kind: string
  * so facing-you keeps the same visual mass (a hint larger is kept on purpose —
  * a face turned toward you naturally reads closer).
  */
-export const FRONT_VIEW_SCALE = 0.8
+export const DEFAULT_FRONT_SCALE = 0.8
 const FEET_ANCHOR_Y = 43
-export function frontScaled(g: Geom, k = FRONT_VIEW_SCALE): Geom {
+let frontViewScale = DEFAULT_FRONT_SCALE
+/** User setting: how big the facing-you view renders (1.0 = "coming at you"). */
+export function setFrontScale(k: number): void { frontViewScale = k }
+export function frontScaled(g: Geom, k = frontViewScale): Geom {
   const sx = (x: number): number => W / 2 + (x - W / 2) * k
   const sy = (y: number): number => FEET_ANCHOR_Y - (FEET_ANCHOR_Y - y) * k
   return {
@@ -345,12 +348,15 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
   put(overlay, nx, ny + 2, O.MOUTH)
   for (const dx of [-2, -1, 1, 2]) put(overlay, nx + dx, ny + 3, O.MOUTH)
 
+  // Whiskers: anchored to the fur edge (scan outward from the head centre on
+  // each row), so they stay attached to the cheek at any front-view scale.
   for (const s of [-1, 1]) {
-    const wx = g.headCx + s * (g.headRx * 0.5)
     for (let k = 0; k < 3; k++) {
-      const wy = g.noseY - 1 + k
-      for (let i = 1; i <= 5; i++) {
-        const x = Math.round(wx + s * (g.headRx * 0.35 + i)), y = Math.round(wy + (k - 1) * 0.6)
+      const y = Math.round(g.noseY - 1 + k + (k - 1) * 0.6)
+      let edge = Math.round(g.headCx)
+      for (let x = Math.round(g.headCx); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
+      for (let i = 2; i <= 5; i++) {
+        const x = edge + s * i
         if (inB(x, y) && overlay[idx(x, y)] === O.NONE && !fur[idx(x, y)]) put(overlay, x, y, O.WHISK)
       }
     }

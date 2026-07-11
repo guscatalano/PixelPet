@@ -225,8 +225,10 @@ function applyMarking(region, fur, g, kind) {
 // ---- generate --------------------------------------------------------------
 // Scale the front pose about the feet anchor so facing-you keeps the same
 // visual mass as the side rig (head r=7) — see catgen.ts frontScaled.
-export const FRONT_VIEW_SCALE = 0.8
-export function frontScaled(g, k = FRONT_VIEW_SCALE) {
+export const DEFAULT_FRONT_SCALE = 0.8
+let frontViewScale = DEFAULT_FRONT_SCALE
+export function setFrontScale(k) { frontViewScale = k }
+export function frontScaled(g, k = frontViewScale) {
   const sx = (x) => W / 2 + (x - W / 2) * k
   const sy = (y) => 43 - (43 - y) * k
   return {
@@ -349,12 +351,14 @@ function drawFace(overlay, fur, g, state) {
   put(overlay, nx, ny + 2, O.MOUTH)
   for (const dx of [-2, -1, 1, 2]) put(overlay, nx + dx, ny + 3, O.MOUTH)
 
+  // Whiskers: anchored to the fur edge so they stay attached at any front scale.
   for (const s of [-1, 1]) {
-    const wx = g.headCx + s * (g.headRx * 0.5)
     for (let k = 0; k < 3; k++) {
-      const wy = g.noseY - 1 + k
-      for (let i = 1; i <= 5; i++) {
-        const x = Math.round(wx + s * (g.headRx * 0.35 + i)), y = Math.round(wy + (k - 1) * 0.6)
+      const y = Math.round(g.noseY - 1 + k + (k - 1) * 0.6)
+      let edge = Math.round(g.headCx)
+      for (let x = Math.round(g.headCx); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
+      for (let i = 2; i <= 5; i++) {
+        const x = edge + s * i
         if (inB(x, y) && overlay[idx(x, y)] === O.NONE && !fur[idx(x, y)]) put(overlay, x, y, O.WHISK)
       }
     }

@@ -4,7 +4,7 @@ import type { AppSettings, ClipName, Personality, TriggerEvent } from '../shared
 import { MIN_SCALE, MAX_SCALE, petWindowSize } from '../shared/constants'
 import { createTray } from './tray'
 import { PetEngine } from './behavior/engine'
-import { loadSettings, saveSettings, effectivePersonality, MIN_TURN_MS, MAX_TURN_MS } from './settings'
+import { loadSettings, saveSettings, effectivePersonality, MIN_TURN_MS, MAX_TURN_MS, MIN_FRONT_SCALE, MAX_FRONT_SCALE } from './settings'
 import { setSelfWindow } from './desktop/windows'
 
 let petWindow: BrowserWindow | null = null
@@ -75,7 +75,7 @@ function createPetWindow(): BrowserWindow {
     // Tell the renderer which pet to draw (it boots on the default cat) and
     // push the live-tunable animation config.
     win.webContents.send('pet:set-pet', settings.activePetId)
-    win.webContents.send('pet:set-config', { turnMs: settings.turnMs })
+    win.webContents.send('pet:set-config', { turnMs: settings.turnMs, frontScale: settings.frontScale })
   })
 
   win.on('closed', () => {
@@ -241,6 +241,11 @@ function registerIpc(): void {
     settings.stayPut = !!v
     saveSettings(settings)
     engine?.setStayPut(settings.stayPut)
+  })
+  ipcMain.on('settings:set-frontscale', (_e, k: number) => {
+    settings.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, k))
+    saveSettings(settings)
+    petWindow?.webContents.send('pet:set-config', { frontScale: settings.frontScale })
   })
   ipcMain.on('settings:set-trait', (_e, p: { petId: string; key: keyof Personality; value: number }) => {
     const ov = settings.overrides[p.petId] ?? (settings.overrides[p.petId] = {})

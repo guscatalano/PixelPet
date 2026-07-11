@@ -1,5 +1,5 @@
 import { SPRITE_H, SPRITE_TOP, SPRITE_W } from '../../shared/constants'
-import { generateGrid, generateWalkGrid, render as renderPet, type AnimState, type Pet } from '../../shared/catgen'
+import { generateGrid, generateWalkGrid, render as renderPet, setFrontScale, type AnimState, type Pet } from '../../shared/catgen'
 import { generateRigGrid, lerpPose, POSES, type RigPose } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
 import { DEFAULT_PET, PETS } from '../../shared/pets'
@@ -129,6 +129,13 @@ window.pet.onConfig((cfg) => {
     seqCache.delete('sit>front') // rebuilt with the new timing on next use
     seqCache.delete('front>sit')
   }
+  if (typeof cfg.frontScale === 'number') {
+    setFrontScale(cfg.frontScale)
+    // Everything derived from the front view re-renders at the new size.
+    frontCache.clear()
+    seqCache.clear()
+    hitMask = buildHitMask()
+  }
 })
 
 /** The transition sequence for one graph edge (from -> to must be adjacent). */
@@ -225,12 +232,13 @@ function reactFrames(): Frame[] {
   ])
 }
 function pawFrames(): Frame[] {
-  // Facing you, one paw comes up and pats at the glass: raise, pat-pat-pat, lower.
+  // Facing you, one paw reaches out past its side and bats at the glass:
+  // raise, quick down-pats with little recoveries, lower.
   return seqFrames('paw', () => {
-    const f = (paw: number, pawX: number, ms: number): Frame => ({
-      img: rgbaToCanvas(renderPet(generate34Grid(activePet, 0, { paw, pawX }), activePet.coat)), ms
+    const f = (paw: number, pat: number, ms: number): Frame => ({
+      img: rgbaToCanvas(renderPet(generate34Grid(activePet, 0, { paw, pawX: pat }), activePet.coat)), ms
     })
-    return [f(0.5, 0, 110), f(1, 0, 130), f(1, -1, 140), f(1, 1, 140), f(1, -1, 140), f(1, 1, 140), f(1, 0, 130), f(0.5, 0, 110)]
+    return [f(0.5, 0, 110), f(1, 0, 160), f(1, 1, 90), f(1, 0.25, 120), f(1, 1, 90), f(1, 0.25, 120), f(1, 0, 150), f(0.5, 0, 110)]
   })
 }
 const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = { yawn: 'front', stretch: 'stand', react: 'front', paw: 'front' }

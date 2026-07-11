@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import type { AppSettings, Personality } from '../shared/types'
 import { TRAIT_KEYS } from '../shared/types'
 import { DEFAULT_SCALE, MIN_SCALE, MAX_SCALE } from '../shared/constants'
+import { DEFAULT_FRONT_SCALE } from '../shared/catgen'
 import { DEFAULT_PET, PETS } from '../shared/pets'
 
 function settingsPath(): string {
@@ -18,8 +19,11 @@ export const DEFAULT_TURN_MS = 80
 export const MIN_TURN_MS = 50
 export const MAX_TURN_MS = 600 // all the way to a really slow, deliberate turn
 
+export const MIN_FRONT_SCALE = 0.65
+export const MAX_FRONT_SCALE = 1.0
+
 function defaults(): AppSettings {
-  return { activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS, stayPut: false, overrides: {} }
+  return { activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS, stayPut: false, frontScale: DEFAULT_FRONT_SCALE, overrides: {} }
 }
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n))
@@ -37,6 +41,9 @@ function sanitize(raw: unknown): AppSettings {
     s.turnMs = Math.max(MIN_TURN_MS, Math.min(MAX_TURN_MS, Math.round(r.turnMs)))
   }
   if (typeof r.stayPut === 'boolean') s.stayPut = r.stayPut
+  if (typeof r.frontScale === 'number' && Number.isFinite(r.frontScale)) {
+    s.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, r.frontScale))
+  }
   if (r.overrides && typeof r.overrides === 'object') {
     for (const [petId, ov] of Object.entries(r.overrides as Record<string, unknown>)) {
       if (!PETS.some((p) => p.id === petId) || !ov || typeof ov !== 'object') continue

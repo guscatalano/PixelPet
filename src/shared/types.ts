@@ -56,10 +56,13 @@ export interface AppSettings {
   turnMs: number
   /** "Stay here" mode: the cat holds its spot (no wandering or pounce leaps). */
   stayPut: boolean
+  /** Facing-you view scale (0.65 small .. 1.0 = big, "coming at you"). */
+  frontScale: number
   overrides: Record<string, Partial<Personality>>
 }
 
 /** Live-tunable renderer config pushed over pet:set-config. */
 export interface PetConfig {
   turnMs?: number
+  frontScale?: number
 }

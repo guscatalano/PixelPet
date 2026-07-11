@@ -55,13 +55,15 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     for (const s of [-1, 1]) {
       const lx = bx + 0.9 * t + s * legDX
       if (s === 1 && pawAmt > 0.05) {
-        // One paw raised, patting at the viewer: forearm lifts from the chest,
-        // the pad a touch bigger (it's coming toward the camera).
-        const px = lx + 0.8 + pawX * 1.7
-        const py = legTop + 1.5 - pawAmt * 7
+        // One paw raised at you: the forearm reaches up and OUT past the body
+        // silhouette (so the pad reads against the background, outlined — not
+        // white-on-white on the chest). pawX is the bat stroke (0 up, 1 = a
+        // quick downward pat).
+        const px = bx + g.bodyRx * (0.8 + 0.45 * pawAmt) + 0.6
+        const py = legTop + 2 - pawAmt * 12.5 + pawX * 2.4
         const setPaw = (x: number, y: number): void => { set(x, y); if (inB(x, y)) pawMask[idx(x, y)] = 1 }
-        for (let k = 0; k <= 1.001; k += 0.2) ellipse(setPaw, lx + (px - lx) * k, legTop + 2 + (py - (legTop + 2)) * k, 1.9, 1.6)
-        ellipse(setPaw, px, py, 3.2, 2.7)
+        for (let k = 0; k <= 1.001; k += 0.2) ellipse(setPaw, lx + 0.5 + (px - (lx + 0.5)) * k, legTop + 1.5 + (py + 1.5 - (legTop + 1.5)) * k, 1.9 - k * 0.4, 1.7 - k * 0.3)
+        ellipse(setPaw, px, py, 2.9, 2.6)
         continue
       }
       for (let y = legTop; y <= pawY; y += 0.5) ellipse(set, lx, y, 2.3, 1.6)
@@ -100,7 +102,8 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (!fur[idx(x, y)]) continue
-      if (inHead(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, hx, g.headCy, g.headRx, g.headRy))
+      if (pawMask[idx(x, y)]) shade[idx(x, y)] = BASE // the raised paw is a near limb — plain fur
+      else if (inHead(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, hx, g.headCy, g.headRx, g.headRy))
       else shade[idx(x, y)] = shadeLevel(sphereBright(x, y, bx, g.bodyCy, g.bodyRx, g.bodyRy))
     }
   for (let y = 0; y < H - 1; y++)
@@ -126,7 +129,7 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     }
   }
   if (pawAmt > 0.05) {
-    // Shadow crease around the raised paw so it reads against the white chest.
+    // Shadow crease where the forearm crosses the chest, so it reads there too.
     for (let y = 0; y < H; y++)
       for (let x = 0; x < W; x++) {
         if (!pawMask[idx(x, y)]) continue
@@ -138,6 +141,13 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
             if (shade[idx(nx2, ny2)] < SHADOW) shade[idx(nx2, ny2)] = SHADOW
           }
       }
+    // Toe notches on the pad — the detail that makes it read as a paw.
+    const tpx = Math.round(bx + g.bodyRx * (0.8 + 0.45 * pawAmt) + 0.6)
+    const tpy = Math.round(g.bodyCy + g.bodyRy * 0.32 + 2 - pawAmt * 12.5 + pawX * 2.4)
+    for (const dx of [-1, 1]) {
+      const x = tpx + dx, y = tpy - 2
+      if (inB(x, y) && pawMask[idx(x, y)]) put(overlay, x, y, O.OUTLINE)
+    }
   }
 
   // --- face: near (left) eye full, far (right) eye narrowed & closer to nose ---
@@ -160,11 +170,12 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
   }
   triangle((x, y) => put(overlay, x, y, O.NOSE), noseX - 1.6, noseY - 1, noseX + 1.6, noseY - 1, noseX, noseY + 1.2)
   if (yawn > 0.05) {
-    // Open mouth: a dark oval growing with the yawn, pink tongue at its base.
-    const mrx = 0.7 + 1.7 * yawn, mry = 0.6 + 2.4 * yawn
-    const mcy = noseY + 2.4 + mry * 0.55
+    // Open mouth: a small dark oval (cat yawns are dainty, not hippo-sized),
+    // pink tongue at its base.
+    const mrx = 0.5 + 1.0 * yawn, mry = 0.4 + 1.5 * yawn
+    const mcy = noseY + 2.2 + mry * 0.5
     ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.MOUTH) }, noseX, mcy, mrx, mry)
-    if (yawn > 0.4) ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, noseX, mcy + mry * 0.45, mrx * 0.55, Math.max(0.7, mry * 0.3))
+    if (yawn > 0.5) ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, noseX, mcy + mry * 0.4, mrx * 0.5, Math.max(0.6, mry * 0.28))
   } else {
     put(overlay, Math.round(noseX), Math.round(noseY) + 2, O.MOUTH)
     for (const dx of [-2, -1, 1, 2]) put(overlay, Math.round(noseX) + dx, Math.round(noseY) + 3, O.MOUTH)
@@ -177,14 +188,16 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
       earR - 0.5 - iwR, earBaseY - 0.5, earR - 0.5 + iwR, earBaseY - 0.5, earR - 0.3 + g.earLean * 0.3, earBaseY - earRH * 0.5)
   }
-  // whiskers: near side full, far side shortened (turning away from viewer)
+  // Whiskers: anchored to the fur edge (near side full, far side shortened as
+  // the head turns away), so they stay attached at any front-view scale.
   for (const s of [-1, 1]) {
-    const wx = noseX + s * (g.headRx * 0.5)
-    const len = s < 0 ? 5 : Math.max(1, Math.round(5 * (1 - 0.6 * t)))
+    const len = s < 0 ? 4 : Math.max(1, Math.round(4 * (1 - 0.6 * t)))
     for (let k = 0; k < 3; k++) {
-      const wy = noseY - 1 + k
-      for (let i = 1; i <= len; i++) {
-        const x = Math.round(wx + s * (g.headRx * 0.35 + i)), y = Math.round(wy + (k - 1) * 0.6)
+      const y = Math.round(noseY - 1 + k + (k - 1) * 0.6)
+      let edge = Math.round(hx)
+      for (let x = Math.round(hx); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
+      for (let i = 2; i < 2 + len; i++) {
+        const x = edge + s * i
         if (inB(x, y) && overlay[idx(x, y)] === O.NONE && !fur[idx(x, y)]) put(overlay, x, y, O.WHISK)
       }
     }
