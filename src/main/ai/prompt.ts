@@ -61,9 +61,10 @@ export const USER_PROMPT =
 // follows this just as well.
 const list = (a: readonly string[]): string => a.join(' | ')
 export const JSON_SYSTEM_PROMPT =
-  'You are a pet-portrait analyst for a cute 8-bit pixel-art desktop-pet generator. Given a photo ' +
-  'of a real cat, sample real hex colors from the fur, eyes, and nose, pick the closest build and ' +
-  'marking, and infer a playful personality from breed cues, pose, expression, and setting. ' +
+  'You are a pet-portrait analyst for a cute 8-bit pixel-art desktop-pet generator. Given one or more ' +
+  'photos of the SAME cat, sample real hex colors from the fur, eyes, and nose, pick the closest build ' +
+  'and marking, and infer a playful personality from breed cues, pose, expression, and setting. ' +
+  'Use all the photos together to judge the cat more accurately. ' +
   'Return ONLY a JSON object — no prose, no markdown code fences — with exactly these fields:\n' +
   `- name: string (short, fitting)\n` +
   `- blurb: string (one charming sentence, max ~10 words)\n` +

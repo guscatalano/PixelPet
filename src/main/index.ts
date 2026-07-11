@@ -321,7 +321,7 @@ function registerIpc(): void {
     if (!cfg) return { ok: false, error: 'Add an API key first (or set a local endpoint that needs none).' }
     if (!Array.isArray(dataUrls) || !dataUrls.length) return { ok: false, error: 'No photo provided.' }
     try {
-      const images = dataUrls.slice(0, 3).map(dataUrlToImage)
+      const images = dataUrls.slice(0, 4).map(dataUrlToImage)
       const pet = await generatePetFromPhotos(images, cfg)
       settings.userPets.push(pet)
       settings.activePetId = pet.id

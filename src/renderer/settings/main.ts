@@ -374,10 +374,11 @@ function buildAi(): void {
   const saveKey = $<HTMLButtonElement>('aisavekey')
   const test = $<HTMLButtonElement>('aitest')
   const keystate = $('aikeystate')
-  const drop = $('aidrop'), thumb = $<HTMLImageElement>('aithumb'), droptext = $('aidroptext')
+  const drop = $('aidrop'), thumbs = $('aithumbs'), droptext = $('aidroptext')
   const file = $<HTMLInputElement>('aifile'), gen = $<HTMLButtonElement>('aigen'), status = $('aistatus')
 
-  let chosen: string | null = null // data URL of the selected photo
+  const MAX_PHOTOS = 4
+  let chosen: string[] = [] // downscaled photo data URLs
   const setStatus = (msg: string, cls = ''): void => { status.textContent = msg; status.className = 'status' + (cls ? ' ' + cls : '') }
   const paintKeyState = (st: AiStatus): void => {
     keystate.textContent = st.hasKey
@@ -425,28 +426,47 @@ function buildAi(): void {
     setStatus(r.message, r.ok ? 'ok' : 'err')
   })
 
-  drop.addEventListener('click', () => file.click())
-  file.addEventListener('change', () => {
-    const f = file.files?.[0]
-    if (!f) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      chosen = String(reader.result)
-      thumb.src = chosen
-      drop.classList.add('has')
-      droptext.textContent = f.name
-      gen.disabled = false
+  const readAsDataUrl = (f: File): Promise<string> => new Promise((res, rej) => {
+    const r = new FileReader()
+    r.onload = () => res(String(r.result))
+    r.onerror = () => rej(r.error)
+    r.readAsDataURL(f)
+  })
+  // Shrink big photos so several fit in one request (vision models don't need full res).
+  const downscale = (dataUrl: string, max = 768): Promise<string> => new Promise((res) => {
+    const img = new Image()
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height))
+      const w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s))
+      const c = document.createElement('canvas')
+      c.width = w; c.height = h
+      c.getContext('2d')?.drawImage(img, 0, 0, w, h)
+      try { res(c.toDataURL('image/jpeg', 0.85)) } catch { res(dataUrl) }
     }
-    reader.readAsDataURL(f)
+    img.onerror = () => res(dataUrl)
+    img.src = dataUrl
+  })
+
+  drop.addEventListener('click', () => file.click())
+  file.addEventListener('change', async () => {
+    const files = [...(file.files ?? [])].slice(0, MAX_PHOTOS)
+    if (!files.length) return
+    setStatus('Reading photos…', 'busy')
+    chosen = await Promise.all(files.map(async (f) => downscale(await readAsDataUrl(f))))
+    thumbs.replaceChildren(...chosen.map((u) => Object.assign(new Image(), { src: u, alt: '' })))
+    drop.classList.add('has')
+    droptext.textContent = chosen.length === 1 ? '1 photo — Generate when ready' : `${chosen.length} photos — Generate when ready`
+    gen.disabled = false
+    setStatus('', '')
   })
 
   gen.addEventListener('click', async () => {
-    if (!chosen) return
+    if (!chosen.length) return
     pushConfig()
     await flushKey()
     gen.disabled = true
-    setStatus('Generating… this can take a few seconds.', 'busy')
-    const r = await window.settings.generateFromPhotos([chosen])
+    setStatus(`Generating from ${chosen.length} photo${chosen.length > 1 ? 's' : ''}… this can take a few seconds.`, 'busy')
+    const r = await window.settings.generateFromPhotos(chosen)
     gen.disabled = false
     if (!r.ok) { setStatus(r.error, 'err'); return }
     setStatus(`Created ${r.pet.name} — added to your pets and made active.`, 'ok')

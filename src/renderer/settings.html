@@ -155,11 +155,9 @@
       }
       .drop:hover { border-color: var(--accent); }
       .drop.has { border-style: solid; }
-      .drop .thumb {
-        width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: var(--panel-2);
-        flex: 0 0 auto; display: none;
-      }
-      .drop.has .thumb { display: block; }
+      .drop .thumbs { display: none; gap: 6px; flex: 0 0 auto; }
+      .drop.has .thumbs { display: flex; }
+      .drop .thumbs img { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: var(--panel-2); }
       .drop .dtext { font-size: 13px; color: var(--dim); }
       .genrow { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
       .status { font-size: 12.5px; color: var(--dim); min-height: 18px; }
@@ -211,10 +209,10 @@
           <div class="keystate" id="aikeystate"></div>
 
           <div class="drop" id="aidrop">
-            <img class="thumb" id="aithumb" alt="" />
-            <div class="dtext" id="aidroptext">Click to choose a photo of a cat…</div>
+            <div class="thumbs" id="aithumbs"></div>
+            <div class="dtext" id="aidroptext">Click to choose photos of your cat…</div>
           </div>
-          <input type="file" id="aifile" accept="image/png,image/jpeg,image/webp" hidden />
+          <input type="file" id="aifile" accept="image/png,image/jpeg,image/webp" multiple hidden />
 
           <div class="genrow">
             <button class="btn primary" id="aigen" disabled>Generate cat</button>
