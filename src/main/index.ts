@@ -87,6 +87,7 @@ function createPetWindow(): BrowserWindow {
     engine = new PetEngine(win, effectivePersonality(settings, settings.activePetId))
     engine.setStayPut(settings.stayPut)
     engine.setDisabled(settings.disabledAnims)
+    engine.setEmoter((kind) => petWindow?.webContents.send('pet:emote', kind))
     engine.start()
     applyCare()
     // Tell the renderer which pet to draw (the full spec, so user-generated pets

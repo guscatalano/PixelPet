@@ -62,6 +62,7 @@ export class PetEngine {
   private lastCareTs = 0
   private careSaveCtr = 0
   private saver: ((n: Needs) => void) | null = null
+  private emoter: ((kind: string) => void) | null = null
 
   constructor(
     private readonly win: BrowserWindow,
@@ -167,6 +168,8 @@ export class PetEngine {
     if (!this.careMode || !this.needs) return
     this.needs = applyCare(this.needs, action)
     this.persistNeeds()
+    // A little visual reward: sparkles for healing/cleaning, hearts otherwise.
+    this.emoter?.(action === 'heal' || action === 'groom' ? 'sparkle' : 'heart')
     if (this.dragging || this.busy || this.airMode !== 'none') return
     // A pleased acknowledgement: play makes it pounce; the rest a happy react.
     if (action === 'play' && !this.stayPut && this.allowed('pounce')) this.startPounce()
@@ -253,7 +256,13 @@ export class PetEngine {
   private onClick(): void {
     if (this.dragging) return
     if (this.careMode && this.needs) this.needs = nudge(this.needs, 'fun', 0.05) // petting is fun
+    this.emoter?.('heart') // a little love
     if (this.allowed('react')) this.playOneShot('react')
+  }
+
+  /** Set the callback that floats emote particles over the cat. */
+  setEmoter(fn: (kind: string) => void): void {
+    this.emoter = fn
   }
 
   /** Play a one-shot (react/yawn/stretch); `after` chains the next action. */

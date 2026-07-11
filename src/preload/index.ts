@@ -34,6 +34,10 @@ const api = {
   /** Live-tunable animation config (e.g. turn speed) pushed from settings. */
   onConfig: (handler: (cfg: PetConfig) => void): void => {
     ipcRenderer.on('pet:set-config', (_e, cfg: PetConfig) => handler(cfg))
+  },
+  /** Emote burst (hearts / sparkles / sweat) to float over the cat. */
+  onEmote: (handler: (kind: string) => void): void => {
+    ipcRenderer.on('pet:emote', (_e, kind: string) => handler(kind))
   }
 }
 

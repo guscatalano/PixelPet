@@ -18,6 +18,7 @@ interface PetApi {
   onWalkStep: (handler: (step: number) => void) => void
   onSetPet: (handler: (pet: Pet) => void) => void
   onConfig: (handler: (cfg: PetConfig) => void) => void
+  onEmote: (handler: (kind: string) => void) => void
 }
 declare global {
   interface Window {
@@ -588,6 +589,64 @@ window.pet.onSetPet((next: Pet) => {
   hitMask = buildHitMask()
 })
 
+// ---- Emote particles (hearts / sparkles / sweat) ---------------------------
+interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; kind: string }
+const particles: Particle[] = []
+function emit(kind: string): void {
+  const n = kind === 'sparkle' ? 7 : kind === 'sweat' ? 2 : 4
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x: SPRITE_W * (0.34 + Math.random() * 0.32), // sprite-local, over the cat's upper half
+      y: SPRITE_TOP + SPRITE_H * (0.12 + Math.random() * 0.22),
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: -0.34 - Math.random() * 0.28,
+      life: 0, max: 850 + Math.random() * 550, kind
+    })
+  }
+}
+window.pet.onEmote(emit)
+
+function drawEmoteShape(kind: string, x: number, y: number, s: number): void {
+  const r = s * 1.7
+  if (kind === 'heart') {
+    ctx.fillStyle = '#ff7aa8'
+    ctx.beginPath()
+    ctx.moveTo(x, y + r * 0.55)
+    ctx.bezierCurveTo(x - r, y - r * 0.4, x - r * 0.5, y - r, x, y - r * 0.3)
+    ctx.bezierCurveTo(x + r * 0.5, y - r, x + r, y - r * 0.4, x, y + r * 0.55)
+    ctx.fill()
+  } else if (kind === 'sparkle') {
+    ctx.fillStyle = '#ffe27a'
+    ctx.beginPath()
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4
+      const rr = k % 2 === 0 ? r : r * 0.38
+      const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
+    }
+    ctx.closePath(); ctx.fill()
+  } else { // sweat drop
+    ctx.fillStyle = '#8ec5ff'
+    ctx.beginPath(); ctx.arc(x, y, r * 0.5, 0, Math.PI * 2); ctx.fill()
+  }
+}
+
+function drawParticles(dt: number): void {
+  const step = dt / 16
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]
+    p.life += dt
+    if (p.life >= p.max) { particles.splice(i, 1); continue }
+    p.x += p.vx * step
+    p.y += p.vy * step
+    p.vy *= 0.985 // ease the rise
+    const t = p.life / p.max
+    ctx.globalAlpha = Math.max(0, t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85)
+    drawEmoteShape(p.kind, p.x * scale, p.y * scale, scale)
+  }
+  ctx.globalAlpha = 1
+}
+
 // ---- Rendering ------------------------------------------------------------
 function drawZzz(now: number): void {
   const chars = ['z', 'z', 'Z']
@@ -614,7 +673,10 @@ function drawSprite(frame: HTMLCanvasElement, fc: Facing, ox = 0, oy = 0): void 
   ctx.restore()
 }
 
+let lastRenderNow = 0
 function render(now: number): void {
+  const dt = lastRenderNow ? Math.min(80, now - lastRenderNow) : 16
+  lastRenderNow = now
   // As the time-of-day dilation drifts across a quantized step, rebuild the
   // cached turn so its baked pupils stay in sync with the live front idle.
   if (pupilsByTime) {
@@ -649,6 +711,7 @@ function render(now: number): void {
     drawSprite(f.img, facing, f.ox ?? 0, f.oy ?? 0)
     if (curNode === 'sleep') drawZzz(now)
   }
+  if (particles.length) drawParticles(dt)
   requestAnimationFrame(render)
 }
 requestAnimationFrame(render)
