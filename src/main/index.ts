@@ -213,6 +213,9 @@ function registerIpc(): void {
   ipcMain.on('pet:clip-ended', (_e, clip: ClipName) => {
     engine?.onClipEnded(clip)
   })
+  ipcMain.on('pet:state-reached', (_e, clip: ClipName) => {
+    engine?.onStateReached(clip)
+  })
 
   // ---- settings channels ----
   ipcMain.handle('settings:get', () => settings)

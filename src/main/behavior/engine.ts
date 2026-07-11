@@ -8,37 +8,47 @@ const MOVE_TICK_MS = 16
 const WALK_SPEED = 0.35 // px per tick (~22 px/s) — a calm walking pace, not a scramble
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
-const REACT_SAFETY_MS = 650 // force-end a react if the renderer never reports it
-const FALL_SPEED = 7 // px per tick the pet drops when unsupported
+const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never reports it
+const GRAVITY = 0.45 // px/tick² — vertical acceleration while airborne
+const MAX_FALL = 9 // terminal velocity, px/tick
 const FALL_CLIP_GAP = 10 // only show the flailing fall clip when dropping more than this
 const REFRESH_EVERY = 15 // physics ticks between window-list refreshes (~240ms)
+const EDGE_LOOKAHEAD = 9 // px ahead of the feet to probe for a drop while walking
+const EDGE_DROP = 40 // a support drop bigger than this counts as "an edge"
+const TEETER_MS = 1900 // how long the cat wobbles at an edge before deciding
+const POOF_MS = 1100 // how long the scared poof holds
+const BIG_FALL = 90 // falls taller than this spook the cat on landing
 
 /**
  * The pet's brain. Owns behavior: routes trigger events to reactions, runs the
- * personality-weighted ambient loop (wander / nap / linger), and drives the
- * window during a wander. It tells the renderer *what* to play via `pet:play`;
- * the renderer decides *how* to draw it.
- *
- * This is intentionally a small, explicit engine for M2. The trigger/reaction
- * wiring is centralized here so new triggers (music, process-launch) and
- * reactions can be added without touching the renderer.
+ * personality-weighted ambient loop (wander / nap / loaf / groom / pounce),
+ * and owns physics: walking, gravity onto window platforms, ballistic leaps.
+ * It tells the renderer *what* to play via `pet:play`; the renderer's animation
+ * graph decides *how* to get there (turning, sitting down, tucking in) and
+ * reports arrival via `pet:state-reached`.
  */
 export class PetEngine {
   private clip: ClipName = 'idle'
   private facing: Facing = 'right'
   private dragging = false
-  private busy = false // a one-shot reaction (react) is playing
+  private busy = false // a one-shot (react/yawn/stretch) is playing
+  private visualReady = false // renderer's graph has arrived at this.clip
   private wanderTarget: number | null = null
   private curX = 0 // internal float position (avoids get/set round-trip jitter)
   private curY = 0
   private lastX = 0 // last integer position sent (avoid redundant setPosition calls)
   private lastY = 0
   private walkDist = 0 // px travelled this wander, drives the gait phase
-  private falling = false // pet is above its support surface (gravity active)
+  private vx = 0 // ballistic horizontal velocity (leaps)
+  private vy = 0 // vertical velocity (gravity / leap impulse)
+  private airMode: 'none' | 'fall' | 'leap' = 'none'
+  private fallStartY = 0 // where the current fall began (poof on big landings)
+  private walkAskedAt = 0 // when we requested the walk visual (stall safety)
+  private afterShot: (() => void) | null = null // continuation after a one-shot ends
   private refreshCtr = 0
   private physicsTimer: ReturnType<typeof setInterval> | null = null
   private ambientTimer: ReturnType<typeof setTimeout> | null = null
-  private reactTimer: ReturnType<typeof setTimeout> | null = null
+  private actionTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(
     private readonly win: BrowserWindow,
@@ -53,7 +63,7 @@ export class PetEngine {
     this.lastX = x
     this.lastY = y
     refreshPlatforms()
-    this.physicsTimer = setInterval(() => this.physics(), MOVE_TICK_MS) // gravity + walking, always on
+    this.physicsTimer = setInterval(() => this.physics(), MOVE_TICK_MS)
     this.send()
     this.scheduleAmbient(1500)
   }
@@ -61,16 +71,35 @@ export class PetEngine {
   dispose(): void {
     if (this.physicsTimer) clearInterval(this.physicsTimer)
     if (this.ambientTimer) clearTimeout(this.ambientTimer)
-    if (this.reactTimer) clearTimeout(this.reactTimer)
+    if (this.actionTimer) clearTimeout(this.actionTimer)
   }
 
-  /** Feet position (screen y) within the pet window, accounting for bob headroom. */
+  /** Feet position (window-local y), accounting for the bob headroom. */
   private feetOffset(height: number): number {
     const scale = height / (SPRITE_H + BOB_AMPLITUDE * 2)
     return height - BOB_AMPLITUDE * scale
   }
 
-  // ---- trigger intake -------------------------------------------------------
+  // ---- renderer feedback -----------------------------------------------------
+
+  onStateReached(clip: ClipName): void {
+    if (clip === this.clip) this.visualReady = true
+  }
+
+  onClipEnded(clip: ClipName): void {
+    if (this.actionTimer) { clearTimeout(this.actionTimer); this.actionTimer = null }
+    this.busy = false
+    const next = this.afterShot
+    this.afterShot = null
+    if (this.dragging) return
+    if (next) { next(); return }
+    if (clip === 'react' || clip === 'yawn' || clip === 'stretch') {
+      this.setClip('idle')
+      this.scheduleAmbient()
+    }
+  }
+
+  // ---- trigger intake ----------------------------------------------------------
 
   emit(ev: TriggerEvent): void {
     switch (ev.type) {
@@ -80,55 +109,55 @@ export class PetEngine {
       case 'click':
         this.onClick()
         break
+      case 'leap':
+        this.onLeap()
+        break
     }
   }
 
   onDragStart(): void {
     this.dragging = true
     this.cancelWander()
+    this.airMode = 'none'
+    this.vy = 0
+    this.vx = 0
     this.setClip('idle')
   }
 
   onDragEnd(): void {
     this.dragging = false
     // A little startled shake after being put down, then resume ambient life.
-    this.playReact()
+    this.playOneShot('react')
   }
 
-  onClipEnded(clip: ClipName): void {
-    if (clip !== 'react') return
-    if (this.reactTimer) {
-      clearTimeout(this.reactTimer)
-      this.reactTimer = null
-    }
-    this.busy = false
-    if (!this.dragging) {
-      this.setClip('idle')
-      this.scheduleAmbient()
-    }
-  }
-
-  // ---- reactions ------------------------------------------------------------
+  // ---- reactions ---------------------------------------------------------------
 
   private onHover(): void {
     if (this.busy || this.dragging) return
+    // The sleeping/loafing hover response is the renderer's ear-perk — don't wake.
+    if (this.clip === 'sleep' || this.clip === 'loaf') return
+    if (this.clip !== 'idle' && this.clip !== 'sit') return
     // Affectionate cats greet you; independent ones often ignore a hover.
     const chance = 0.35 + this.personality.affection * 0.5 - this.personality.independence * 0.25
-    if (Math.random() < chance) this.playReact()
+    if (Math.random() < chance) this.playOneShot('react')
   }
 
   private onClick(): void {
     if (this.dragging) return
-    this.playReact()
+    this.playOneShot('react')
   }
 
-  private playReact(): void {
+  /** Play a one-shot (react/yawn/stretch); `after` chains the next action. */
+  private playOneShot(shot: ClipName, after?: () => void): void {
     this.cancelWander()
     this.busy = true
-    this.setClip('react')
-    if (this.reactTimer) clearTimeout(this.reactTimer)
-    this.reactTimer = setTimeout(() => this.onClipEnded('react'), REACT_SAFETY_MS)
+    this.afterShot = after ?? null
+    this.setClip(shot)
+    if (this.actionTimer) clearTimeout(this.actionTimer)
+    this.actionTimer = setTimeout(() => this.onClipEnded(shot), SHOT_SAFETY_MS)
   }
+
+  // ---- wandering + physics -------------------------------------------------------
 
   private startWander(): void {
     if (this.dragging || this.win.isDestroyed()) return
@@ -139,7 +168,6 @@ export class PetEngine {
       this.finishWander()
       return
     }
-    // Pick a target that's a worthwhile distance away, clamped on-screen.
     let target = Math.round(minX + Math.random() * (maxX - minX))
     if (Math.abs(target - this.curX) < MIN_WANDER) {
       target = this.curX + (target >= this.curX ? 1 : -1) * (MIN_WANDER + Math.random() * 140)
@@ -148,44 +176,77 @@ export class PetEngine {
     this.wanderTarget = target
     this.walkDist = 0
     this.facing = target < this.curX ? 'left' : 'right'
+    this.walkAskedAt = Date.now()
     this.setClip('walk', this.facing)
   }
 
-  // The always-on physics tick: walk toward a wander target (horizontal) and
-  // fall onto whatever window/floor is under the feet (vertical gravity). This is
-  // what makes the pet "aware of what it's standing on".
+  // The always-on physics tick: walking, gravity onto whatever window/taskbar is
+  // under the feet, ballistic leaps, and edge detection (teeter before a drop).
   private physics(): void {
     if (this.win.isDestroyed()) return
     if (++this.refreshCtr >= REFRESH_EVERY) { this.refreshCtr = 0; refreshPlatforms() }
-    if (this.dragging) { const [x, y] = this.win.getPosition(); this.curX = x; this.curY = y; return }
+    if (this.dragging) {
+      const [x, y] = this.win.getPosition()
+      this.curX = x
+      this.curY = y
+      return
+    }
 
     const b = this.win.getBounds()
+    const feetOff = this.feetOffset(b.height)
 
-    // Horizontal: advance toward the wander target while the walk clip is playing.
-    if (this.wanderTarget !== null && this.clip === 'walk') {
-      const dx = this.wanderTarget - this.curX
-      if (Math.abs(dx) <= WALK_SPEED) { this.curX = this.wanderTarget; this.finishWander() }
-      else { this.curX += Math.sign(dx) * WALK_SPEED; this.walkDist += WALK_SPEED }
+    // Horizontal: walking (gated on the renderer having visually reached the walk)
+    // or ballistic drift during a leap.
+    if (this.airMode === 'leap') {
+      this.curX += this.vx
+    } else if (this.wanderTarget !== null && this.clip === 'walk') {
+      if (this.visualReady) {
+        const feetX = this.curX + b.width / 2
+        const feetY = this.curY + feetOff
+        // An edge ahead? Stop and teeter before walking off.
+        const dir = this.facing === 'right' ? 1 : -1
+        const aheadT = supportY(feetX + dir * EDGE_LOOKAHEAD, feetY)
+        if (aheadT - feetY > EDGE_DROP && this.airMode === 'none') {
+          this.startTeeter()
+          return
+        }
+        const dx = this.wanderTarget - this.curX
+        if (Math.abs(dx) <= WALK_SPEED) {
+          this.curX = this.wanderTarget
+          this.finishWander()
+        } else {
+          this.curX += Math.sign(dx) * WALK_SPEED
+          this.walkDist += WALK_SPEED
+        }
+      } else if (Date.now() - this.walkAskedAt > 5000) {
+        this.finishWander() // renderer never arrived; don't stall forever
+      }
     }
 
     // Vertical: gravity toward the support surface under the feet.
-    const feetOff = this.feetOffset(b.height)
     const feetX = this.curX + b.width / 2
     const feetY0 = this.curY + feetOff
     const T = supportY(feetX, feetY0)
     const gap = T - feetY0
-    if (gap > 0.5) { this.curY = Math.min(T, feetY0 + FALL_SPEED) - feetOff; this.falling = true }
-    else { this.curY = T - feetOff; this.falling = false }
-
-    // Play the flailing fall clip while dropping a meaningful distance; land to idle.
-    if (this.falling && gap > FALL_CLIP_GAP && this.clip !== 'fall' && !this.dragging) {
-      this.cancelWander()
-      if (this.reactTimer) { clearTimeout(this.reactTimer); this.reactTimer = null }
-      this.busy = false
-      this.setClip('fall', this.facing)
-    } else if (!this.falling && this.clip === 'fall') {
-      this.setClip('idle')
-      this.scheduleAmbient(400)
+    if (gap > 0.5 || this.vy < 0) {
+      if (this.airMode === 'none') {
+        this.airMode = 'fall'
+        this.fallStartY = feetY0
+      }
+      this.vy = Math.min(MAX_FALL, this.vy + GRAVITY)
+      const newFeetY = this.vy > 0 ? Math.min(T, feetY0 + this.vy) : feetY0 + this.vy
+      this.curY = newFeetY - feetOff
+      // Show the flailing fall once it's a real drop (not for leaps going up).
+      if (this.airMode === 'fall' && this.vy > 0 && T - newFeetY > 0 && gap > FALL_CLIP_GAP && this.clip !== 'fall') {
+        this.cancelWander()
+        this.busy = false
+        this.afterShot = null
+        this.setClip('fall', this.facing)
+      }
+      if (newFeetY >= T && this.vy > 0) this.landAt(T, feetOff)
+    } else {
+      this.curY = T - feetOff
+      if (this.airMode !== 'none') this.landAt(T, feetOff)
     }
 
     const rx = Math.round(this.curX), ry = Math.round(this.curY)
@@ -194,7 +255,85 @@ export class PetEngine {
       this.lastX = rx
       this.lastY = ry
     }
-    if (this.clip === 'walk' && !this.falling) this.win.webContents.send('pet:walk-step', (this.walkDist / STRIDE) % 1)
+    if (this.clip === 'walk' && this.airMode === 'none' && this.visualReady) {
+      this.win.webContents.send('pet:walk-step', (this.walkDist / STRIDE) % 1)
+    }
+  }
+
+  private landAt(T: number, feetOff: number): void {
+    const dropped = T - this.fallStartY
+    const wasLeap = this.airMode === 'leap'
+    this.airMode = 'none'
+    this.vy = 0
+    this.vx = 0
+    this.curY = T - feetOff
+    if (this.clip === 'fall' || this.clip === 'pounce' || wasLeap) {
+      if (!wasLeap && dropped > BIG_FALL) {
+        // That was a long way down — Halloween-cat moment, then compose yourself.
+        this.setClip('poof')
+        if (this.actionTimer) clearTimeout(this.actionTimer)
+        this.actionTimer = setTimeout(() => {
+          this.setClip('idle')
+          this.scheduleAmbient(800)
+        }, POOF_MS)
+      } else {
+        this.setClip('idle')
+        this.scheduleAmbient(600)
+      }
+    }
+  }
+
+  // ---- edge teetering ------------------------------------------------------------
+
+  private startTeeter(): void {
+    this.cancelWander()
+    this.setClip('teeter', this.facing)
+    if (this.actionTimer) clearTimeout(this.actionTimer)
+    this.actionTimer = setTimeout(() => {
+      if (this.dragging || this.clip !== 'teeter') return
+      const p = this.personality
+      // Bold cats sometimes just hop down; most back away from the edge.
+      if (Math.random() < 0.2 + p.curiosity * 0.25 + p.mischief * 0.2) {
+        const dir = this.facing === 'right' ? 1 : -1
+        this.airMode = 'leap'
+        this.fallStartY = 0 // a chosen hop never spooks
+        this.vx = dir * 1.6
+        this.vy = -2.4
+        this.setClip('fall', this.facing) // legs out as it drops
+      } else {
+        this.facing = this.facing === 'right' ? 'left' : 'right'
+        this.setClip('idle', this.facing)
+        this.scheduleAmbient(900)
+      }
+    }, TEETER_MS)
+  }
+
+  // ---- the pounce ------------------------------------------------------------------
+
+  private startPounce(): void {
+    // Face whichever side has more room to land in.
+    const wa = screen.getDisplayMatching(this.win.getBounds()).workArea
+    const centre = wa.x + wa.width / 2
+    this.facing = this.curX < centre ? 'right' : 'left'
+    this.setClip('pounce', this.facing)
+    // Safety: if the renderer never sends 'leap', recover.
+    if (this.actionTimer) clearTimeout(this.actionTimer)
+    this.actionTimer = setTimeout(() => {
+      if (this.clip === 'pounce' && this.airMode === 'none') {
+        this.setClip('idle')
+        this.scheduleAmbient()
+      }
+    }, SHOT_SAFETY_MS)
+  }
+
+  /** The renderer finished the butt-wiggle and left the ground — apply the impulse. */
+  private onLeap(): void {
+    if (this.clip !== 'pounce' || this.dragging) return
+    if (this.actionTimer) { clearTimeout(this.actionTimer); this.actionTimer = null }
+    this.airMode = 'leap'
+    this.fallStartY = 0
+    this.vx = (this.facing === 'right' ? 1 : -1) * 2.1
+    this.vy = -5.2
   }
 
   private finishWander(): void {
@@ -209,13 +348,7 @@ export class PetEngine {
     this.wanderTarget = null
   }
 
-  private startSleep(): void {
-    this.setClip('sleep')
-    // Nap for a while; the next ambient tick wakes the cat into a new action.
-    this.scheduleAmbient(7000 + Math.random() * 7000)
-  }
-
-  // ---- personality-weighted ambient loop ------------------------------------
+  // ---- personality-weighted ambient loop ---------------------------------------
 
   private scheduleAmbient(delayMs?: number): void {
     if (this.ambientTimer) clearTimeout(this.ambientTimer)
@@ -224,33 +357,65 @@ export class PetEngine {
   }
 
   private ambientTick(): void {
-    if (this.dragging || this.busy || this.falling) {
+    if (this.dragging || this.busy || this.airMode !== 'none' || this.clip === 'teeter' || this.clip === 'pounce') {
       this.scheduleAmbient(2000)
       return
     }
     const p = this.personality
-    const action = weightedPick<'wander' | 'sleep' | 'linger'>([
-      { item: 'wander', weight: 0.3 + p.energy * 0.9 + p.curiosity * 0.3 },
-      { item: 'sleep', weight: 0.15 + p.sleepiness * 1.0 - p.energy * 0.2 },
-      { item: 'linger', weight: 0.4 + (1 - p.energy) * 0.4 }
+    const wasAsleep = this.clip === 'sleep'
+    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'groom' | 'pounce' | 'sit' | 'linger'>([
+      { item: 'wander', weight: 0.3 + p.energy * 0.8 + p.curiosity * 0.3 },
+      { item: 'sleep', weight: 0.12 + p.sleepiness * 0.9 - p.energy * 0.2 },
+      { item: 'loaf', weight: 0.18 + p.sleepiness * 0.4 + (1 - p.energy) * 0.3 },
+      { item: 'groom', weight: 0.15 + p.independence * 0.2 },
+      { item: 'pounce', weight: 0.06 + p.energy * 0.35 + p.mischief * 0.35 },
+      { item: 'sit', weight: 0.2 + (1 - p.energy) * 0.2 },
+      { item: 'linger', weight: 0.3 + (1 - p.energy) * 0.3 }
     ])
-    switch (action) {
-      case 'wander':
-        this.startWander()
-        break
-      case 'sleep':
-        this.startSleep()
-        break
-      default:
-        this.setClip('idle')
-        this.scheduleAmbient()
-        break
+    const go = (): void => {
+      switch (action) {
+        case 'wander':
+          this.startWander()
+          break
+        case 'sleep':
+          this.setClip('sleep')
+          this.scheduleAmbient(9000 + Math.random() * 10000)
+          break
+        case 'loaf':
+          this.setClip('loaf')
+          this.scheduleAmbient(8000 + Math.random() * 9000)
+          break
+        case 'groom':
+          this.setClip('groom')
+          this.scheduleAmbient(4000 + Math.random() * 4000)
+          break
+        case 'pounce':
+          this.startPounce()
+          break
+        case 'sit':
+          this.setClip('sit')
+          this.scheduleAmbient()
+          break
+        default:
+          this.setClip('idle')
+          this.scheduleAmbient()
+          break
+      }
+    }
+    // Flourishes: a yawn on the way to a nap; a stretch on waking up to move.
+    if (action === 'sleep' && this.clip === 'idle' && Math.random() < 0.45 + p.sleepiness * 0.45) {
+      this.playOneShot('yawn', go)
+    } else if (wasAsleep && (action === 'wander' || action === 'pounce') ) {
+      this.playOneShot('stretch', go)
+    } else {
+      go()
     }
   }
 
-  // ---- plumbing -------------------------------------------------------------
+  // ---- plumbing ------------------------------------------------------------------
 
   private setClip(clip: ClipName, facing?: Facing): void {
+    if (clip !== this.clip) this.visualReady = false
     this.clip = clip
     if (facing) this.facing = facing
     this.send()

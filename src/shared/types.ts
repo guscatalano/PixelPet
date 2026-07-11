@@ -1,7 +1,14 @@
 // Types shared across main, preload, and renderer.
 
-/** Animation clips the renderer knows how to play. */
-export type ClipName = 'idle' | 'sit' | 'walk' | 'sleep' | 'react' | 'fall'
+/**
+ * Animation clips the renderer knows how to play. Most are stable states the
+ * renderer transitions to through the animation graph (real motion — turning,
+ * sitting down, tucking into a loaf); yawn/stretch/react/pounce are one-shots
+ * that report back via pet:clip-ended when finished.
+ */
+export type ClipName =
+  | 'idle' | 'sit' | 'walk' | 'sleep' | 'react' | 'fall'
+  | 'loaf' | 'groom' | 'teeter' | 'poof' | 'pounce' | 'yawn' | 'stretch'
 
 /** Which way the pet faces (affects horizontal flip). */
 export type Facing = 'left' | 'right'

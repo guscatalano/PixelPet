@@ -606,3 +606,9 @@ export function render(parts: Parts, coatSpec: CoatSpec): Uint8ClampedArray {
 export function renderCat(pet: Pet, state: AnimState = {}): { w: number; h: number; rgba: Uint8ClampedArray } {
   return { w: W, h: H, rgba: render(generateGrid(pet, state), pet.coat) }
 }
+
+/**
+ * Internal drawing primitives, shared with the pose/rig generators (rigcat,
+ * turn34) so the raster helpers exist in exactly one place.
+ */
+export const internals = { ellipse, triangle, idx, inB, put, sphereBright, shadeLevel, O, HI, BASE, SHADOW, DEEP }

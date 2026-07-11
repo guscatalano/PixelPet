@@ -1,4 +1,5 @@
-import { generateGrid, generateWalkGrid, generateCurlGrid, render as renderPet, type AnimState } from '../../shared/catgen'
+import { generateGrid, generateWalkGrid, render as renderPet, type AnimState } from '../../shared/catgen'
+import { generateRigGrid, lerpPose, POSES as RIG } from '../../shared/rigcat'
 import { PETS, type AppPet } from '../../shared/pets'
 import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
 import { TRAIT_KEYS, type AppSettings, type Personality } from '../../shared/types'
@@ -53,10 +54,24 @@ function reactState(t: number): AnimState {
   if (p < 950) return { eyeOpen: true, tailPhase: 0.3, look: 1, earPhase: 0 }
   return { eyeOpen: true, tailPhase: Math.sin(t / 1400), look: 0, earPhase: 0 }
 }
+function sleepPose(t: number): ReturnType<typeof lerpPose> {
+  const br = Math.sin(t / 900)
+  const p = lerpPose(RIG.curl, RIG.curl, 0)
+  p.body = [p.body[0], p.body[1] - br * 0.25, p.body[2], p.body[3] + br * 0.5]
+  return p
+}
+function loafPose(t: number): ReturnType<typeof lerpPose> {
+  const br = Math.sin(t / 1100)
+  const p = lerpPose(RIG.loaf, RIG.loaf, 0)
+  p.body = [p.body[0], p.body[1] - br * 0.2, p.body[2], p.body[3] + br * 0.35]
+  p.eye = t % 4200 > 160 ? 1 : 0
+  return p
+}
 const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) => Uint8ClampedArray }> = [
   { key: 'idle', label: 'Idle', rgba: (pet, t) => renderPet(generateGrid(pet, idleState(t)), pet.coat) },
   { key: 'walk', label: 'Walk', rgba: (pet, t) => renderPet(generateWalkGrid(pet, (t / 900) % 1), pet.coat) },
-  { key: 'sleep', label: 'Sleep', rgba: (pet, t) => renderPet(generateCurlGrid(pet, (t / 1500) % (Math.PI * 2)), pet.coat) },
+  { key: 'loaf', label: 'Loaf', rgba: (pet, t) => renderPet(generateRigGrid(pet, loafPose(t)), pet.coat) },
+  { key: 'sleep', label: 'Sleep', rgba: (pet, t) => renderPet(generateRigGrid(pet, sleepPose(t)), pet.coat) },
   { key: 'react', label: 'React', rgba: (pet, t) => renderPet(generateGrid(pet, reactState(t)), pet.coat) }
 ]
 const poseCanvases: CanvasRenderingContext2D[] = []
