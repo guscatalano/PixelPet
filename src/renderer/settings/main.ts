@@ -10,6 +10,7 @@ interface SettingsApi {
   setPet: (petId: string) => void
   setScale: (scale: number) => void
   setTurnMs: (ms: number) => void
+  setStayPut: (v: boolean) => void
   setTrait: (petId: string, key: keyof Personality, value: number) => void
   resetTraits: (petId: string) => void
 }
@@ -225,6 +226,19 @@ function buildAnimation(): void {
   slider.addEventListener('input', () => {
     show()
     window.settings.setTurnMs(Number(slider.value))
+  })
+
+  const stay = $<HTMLButtonElement>('stayput')
+  const paint = (on: boolean): void => {
+    stay.classList.toggle('on', on)
+    stay.setAttribute('aria-pressed', String(on))
+    stay.textContent = on ? 'On — holding this spot' : 'Off — free to roam'
+  }
+  paint(state.stayPut ?? false)
+  stay.addEventListener('click', () => {
+    state.stayPut = !state.stayPut
+    paint(state.stayPut)
+    window.settings.setStayPut(state.stayPut)
   })
 }
 

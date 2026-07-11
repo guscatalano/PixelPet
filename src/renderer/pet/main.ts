@@ -224,8 +224,17 @@ function reactFrames(): Frame[] {
     { img: getFrontFrame(true, 0.3, 1, 0), ms: 320 }
   ])
 }
-const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = { yawn: 'front', stretch: 'stand', react: 'front' }
-const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = { yawn: yawnFrames, stretch: stretchFrames, react: reactFrames }
+function pawFrames(): Frame[] {
+  // Facing you, one paw comes up and pats at the glass: raise, pat-pat-pat, lower.
+  return seqFrames('paw', () => {
+    const f = (paw: number, pawX: number, ms: number): Frame => ({
+      img: rgbaToCanvas(renderPet(generate34Grid(activePet, 0, { paw, pawX }), activePet.coat)), ms
+    })
+    return [f(0.5, 0, 110), f(1, 0, 130), f(1, -1, 140), f(1, 1, 140), f(1, -1, 140), f(1, 1, 140), f(1, 0, 130), f(0.5, 0, 110)]
+  })
+}
+const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = { yawn: 'front', stretch: 'stand', react: 'front', paw: 'front' }
+const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = { yawn: yawnFrames, stretch: stretchFrames, react: reactFrames, paw: pawFrames }
 
 // ---- Graph runtime state ------------------------------------------------------
 const NODE_OF: Partial<Record<ClipName, Node>> = {
@@ -341,6 +350,8 @@ let perkLast = 0
 // Hover head-turn while loafing: the head eases toward facing you.
 let headCur = 0
 let headLast = 0
+// Loaf settling: eases toward the dozy low-head loaf when left alone.
+let relaxCur = 0
 function sleepFrame(now: number): HTMLCanvasElement {
   const dt = Math.min(100, now - perkLast)
   perkLast = now
@@ -374,17 +385,22 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
     case 'fall': return { img: getWalkFrame((now / 90) % 1) } // legs scrabbling in the air
     case 'loaf': {
       // Hover a loafing cat and it turns its head to look at you (body stays
-      // bread) — through the mid-turn blink, ears perking slightly.
+      // bread). Left alone for a while, the head sinks into the dozy low loaf;
+      // hovering lifts it back up.
       const dt = Math.min(100, now - headLast)
       headLast = now
       const speed = dt / 200
       const target = hovering ? 1 : 0
       headCur = target > headCur ? Math.min(target, headCur + speed) : Math.max(target, headCur - speed)
+      const relaxTarget = hovering ? 0 : Math.max(0, Math.min(1, (now - nodeSince - 7000) / 3000))
+      const rSpeed = dt / 650
+      relaxCur = relaxTarget > relaxCur ? Math.min(relaxTarget, relaxCur + rSpeed) : Math.max(relaxTarget, relaxCur - rSpeed)
       const f = Math.round(headCur * 2) // 0 = profile, 1 = mid-turn blink, 2 = facing you
+      const rq = Math.round(relaxCur * 4) // 0 = heads-up loaf .. 4 = fully settled
       const b = Math.round(((Math.sin(now / 1100) + 1) / 2) * 5)
-      const open = restBlink(now)
-      return { img: getRigFrame(`loaf|${b}|${open ? 1 : 0}|${f}`, () => {
-        const pose = lerpPose(POSES.loaf, POSES.loaf, 0)
+      const open = rq >= 3 ? false : restBlink(now) // dozing once fully settled
+      return { img: getRigFrame(`loaf|${b}|${open ? 1 : 0}|${f}|${rq}`, () => {
+        const pose = lerpPose(POSES.loaf, POSES.loafLow, rq / 4)
         const br = (b / 5) * 2 - 1
         pose.body = [pose.body[0], pose.body[1] - br * 0.2, pose.body[2], pose.body[3] + br * 0.35]
         pose.eye = open ? 1 : 0

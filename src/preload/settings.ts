@@ -11,6 +11,8 @@ const api = {
   setScale: (scale: number): void => ipcRenderer.send('settings:set-scale', scale),
   /** Set the ¾-turn speed (ms per keyframe; lower = snappier). */
   setTurnMs: (ms: number): void => ipcRenderer.send('settings:set-turnms', ms),
+  /** Toggle "stay here" mode (the cat holds its spot). */
+  setStayPut: (v: boolean): void => ipcRenderer.send('settings:set-stayput', v),
   /** Override one personality trait of a pet (live if it's the active pet). */
   setTrait: (petId: string, key: keyof Personality, value: number): void =>
     ipcRenderer.send('settings:set-trait', { petId, key, value }),

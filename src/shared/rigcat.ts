@@ -219,6 +219,19 @@ export const POSES: Record<string, RigPose> = {
       { hip: [30, 37], mid: [30, 40], foot: [29, 41], near: true }
     ]
   },
+  // The settled loaf: same bread, but the head has sunk low toward the chest —
+  // deeply relaxed, on the way to a doze. The loaf node lerps loaf -> loafLow
+  // after the cat has loafed for a while.
+  loafLow: {
+    body: [21, 35.5, 13.5, 7.2], head: [32.5, 30.5, 7], neck: [29.5, 34, 6.5, 5],
+    tail: { root: [8, 38], ctrl: [9, 44], tip: [26, 42.5] }, eye: 1,
+    legs: [
+      { hip: [15, 37], mid: [13, 40], foot: [16, 41], near: false },
+      { hip: [28, 37], mid: [28, 40], foot: [27, 41], near: false },
+      { hip: [17, 37], mid: [15, 40], foot: [18, 41], near: true },
+      { hip: [30, 37], mid: [30, 40], foot: [29, 41], near: true }
+    ]
+  },
   // Washing up: sitting, one front paw raised to the mouth, head dipped toward
   // it, eyes squeezed in concentration. Lerp groom <-> groomLick for the licks.
   groom: {

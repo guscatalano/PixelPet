@@ -91,6 +91,10 @@
       .link:hover { color: var(--accent); text-decoration: underline; }
       .link:disabled { opacity: 0.4; cursor: default; }
       .link:disabled:hover { color: var(--faint); text-decoration: none; }
+      .toggle { font-family: var(--sans); font-size: 12.5px; color: var(--ink); background: transparent;
+        border: 1px solid var(--hair); border-radius: 9px; padding: 6px 12px; cursor: pointer; justify-self: start; }
+      .toggle:hover { border-color: var(--accent); }
+      .toggle.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 
       /* Selected-pet identity line */
       .petid { margin-top: 13px; font-size: 13px; color: var(--dim); }
@@ -132,12 +136,17 @@
       </section>
 
       <section>
-        <div class="label">Animation</div>
+        <div class="label">Animation &amp; behavior</div>
         <div class="traits">
           <div class="trow">
             <div class="tn">Turn speed</div>
-            <input type="range" id="turnms" min="50" max="220" step="10" />
+            <input type="range" id="turnms" min="50" max="600" step="10" />
             <div class="tv" id="turnmsv" style="width: 74px">80ms</div>
+          </div>
+          <div class="trow" style="margin-top: 6px">
+            <div class="tn">Stay here</div>
+            <button class="toggle" id="stayput" aria-pressed="false">Off — free to roam</button>
+            <div class="tv"></div>
           </div>
         </div>
       </section>

@@ -223,8 +223,24 @@ function applyMarking(region, fur, g, kind) {
 }
 
 // ---- generate --------------------------------------------------------------
+// Scale the front pose about the feet anchor so facing-you keeps the same
+// visual mass as the side rig (head r=7) — see catgen.ts frontScaled.
+export const FRONT_VIEW_SCALE = 0.8
+export function frontScaled(g, k = FRONT_VIEW_SCALE) {
+  const sx = (x) => W / 2 + (x - W / 2) * k
+  const sy = (y) => 43 - (43 - y) * k
+  return {
+    ...g,
+    headCx: sx(g.headCx), headCy: sy(g.headCy), headRx: g.headRx * k, headRy: g.headRy * k,
+    bodyCx: sx(g.bodyCx), bodyCy: sy(g.bodyCy), bodyRx: g.bodyRx * k, bodyRy: g.bodyRy * k,
+    earW: g.earW * k, earH: g.earH * k, earSpread: g.earSpread * k, earLean: g.earLean * k,
+    eyeDX: g.eyeDX * k, eyeY: sy(g.eyeY), eyeRx: g.eyeRx * k, eyeRy: g.eyeRy * k,
+    noseY: sy(g.noseY), cheekFluff: g.cheekFluff * k
+  }
+}
+
 export function generateGrid(preset, state = {}) {
-  const g = { ...defaultGeom(), ...(preset.geom || {}) }
+  const g = frontScaled({ ...defaultGeom(), ...(preset.geom || {}) })
   const marking = preset.marking || 'solid'
   const fur = buildFur(g, state)
   const shade = new Uint8Array(W * H)

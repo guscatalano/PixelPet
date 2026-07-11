@@ -218,8 +218,30 @@ function applyMarking(region: Uint8Array, fur: Uint8Array, g: Geom, kind: string
   }
 }
 
+/**
+ * The front view rasterized at full geometry reads ~40% larger than the side
+ * rig (whose head is r=7 to match the walk pose), so the cat visibly "grew"
+ * when it turned to face you. Scale the whole front pose about the feet anchor
+ * so facing-you keeps the same visual mass (a hint larger is kept on purpose —
+ * a face turned toward you naturally reads closer).
+ */
+export const FRONT_VIEW_SCALE = 0.8
+const FEET_ANCHOR_Y = 43
+export function frontScaled(g: Geom, k = FRONT_VIEW_SCALE): Geom {
+  const sx = (x: number): number => W / 2 + (x - W / 2) * k
+  const sy = (y: number): number => FEET_ANCHOR_Y - (FEET_ANCHOR_Y - y) * k
+  return {
+    ...g,
+    headCx: sx(g.headCx), headCy: sy(g.headCy), headRx: g.headRx * k, headRy: g.headRy * k,
+    bodyCx: sx(g.bodyCx), bodyCy: sy(g.bodyCy), bodyRx: g.bodyRx * k, bodyRy: g.bodyRy * k,
+    earW: g.earW * k, earH: g.earH * k, earSpread: g.earSpread * k, earLean: g.earLean * k,
+    eyeDX: g.eyeDX * k, eyeY: sy(g.eyeY), eyeRx: g.eyeRx * k, eyeRy: g.eyeRy * k,
+    noseY: sy(g.noseY), cheekFluff: g.cheekFluff * k
+  }
+}
+
 export function generateGrid(preset: Pet, state: AnimState = {}): Parts {
-  const g: Geom = { ...defaultGeom(), ...(preset.geom || {}) }
+  const g: Geom = frontScaled({ ...defaultGeom(), ...(preset.geom || {}) })
   const marking = preset.marking || 'solid'
   const fur = buildFur(g, state)
   const shade = new Uint8Array(W * H)

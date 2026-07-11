@@ -9,14 +9,22 @@
 // Also carries the yawn (state34.yawn 0..1): eyes squeeze shut, a dark mouth
 // oval opens with the yawn amount, pink tongue at its base.
 
-import { W, H, internals, defaultGeom, type Pet, type Parts } from './catgen'
+import { W, H, internals, defaultGeom, frontScaled, type Pet, type Parts } from './catgen'
 
 const { ellipse, triangle, idx, inB, put, sphereBright, shadeLevel, O, HI, BASE, SHADOW, DEEP } = internals
 
-export interface State34 { eyeOpen?: boolean; look?: number; yawn?: number }
+export interface State34 {
+  eyeOpen?: boolean
+  look?: number
+  yawn?: number
+  /** 0..1 — one front paw raised, reaching toward the viewer. */
+  paw?: number
+  /** -1..1 — lateral pat offset of the raised paw (animate for pat-pat-pat). */
+  pawX?: number
+}
 
 export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Parts {
-  const g = { ...defaultGeom(), ...(preset.geom || {}) }
+  const g = frontScaled({ ...defaultGeom(), ...(preset.geom || {}) }) // same visual mass as the side rig
   const fur = new Uint8Array(W * H)
   const set = (x: number, y: number): void => { if (inB(x, y)) fur[idx(x, y)] = 1 }
 
@@ -39,11 +47,23 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
       ellipse(set, it * it * p0[0] + 2 * it * k * p1[0] + k * k * p2[0], it * it * p0[1] + 2 * it * k * p1[1] + k * k * p2[1], (3.0 - k * 1.2) * Math.min(1, ta + 0.4), (3.0 - k * 1.2) * Math.min(1, ta + 0.4))
     }
   }
+  const pawAmt = state.paw || 0, pawX = state.pawX || 0
+  const pawMask = new Uint8Array(W * H)
   { // front legs, shifted with the chest
     const legDX = g.bodyRx * 0.3
     const legTop = g.bodyCy + g.bodyRy * 0.32, pawY = g.bodyCy + g.bodyRy * 0.98
     for (const s of [-1, 1]) {
       const lx = bx + 0.9 * t + s * legDX
+      if (s === 1 && pawAmt > 0.05) {
+        // One paw raised, patting at the viewer: forearm lifts from the chest,
+        // the pad a touch bigger (it's coming toward the camera).
+        const px = lx + 0.8 + pawX * 1.7
+        const py = legTop + 1.5 - pawAmt * 7
+        const setPaw = (x: number, y: number): void => { set(x, y); if (inB(x, y)) pawMask[idx(x, y)] = 1 }
+        for (let k = 0; k <= 1.001; k += 0.2) ellipse(setPaw, lx + (px - lx) * k, legTop + 2 + (py - (legTop + 2)) * k, 1.9, 1.6)
+        ellipse(setPaw, px, py, 3.2, 2.7)
+        continue
+      }
       for (let y = legTop; y <= pawY; y += 0.5) ellipse(set, lx, y, 2.3, 1.6)
       ellipse(set, lx, pawY, 3, 2.3)
     }
@@ -100,9 +120,24 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
       if (inB(cxp - 1, y) && fur[idx(cxp - 1, y)] && shade[idx(cxp - 1, y)] < SHADOW) shade[idx(cxp - 1, y)] = SHADOW
     }
     for (const s of [-1, 1]) {
+      if (s === 1 && pawAmt > 0.05) continue // that leg is up in the air
       const px = Math.round(bx + 0.9 * t + s * legDX)
       if (inB(px, pawY) && fur[idx(px, pawY)]) shade[idx(px, pawY)] = DEEP
     }
+  }
+  if (pawAmt > 0.05) {
+    // Shadow crease around the raised paw so it reads against the white chest.
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        if (!pawMask[idx(x, y)]) continue
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx2 = x + dx, ny2 = y + dy
+            if (!inB(nx2, ny2) || pawMask[idx(nx2, ny2)] || !fur[idx(nx2, ny2)]) continue
+            if (overlay[idx(nx2, ny2)] === O.OUTLINE) continue
+            if (shade[idx(nx2, ny2)] < SHADOW) shade[idx(nx2, ny2)] = SHADOW
+          }
+      }
   }
 
   // --- face: near (left) eye full, far (right) eye narrowed & closer to nose ---

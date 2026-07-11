@@ -30,6 +30,7 @@ const BIG_FALL = 90 // falls taller than this spook the cat on landing
 export class PetEngine {
   private clip: ClipName = 'idle'
   private facing: Facing = 'right'
+  private stayPut = false // settings: hold this spot (no wandering / leaping)
   private dragging = false
   private busy = false // a one-shot (react/yawn/stretch) is playing
   private visualReady = false // renderer's graph has arrived at this.clip
@@ -93,10 +94,16 @@ export class PetEngine {
     this.afterShot = null
     if (this.dragging) return
     if (next) { next(); return }
-    if (clip === 'react' || clip === 'yawn' || clip === 'stretch') {
+    if (clip === 'react' || clip === 'yawn' || clip === 'stretch' || clip === 'paw') {
       this.setClip('idle')
       this.scheduleAmbient()
     }
+  }
+
+  /** "Stay here" mode: no wandering, no pounce leaps — the cat holds its spot. */
+  setStayPut(v: boolean): void {
+    this.stayPut = v
+    if (v && this.clip === 'walk') this.finishWander()
   }
 
   // ---- trigger intake ----------------------------------------------------------
@@ -139,7 +146,11 @@ export class PetEngine {
     if (this.clip !== 'idle' && this.clip !== 'sit') return
     // Affectionate cats greet you; independent ones often ignore a hover.
     const chance = 0.35 + this.personality.affection * 0.5 - this.personality.independence * 0.25
-    if (Math.random() < chance) this.playOneShot('react')
+    if (Math.random() < chance) {
+      // Sometimes the greeting is a paw reaching at you instead of a glance.
+      const pawChance = 0.25 + this.personality.affection * 0.4
+      this.playOneShot(Math.random() < pawChance ? 'paw' : 'react')
+    }
   }
 
   private onClick(): void {
@@ -363,12 +374,14 @@ export class PetEngine {
     }
     const p = this.personality
     const wasAsleep = this.clip === 'sleep'
-    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'groom' | 'pounce' | 'sit' | 'linger'>([
-      { item: 'wander', weight: 0.3 + p.energy * 0.8 + p.curiosity * 0.3 },
+    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger'>([
+      // In stay-put mode the cat holds its spot: no wandering, no pounce leaps.
+      { item: 'wander', weight: this.stayPut ? 0 : 0.3 + p.energy * 0.8 + p.curiosity * 0.3 },
       { item: 'sleep', weight: 0.12 + p.sleepiness * 0.9 - p.energy * 0.2 },
       { item: 'loaf', weight: 0.18 + p.sleepiness * 0.4 + (1 - p.energy) * 0.3 },
       { item: 'groom', weight: 0.15 + p.independence * 0.2 },
-      { item: 'pounce', weight: 0.06 + p.energy * 0.35 + p.mischief * 0.35 },
+      { item: 'pounce', weight: this.stayPut ? 0 : 0.06 + p.energy * 0.35 + p.mischief * 0.35 },
+      { item: 'paw', weight: 0.05 + p.affection * 0.22 },
       { item: 'sit', weight: 0.2 + (1 - p.energy) * 0.2 },
       { item: 'linger', weight: 0.3 + (1 - p.energy) * 0.3 }
     ])
@@ -391,6 +404,9 @@ export class PetEngine {
           break
         case 'pounce':
           this.startPounce()
+          break
+        case 'paw':
+          this.playOneShot('paw')
           break
         case 'sit':
           this.setClip('sit')

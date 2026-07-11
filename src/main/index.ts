@@ -70,6 +70,7 @@ function createPetWindow(): BrowserWindow {
     // so orphaned timers don't keep running and fighting over the window.
     engine?.dispose()
     engine = new PetEngine(win, effectivePersonality(settings, settings.activePetId))
+    engine.setStayPut(settings.stayPut)
     engine.start()
     // Tell the renderer which pet to draw (it boots on the default cat) and
     // push the live-tunable animation config.
@@ -235,6 +236,11 @@ function registerIpc(): void {
     settings.turnMs = Math.max(MIN_TURN_MS, Math.min(MAX_TURN_MS, Math.round(ms)))
     saveSettings(settings)
     petWindow?.webContents.send('pet:set-config', { turnMs: settings.turnMs })
+  })
+  ipcMain.on('settings:set-stayput', (_e, v: boolean) => {
+    settings.stayPut = !!v
+    saveSettings(settings)
+    engine?.setStayPut(settings.stayPut)
   })
   ipcMain.on('settings:set-trait', (_e, p: { petId: string; key: keyof Personality; value: number }) => {
     const ov = settings.overrides[p.petId] ?? (settings.overrides[p.petId] = {})

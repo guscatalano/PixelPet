@@ -16,10 +16,10 @@ function settingsPath(): string {
 
 export const DEFAULT_TURN_MS = 80
 export const MIN_TURN_MS = 50
-export const MAX_TURN_MS = 220
+export const MAX_TURN_MS = 600 // all the way to a really slow, deliberate turn
 
 function defaults(): AppSettings {
-  return { activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS, overrides: {} }
+  return { activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS, stayPut: false, overrides: {} }
 }
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n))
@@ -36,6 +36,7 @@ function sanitize(raw: unknown): AppSettings {
   if (typeof r.turnMs === 'number' && Number.isFinite(r.turnMs)) {
     s.turnMs = Math.max(MIN_TURN_MS, Math.min(MAX_TURN_MS, Math.round(r.turnMs)))
   }
+  if (typeof r.stayPut === 'boolean') s.stayPut = r.stayPut
   if (r.overrides && typeof r.overrides === 'object') {
     for (const [petId, ov] of Object.entries(r.overrides as Record<string, unknown>)) {
       if (!PETS.some((p) => p.id === petId) || !ov || typeof ov !== 'object') continue

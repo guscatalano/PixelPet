@@ -10,7 +10,7 @@ const root = resolve(__dirname, '..')
 const outPath = resolve(process.argv[2] || resolve(root, '.settings.png'))
 
 app.whenReady().then(async () => {
-  ipcMain.handle('settings:get', () => ({ activePetId: 'tiger', scale: 5, turnMs: 80, overrides: {} }))
+  ipcMain.handle('settings:get', () => ({ activePetId: 'tiger', scale: 5, turnMs: 80, stayPut: false, overrides: {} }))
   for (const ch of ['settings:set-pet', 'settings:set-scale', 'settings:set-trait', 'settings:reset-traits']) {
     ipcMain.on(ch, (_e, arg) => console.log(`[ipc] ${ch}`, JSON.stringify(arg)))
   }

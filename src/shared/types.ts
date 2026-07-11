@@ -8,7 +8,7 @@
  */
 export type ClipName =
   | 'idle' | 'sit' | 'walk' | 'sleep' | 'react' | 'fall'
-  | 'loaf' | 'groom' | 'teeter' | 'poof' | 'pounce' | 'yawn' | 'stretch'
+  | 'loaf' | 'groom' | 'teeter' | 'poof' | 'pounce' | 'yawn' | 'stretch' | 'paw'
 
 /** Which way the pet faces (affects horizontal flip). */
 export type Facing = 'left' | 'right'
@@ -54,6 +54,8 @@ export interface AppSettings {
   scale: number
   /** ¾-turn keyframe duration, ms per frame (lower = snappier turn). */
   turnMs: number
+  /** "Stay here" mode: the cat holds its spot (no wandering or pounce leaps). */
+  stayPut: boolean
   overrides: Record<string, Partial<Personality>>
 }
 
