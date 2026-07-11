@@ -105,7 +105,7 @@ function getRigFrame(key: string, make: () => RigPose): HTMLCanvasElement {
 // the renderer walks the graph to it and reports arrival via stateReached.
 type Node =
   | 'front' | 'sit' | 'stand' | 'walk' | 'loaf' | 'sphinx' | 'sleep' | 'groom'
-  | 'teeter' | 'crouch' | 'air' | 'fall' | 'poof'
+  | 'teeter' | 'crouch' | 'air' | 'fall' | 'poof' | 'sick'
 
 interface Frame { img: HTMLCanvasElement; ms: number; ox?: number; oy?: number }
 
@@ -179,6 +179,8 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
     case 'sleep>sit': return rigLerpFrames(sleepBase, POSES.sit, 7, 105)
     case 'sit>groom': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.groom, 4, 110))
     case 'groom>sit': return seqFrames(key, () => rigLerpFrames(POSES.groom, POSES.sit, 4, 110))
+    case 'sit>sick': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.sick, 7, 120)) // slump down, unwell
+    case 'sick>sit': return seqFrames(key, () => rigLerpFrames(POSES.sick, POSES.sit, 6, 120))
     case 'stand>walk': case 'walk>stand': return [] // same base pose
     case 'stand>teeter': return seqFrames(key, () => rigLerpFrames(POSES.stand, POSES.teeter, 4, 100))
     case 'teeter>stand': return seqFrames(key, () => rigLerpFrames(POSES.teeter, POSES.stand, 4, 100))
@@ -201,13 +203,14 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
 // Graph adjacency for pathfinding (BFS over a dozen nodes).
 const EDGES: Record<Node, Node[]> = {
   front: ['sit'],
-  sit: ['front', 'stand', 'loaf', 'sphinx', 'sleep', 'groom'],
+  sit: ['front', 'stand', 'loaf', 'sphinx', 'sleep', 'groom', 'sick'],
   stand: ['sit', 'walk', 'teeter', 'poof', 'crouch'],
   walk: ['stand'],
   loaf: ['sit', 'sphinx'],
   sphinx: ['sit', 'loaf'],
   sleep: ['sit'],
   groom: ['sit'],
+  sick: ['sit'],
   teeter: ['stand'],
   crouch: ['stand', 'air'],
   air: ['stand'],
@@ -279,7 +282,7 @@ const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = { yawn: yawnFr
 // ---- Graph runtime state ------------------------------------------------------
 const NODE_OF: Partial<Record<ClipName, Node>> = {
   idle: 'front', sit: 'sit', walk: 'walk', sleep: 'sleep', loaf: 'loaf', sphinx: 'sphinx',
-  groom: 'groom', teeter: 'teeter', fall: 'fall', poof: 'poof'
+  groom: 'groom', teeter: 'teeter', fall: 'fall', poof: 'poof', sick: 'sick'
 }
 const CROUCH_WIGGLE_MS = 1150 // butt-wiggle time before the leap
 
@@ -494,6 +497,18 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
     }
     case 'air': return { img: getRigFrame('air', () => POSES.pounce) }
     case 'poof': return { img: getRigFrame('poof', () => POSES.poof) }
+    case 'sick': {
+      // Lethargic: slow, shallow breathing and a heavy slow blink.
+      const b = Math.round(((Math.sin(now / 1500) + 1) / 2) * 4)
+      const open = now % 5200 > 320
+      return { img: getRigFrame(`sick|${b}|${open ? 1 : 0}`, () => {
+        const pose = lerpPose(POSES.sick, POSES.sick, 0)
+        const br = (b / 4) * 2 - 1
+        pose.body = [pose.body[0], pose.body[1] - br * 0.15, pose.body[2], pose.body[3] + br * 0.3]
+        pose.eye = open ? 1 : 0
+        return pose
+      }) }
+    }
   }
 }
 

@@ -32,6 +32,8 @@ export interface RigPose {
    * (both eyes + centred nose) while the body stays side-on.
    */
   headFace?: number
+  /** Draw an Elizabethan collar (cone of shame) around the head — the sick look. */
+  cone?: boolean
   /** 1 = open, 0 = closed. */
   eye: number
   /** [hindFar, frontFar, hindNear, frontNear] — index order matters for lerp! */
@@ -191,6 +193,28 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
     }
     const nfx = hcx + hr - 1, nfy = hcy + 0.8
     if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+  }
+
+  // Cone of shame: a translucent funnel opening toward the viewer — two edges
+  // flaring from behind the head to an oval rim in front of the face (drawn as
+  // an outline so the face shows through, like clear plastic).
+  if (pose.cone) {
+    // A big oval opening that encircles the head (the cat looks out through it),
+    // with two funnel edges running back to the neck. Drawn with a dark outer
+    // edge + light rim so it reads on any coat.
+    const ccx = hcx + hr * 0.4, ccy = hcy + 0.5, crx = hr * 1.05, cry = hr * 1.75
+    const putc = (x: number, y: number, role: number): void => { const rx = Math.round(x), ry = Math.round(y); if (inB(rx, ry)) overlay[idx(rx, ry)] = role }
+    const linec = (a: number[], b: number[], role: number): void => {
+      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])))
+      for (let i = 0; i <= n; i++) putc(a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n, role)
+    }
+    linec([hcx - hr * 0.9, hcy - hr * 0.4], [ccx - crx, ccy - cry * 0.65], O.CONE)
+    linec([hcx - hr * 0.9, hcy + hr * 0.65], [ccx - crx, ccy + cry * 0.65], O.CONE)
+    for (let a = 0; a < Math.PI * 2; a += 0.035) {
+      const c = Math.cos(a), s = Math.sin(a)
+      putc(ccx + c * (crx + 1), ccy + s * (cry + 1), O.OUTLINE) // dark outer lip
+      putc(ccx + c * crx, ccy + s * cry, c >= 0 ? O.CONE_HI : O.CONE) // bright rim
+    }
   }
 
   return { shade, region, overlay, geom: defaultGeom(), fur }
@@ -424,6 +448,18 @@ export const POSES: Record<string, RigPose> = {
       { hip: [29, 37], mid: [34, 41], foot: [39, GROUND], near: false },
       { hip: [15, 32], mid: [14, 38], foot: [15, GROUND], near: true },
       { hip: [31, 37], mid: [36, 41], foot: [41, GROUND], near: true }
+    ]
+  },
+  // Under the weather: a flat, low, lethargic lie with the cone of shame — the
+  // head rests forward and the front paws splay out limply.
+  sick: {
+    body: [20, 37.5, 13, 5.5], head: [32, 31, 6.5], neck: [29, 34.5, 6, 5],
+    tail: { root: [8, 39.5], ctrl: [9, 44], tip: [23, 43] }, eye: 1, cone: true,
+    legs: [
+      { hip: [15, 39], mid: [13, 41], foot: [16, 42], near: false },
+      { hip: [27, 39], mid: [30, 41], foot: [33, 42], near: false },
+      { hip: [17, 39], mid: [15, 41], foot: [18, 42], near: true },
+      { hip: [29, 39], mid: [32, 41], foot: [35, 42], near: true }
     ]
   }
 }

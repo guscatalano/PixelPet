@@ -23,8 +23,10 @@ const HI = 1, BASE = 2, SHADOW = 3, DEEP = 4
 const P = 0, S = 1, WHITE = 2, T = 3
 // Overlay roles (0 = none).
 const O = {
-  NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8
+  NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8, CONE: 9, CONE_HI: 10
 }
+const CONE_COLOR = [176, 196, 224]
+const CONE_HI_COLOR = [225, 234, 247]
 
 const LIGHT = (() => {
   const v = [-0.35, -0.5, 0.79]
@@ -647,6 +649,8 @@ export function render(parts, coatSpec) {
     else if (ov === O.INEAR) col = coat.inEar
     else if (ov === O.MOUTH) col = coat.mouth
     else if (ov === O.WHISK) col = coat.whisk
+    else if (ov === O.CONE) col = CONE_COLOR
+    else if (ov === O.CONE_HI) col = CONE_HI_COLOR
     else if (shade[i]) col = coat.ramps[region[i]][shade[i] - 1]
     if (!col) continue
     rgba[i * 4] = col[0]

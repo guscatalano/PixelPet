@@ -8,7 +8,7 @@ import { W, H, render } from './catgen.mjs'
 
 // ---- helpers copied from catgen.mjs (module-private there) ------------------
 const HI = 1, BASE = 2, SHADOW = 3, DEEP = 4
-const O = { NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8 }
+const O = { NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8, CONE: 9, CONE_HI: 10 }
 const idx = (x, y) => y * W + x
 const inB = (x, y) => x >= 0 && x < W && y >= 0 && y < H
 function ellipse(cb, cx, cy, rx, ry) {
@@ -163,6 +163,15 @@ export function generateRigGrid(pet, pose) {
     }
     const nfx = hcx + hr - 1, nfy = hcy + 0.8
     if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+  }
+
+  if (pose.cone) {
+    const ccx = hcx + hr * 0.4, ccy = hcy + 0.5, crx = hr * 1.05, cry = hr * 1.75
+    const putc = (x, y, role) => { const rx = Math.round(x), ry = Math.round(y); if (inB(rx, ry)) overlay[idx(rx, ry)] = role }
+    const linec = (a, b, role) => { const n = Math.max(1, Math.ceil(Math.hypot(b[0]-a[0], b[1]-a[1]))); for (let i=0;i<=n;i++) putc(a[0]+(b[0]-a[0])*i/n, a[1]+(b[1]-a[1])*i/n, role) }
+    linec([hcx - hr*0.9, hcy - hr*0.4], [ccx - crx, ccy - cry*0.65], O.CONE)
+    linec([hcx - hr*0.9, hcy + hr*0.65], [ccx - crx, ccy + cry*0.65], O.CONE)
+    for (let a=0;a<Math.PI*2;a+=0.035) { const c=Math.cos(a), s=Math.sin(a); putc(ccx+c*(crx+1), ccy+s*(cry+1), O.OUTLINE); putc(ccx+c*crx, ccy+s*cry, c>=0 ? O.CONE_HI : O.CONE) }
   }
 
   return { shade, region, overlay, geom: {}, fur }
@@ -369,6 +378,16 @@ export const POSES = {
       { hip: [29, 37], mid: [34, 41], foot: [39, GROUND], near: false }, // front far, stretched forward
       { hip: [15, 32], mid: [14, 38], foot: [15, GROUND], near: true },  // hind near
       { hip: [31, 37], mid: [36, 41], foot: [41, GROUND], near: true }   // front near, stretched forward
+    ]
+  },
+  sick: {
+    body: [20, 37.5, 13, 5.5], head: [32, 31, 6.5], neck: [29, 34.5, 6, 5],
+    tail: { root: [8, 39.5], ctrl: [9, 44], tip: [23, 43] }, eye: 1, cone: true,
+    legs: [
+      { hip: [15, 39], mid: [13, 41], foot: [16, 42], near: false },
+      { hip: [27, 39], mid: [30, 41], foot: [33, 42], near: false },
+      { hip: [17, 39], mid: [15, 41], foot: [18, 42], near: true },
+      { hip: [29, 39], mid: [32, 41], foot: [35, 42], near: true }
     ]
   }
 }
