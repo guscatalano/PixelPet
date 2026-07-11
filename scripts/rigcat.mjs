@@ -86,18 +86,45 @@ export function generateRigGrid(_pet, pose) {
     else if (inBody2(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, b2[0], b2[1], b2[2], b2[3]))
     else shade[idx(x, y)] = BASE
   }
-  // Face (matches the walk pose exactly).
-  triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
-    hcx + 2, hcy - hr + 1.5, hcx + 3.6, hcy - hr + 1.5, hcx + 3.2, hcy - hr - 1)
-  if (pose.eye > 0.5) {
-    ellipse((x, y) => put(overlay, x, y, O.IRIS), hcx + 1.6, hcy - 0.5, 1.7, 2)
-    ellipse((x, y) => put(overlay, x, y, O.PUPIL), hcx + 2, hcy - 0.3, 0.9, 1.4)
-    put(overlay, Math.round(hcx + 1.2), Math.round(hcy - 1.3), O.GLINT)
+  // Face. pose.headFace turns the head to the viewer while the body stays
+  // side-on: 0 profile (default) -> ~0.5 mid-turn blink -> 1 front face.
+  const face = pose.headFace ?? 0
+  const inear = (ax, bx, tx) =>
+    triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
+      ax, hcy - hr + 1.5, bx, hcy - hr + 1.5, tx, hcy - hr - 1)
+  if (face >= 0.75) {
+    inear(hcx + 2, hcx + 3.6, hcx + 3.2)
+    inear(hcx - 3.6, hcx - 2, hcx - 3.2)
+    for (const s of [-1, 1]) {
+      const ex = hcx + s * 2.6, ey = hcy - 0.4
+      if (pose.eye > 0.5) {
+        ellipse((x, y) => put(overlay, x, y, O.IRIS), ex, ey, 1.45, 1.75)
+        ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex, ey + 0.2, 0.8, 1.2)
+        put(overlay, Math.round(ex - 0.5), Math.round(ey - 0.9), O.GLINT)
+      } else {
+        for (const dx of [-1, 0, 1]) put(overlay, Math.round(ex + dx), Math.round(ey), O.OUTLINE)
+      }
+    }
+    triangle((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, hcx - 1.2, hcy + 1.6, hcx + 1.2, hcy + 1.6, hcx, hcy + 3)
+  } else if (face >= 0.25) {
+    inear(hcx + 2, hcx + 3.6, hcx + 3.2)
+    for (const s of [-1, 1]) {
+      const ex = hcx + s * 2.6
+      for (const dx of [-1, 0, 1]) put(overlay, Math.round(ex + dx), Math.round(hcy - 0.4), O.OUTLINE)
+    }
+    put(overlay, Math.round(hcx + 2), Math.round(hcy + 1.6), O.NOSE)
   } else {
-    for (const dx of [0, 1, 2]) put(overlay, Math.round(hcx + 1 + dx), Math.round(hcy - 0.3), O.OUTLINE)
+    inear(hcx + 2, hcx + 3.6, hcx + 3.2)
+    if (pose.eye > 0.5) {
+      ellipse((x, y) => put(overlay, x, y, O.IRIS), hcx + 1.6, hcy - 0.5, 1.7, 2)
+      ellipse((x, y) => put(overlay, x, y, O.PUPIL), hcx + 2, hcy - 0.3, 0.9, 1.4)
+      put(overlay, Math.round(hcx + 1.2), Math.round(hcy - 1.3), O.GLINT)
+    } else {
+      for (const dx of [0, 1, 2]) put(overlay, Math.round(hcx + 1 + dx), Math.round(hcy - 0.3), O.OUTLINE)
+    }
+    const nfx = hcx + hr - 1, nfy = hcy + 0.8
+    if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
   }
-  const nfx = hcx + hr - 1, nfy = hcy + 0.8
-  if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
 
   return { shade, region, overlay, geom: {}, fur }
 }

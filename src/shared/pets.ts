@@ -25,9 +25,9 @@ const BIGEARS = { earH: 12.5, earW: 8.5, earSpread: 8 }
 const g = (arch: object, extra: object = {}): object => ({ ...arch, ...extra })
 
 export const PETS: AppPet[] = [
-  // The user's pet: the white solid cat, named "Ash", with yellow eyes.
+  // The user's pet: the white solid cat, named "Ash" — slim build, sage eyes.
   { id: 'ash', name: 'Ash', blurb: 'A serene, cloud-soft house cat.',
-    geom: g(NORMAL), marking: 'solid',
+    geom: g(SLIM), marking: 'solid',
     coat: { primary: '#f2f2f4', iris: '#9caf6e' },
     personality: { energy: 0.4, sleepiness: 0.5, affection: 0.7, mischief: 0.2, curiosity: 0.5, independence: 0.4 } },
 

@@ -16,7 +16,7 @@ const g = (arch, extra = {}) => ({ ...arch, ...extra })
 
 export const PRESETS = [
   { id: 'ash', name: 'Ash', blurb: 'A serene, cloud-soft house cat.',
-    geom: g(NORMAL), marking: 'solid',
+    geom: g(SLIM), marking: 'solid',
     coat: { primary: '#f2f2f4', iris: '#9caf6e' },
     personality: { energy: 0.4, sleepiness: 0.5, affection: 0.7, mischief: 0.2, curiosity: 0.5, independence: 0.4 } },
 

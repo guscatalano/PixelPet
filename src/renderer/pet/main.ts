@@ -329,6 +329,9 @@ const restBlink = (now: number): boolean => now % 4200 > 160
 let hovering = false
 let perkCur = 0
 let perkLast = 0
+// Hover head-turn while loafing: the head eases toward facing you.
+let headCur = 0
+let headLast = 0
 function sleepFrame(now: number): HTMLCanvasElement {
   const dt = Math.min(100, now - perkLast)
   perkLast = now
@@ -361,13 +364,23 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
     case 'walk': return { img: getWalkFrame(walkStep) }
     case 'fall': return { img: getWalkFrame((now / 90) % 1) } // legs scrabbling in the air
     case 'loaf': {
+      // Hover a loafing cat and it turns its head to look at you (body stays
+      // bread) — through the mid-turn blink, ears perking slightly.
+      const dt = Math.min(100, now - headLast)
+      headLast = now
+      const speed = dt / 200
+      const target = hovering ? 1 : 0
+      headCur = target > headCur ? Math.min(target, headCur + speed) : Math.max(target, headCur - speed)
+      const f = Math.round(headCur * 2) // 0 = profile, 1 = mid-turn blink, 2 = facing you
       const b = Math.round(((Math.sin(now / 1100) + 1) / 2) * 5)
       const open = restBlink(now)
-      return { img: getRigFrame(`loaf|${b}|${open ? 1 : 0}`, () => {
+      return { img: getRigFrame(`loaf|${b}|${open ? 1 : 0}|${f}`, () => {
         const pose = lerpPose(POSES.loaf, POSES.loaf, 0)
         const br = (b / 5) * 2 - 1
         pose.body = [pose.body[0], pose.body[1] - br * 0.2, pose.body[2], pose.body[3] + br * 0.35]
         pose.eye = open ? 1 : 0
+        pose.headFace = f / 2
+        pose.earPerk = f * 0.25 // it noticed you
         return pose
       }) }
     }
