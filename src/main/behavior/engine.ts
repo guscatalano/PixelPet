@@ -1,7 +1,9 @@
 import { BrowserWindow, screen } from 'electron'
 import type { ClipName, Facing, Personality, PlayCommand, TriggerEvent } from '../../shared/types'
+import type { Needs, Difficulty, CareAction, CareStatus } from '../../shared/care'
 import { SPRITE_H, BOB_AMPLITUDE } from '../../shared/constants'
 import { weightedPick } from './personality'
+import { decay, apply as applyCare, nudge, careState, freshNeeds } from '../care/needs'
 import { refreshPlatforms, supportY } from '../desktop/world'
 
 const MOVE_TICK_MS = 16
@@ -18,6 +20,7 @@ const EDGE_DROP = 40 // a support drop bigger than this counts as "an edge"
 const TEETER_MS = 1900 // how long the cat wobbles at an edge before deciding
 const POOF_MS = 1100 // how long the scared poof holds
 const BIG_FALL = 90 // falls taller than this spook the cat on landing
+const CARE_TICK_MS = 60_000 // needs decay + self-care cadence (Care Mode)
 
 /**
  * The pet's brain. Owns behavior: routes trigger events to reactions, runs the
@@ -51,6 +54,14 @@ export class PetEngine {
   private physicsTimer: ReturnType<typeof setInterval> | null = null
   private ambientTimer: ReturnType<typeof setTimeout> | null = null
   private actionTimer: ReturnType<typeof setTimeout> | null = null
+  // ---- Care Mode ----
+  private careMode = false
+  private needs: Needs | null = null
+  private difficulty: Difficulty = 'normal'
+  private careTimer: ReturnType<typeof setInterval> | null = null
+  private lastCareTs = 0
+  private careSaveCtr = 0
+  private saver: ((n: Needs) => void) | null = null
 
   constructor(
     private readonly win: BrowserWindow,
@@ -71,9 +82,11 @@ export class PetEngine {
   }
 
   dispose(): void {
+    if (this.careMode) this.persistNeeds()
     if (this.physicsTimer) clearInterval(this.physicsTimer)
     if (this.ambientTimer) clearTimeout(this.ambientTimer)
     if (this.actionTimer) clearTimeout(this.actionTimer)
+    if (this.careTimer) clearInterval(this.careTimer)
   }
 
   /** Feet position (window-local y), accounting for the bob headroom. */
@@ -119,6 +132,67 @@ export class PetEngine {
 
   private allowed(clip: ClipName): boolean {
     return !this.disabled.has(clip)
+  }
+
+  // ---- Care Mode ------------------------------------------------------------
+
+  /** Turn Care Mode on with the given (already elapsed-decayed) needs. */
+  enableCare(needs: Needs, difficulty: Difficulty, save: (n: Needs) => void): void {
+    this.needs = needs
+    this.difficulty = difficulty
+    this.saver = save
+    this.careMode = true
+    this.lastCareTs = Date.now()
+    if (!this.careTimer) this.careTimer = setInterval(() => this.careTick(), CARE_TICK_MS)
+  }
+
+  disableCare(): void {
+    this.persistNeeds()
+    this.careMode = false
+    if (this.careTimer) { clearInterval(this.careTimer); this.careTimer = null }
+  }
+
+  setDifficulty(d: Difficulty): void {
+    this.difficulty = d
+  }
+
+  /** Swap in another pet's needs (on active-pet change) without a time jump. */
+  setNeeds(needs: Needs): void {
+    this.needs = needs
+    this.lastCareTs = Date.now()
+  }
+
+  /** A care action from the menu or a dragged object. */
+  careAction(action: CareAction): void {
+    if (!this.careMode || !this.needs) return
+    this.needs = applyCare(this.needs, action)
+    this.persistNeeds()
+    if (this.dragging || this.busy || this.airMode !== 'none') return
+    // A pleased acknowledgement: play makes it pounce; the rest a happy react.
+    if (action === 'play' && !this.stayPut && this.allowed('pounce')) this.startPounce()
+    else if ((this.clip === 'idle' || this.clip === 'sit') && this.allowed('react')) this.playOneShot('react')
+  }
+
+  getStatus(): CareStatus {
+    const needs = this.needs ?? freshNeeds()
+    return { enabled: this.careMode, needs, state: careState(needs) }
+  }
+
+  private persistNeeds(): void {
+    if (this.needs && this.saver) this.saver(this.needs)
+  }
+
+  private careTick(): void {
+    if (!this.careMode || !this.needs) return
+    const now = Date.now()
+    const hours = (now - this.lastCareTs) / 3_600_000
+    this.lastCareTs = now
+    this.needs = decay(this.needs, hours, this.difficulty)
+    // Self-care: the cat restores energy while resting, hygiene while grooming.
+    if (this.clip === 'sleep') this.needs = nudge(this.needs, 'energy', 0.03)
+    else if (this.clip === 'loaf' || this.clip === 'sphinx') this.needs = nudge(this.needs, 'energy', 0.012)
+    if (this.clip === 'groom') this.needs = nudge(this.needs, 'hygiene', 0.03)
+    if (++this.careSaveCtr >= 3) { this.careSaveCtr = 0; this.persistNeeds() }
   }
 
   // ---- trigger intake ----------------------------------------------------------
@@ -173,6 +247,7 @@ export class PetEngine {
 
   private onClick(): void {
     if (this.dragging) return
+    if (this.careMode && this.needs) this.needs = nudge(this.needs, 'fun', 0.05) // petting is fun
     if (this.allowed('react')) this.playOneShot('react')
   }
 
@@ -400,17 +475,26 @@ export class PetEngine {
     }
     const p = this.personality
     const wasAsleep = this.clip === 'sleep'
+    // Care Mode bends the ambient weights toward how the cat FEELS: hungry cats
+    // beg (paw) at you, tired/unwell cats rest, dirty cats groom, bored cats
+    // roam. All these terms are 0 when Care Mode is off → identical to before.
+    const n = this.careMode ? this.needs : null
+    const lowHunger = n ? 1 - n.hunger : 0
+    const tired = n ? 1 - n.energy : 0
+    const bored = n ? 1 - n.fun : 0
+    const dirty = n ? 1 - n.hygiene : 0
+    const sick = n && n.health < 0.5 ? 1 - n.health : 0
     const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger'>([
       // Stay-put drops the moving actions; per-animation opt-outs drop theirs.
-      { item: 'wander', weight: this.stayPut ? 0 : 0.3 + p.energy * 0.8 + p.curiosity * 0.3 },
-      { item: 'sleep', weight: this.allowed('sleep') ? 0.12 + p.sleepiness * 0.9 - p.energy * 0.2 : 0 },
-      { item: 'loaf', weight: this.allowed('loaf') ? 0.14 + p.sleepiness * 0.35 + (1 - p.energy) * 0.25 : 0 },
-      { item: 'sphinx', weight: this.allowed('sphinx') ? 0.14 + p.sleepiness * 0.25 + (1 - p.energy) * 0.25 : 0 },
-      { item: 'groom', weight: this.allowed('groom') ? 0.15 + p.independence * 0.2 : 0 },
-      { item: 'pounce', weight: this.stayPut || !this.allowed('pounce') ? 0 : 0.06 + p.energy * 0.35 + p.mischief * 0.35 },
-      { item: 'paw', weight: this.allowed('paw') ? 0.05 + p.affection * 0.22 : 0 },
-      { item: 'sit', weight: 0.2 + (1 - p.energy) * 0.2 },
-      { item: 'linger', weight: 0.3 + (1 - p.energy) * 0.3 }
+      { item: 'wander', weight: this.stayPut ? 0 : (0.3 + p.energy * 0.8 + p.curiosity * 0.3 + bored * 0.6 + lowHunger * 0.3) * (1 - tired * 0.6) * (1 - sick) },
+      { item: 'sleep', weight: this.allowed('sleep') ? 0.12 + p.sleepiness * 0.9 - p.energy * 0.2 + tired * 0.9 + sick * 1.4 : 0 },
+      { item: 'loaf', weight: this.allowed('loaf') ? 0.14 + p.sleepiness * 0.35 + (1 - p.energy) * 0.25 + tired * 0.5 + sick * 1.2 : 0 },
+      { item: 'sphinx', weight: this.allowed('sphinx') ? 0.14 + p.sleepiness * 0.25 + (1 - p.energy) * 0.25 + tired * 0.4 + sick * 0.8 : 0 },
+      { item: 'groom', weight: this.allowed('groom') ? 0.15 + p.independence * 0.2 + dirty * 1.3 : 0 },
+      { item: 'pounce', weight: this.stayPut || !this.allowed('pounce') ? 0 : (0.06 + p.energy * 0.35 + p.mischief * 0.35 + bored * 0.3) * (1 - tired * 0.8) * (1 - sick) },
+      { item: 'paw', weight: this.allowed('paw') ? (0.05 + p.affection * 0.22 + lowHunger * 1.3 + bored * 0.3) * (1 - sick * 0.7) : 0 },
+      { item: 'sit', weight: 0.2 + (1 - p.energy) * 0.2 + sick * 0.3 },
+      { item: 'linger', weight: 0.3 + (1 - p.energy) * 0.3 + sick * 0.4 }
     ])
     const go = (): void => {
       switch (action) {

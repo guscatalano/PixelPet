@@ -1,6 +1,7 @@
 // Types shared across main, preload, and renderer.
 
 import type { AppPet } from './pets'
+import type { Difficulty } from './care'
 
 /**
  * Animation clips the renderer knows how to play. Most are stable states the
@@ -62,6 +63,10 @@ export interface AppSettings {
   frontScale: number
   /** Pupils dilate/contract with the time of day (round at night, slits at midday). */
   pupilsByTime: boolean
+  /** Care ("Tamagotchi") mode: the cat has needs that decay and shape its behavior. */
+  careMode: boolean
+  /** How fast needs decay in Care Mode. */
+  difficulty: Difficulty
   /** Animations the user turned off (subset of TOGGLEABLE_ANIMS). */
   disabledAnims: ClipName[]
   /** Non-secret AI config (provider/model/endpoint). The API key lives elsewhere (safeStorage). */

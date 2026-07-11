@@ -12,6 +12,8 @@ import { setSelfWindow } from './desktop/windows'
 import { testConnection, DEFAULT_MODEL, DEFAULT_ENDPOINT, type VisionConfig } from './ai/providers'
 import { generatePetFromPhotos, dataUrlToImage } from './ai/petGenerator'
 import { saveApiKey, loadApiKey, hasApiKey, clearApiKey, encryptionAvailable } from './ai/secrets'
+import { loadNeeds, saveNeeds } from './care/needs'
+import { DIFFICULTIES, type CareAction, type Difficulty } from '../shared/care'
 
 let petWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
@@ -79,6 +81,7 @@ function createPetWindow(): BrowserWindow {
     engine.setStayPut(settings.stayPut)
     engine.setDisabled(settings.disabledAnims)
     engine.start()
+    applyCare()
     // Tell the renderer which pet to draw (the full spec, so user-generated pets
     // — absent from the built-in PETS the renderer imports — render too) and
     // push the live-tunable animation config.
@@ -185,6 +188,18 @@ function openSettings(): void {
 function applyActivePet(): void {
   petWindow?.webContents.send('pet:set-pet', findPet(settings, settings.activePetId))
   if (engine) engine.personality = effectivePersonality(settings, settings.activePetId)
+  applyCare() // load the newly-active pet's needs
+}
+
+/** (Re)configure Care Mode on the engine from settings + the active pet. */
+function applyCare(): void {
+  if (!engine) return
+  if (settings.careMode) {
+    const needs = loadNeeds(settings.activePetId, settings.difficulty, Date.now())
+    engine.enableCare(needs, settings.difficulty, (n) => saveNeeds(settings.activePetId, n, Date.now()))
+  } else {
+    engine.disableCare()
+  }
 }
 
 /** Non-secret AI status for the settings UI. */
@@ -254,6 +269,8 @@ function registerIpc(): void {
   // ---- settings channels ----
   ipcMain.handle('settings:get', () => settings)
   ipcMain.on('settings:set-pet', (_e, petId: string) => {
+    // Persist the outgoing pet's needs under its own id before switching.
+    if (settings.careMode && engine) saveNeeds(settings.activePetId, engine.getStatus().needs, Date.now())
     settings.activePetId = petId
     saveSettings(settings)
     applyActivePet()
@@ -288,6 +305,22 @@ function registerIpc(): void {
     saveSettings(settings)
     petWindow?.webContents.send('pet:set-config', { pupilsByTime: settings.pupilsByTime })
   })
+
+  // ---- Care Mode channels ----
+  ipcMain.on('settings:set-caremode', (_e, v: boolean) => {
+    settings.careMode = !!v
+    saveSettings(settings)
+    applyCare()
+  })
+  ipcMain.on('settings:set-difficulty', (_e, d: Difficulty) => {
+    if ((DIFFICULTIES as string[]).includes(d)) {
+      settings.difficulty = d
+      saveSettings(settings)
+      engine?.setDifficulty(d)
+    }
+  })
+  ipcMain.handle('care:get', () => engine?.getStatus() ?? null)
+  ipcMain.on('care:action', (_e, action: CareAction) => engine?.careAction(action))
   ipcMain.on('settings:set-trait', (_e, p: { petId: string; key: keyof Personality; value: number }) => {
     const ov = settings.overrides[p.petId] ?? (settings.overrides[p.petId] = {})
     ov[p.key] = Math.max(0, Math.min(1, p.value))

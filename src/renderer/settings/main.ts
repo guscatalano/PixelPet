@@ -4,6 +4,7 @@ import { generate34Grid } from '../../shared/turn34'
 import { PETS, type AppPet } from '../../shared/pets'
 import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
 import { TRAIT_KEYS, TOGGLEABLE_ANIMS, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Personality } from '../../shared/types'
+import { NEED_KEYS, type CareStatus, type CareAction, type Difficulty, type Needs } from '../../shared/care'
 
 type GenResult = { ok: true; pet: AppPet } | { ok: false; error: string }
 
@@ -16,6 +17,10 @@ interface SettingsApi {
   setStayPut: (v: boolean) => void
   setFrontScale: (k: number) => void
   setPupilsByTime: (v: boolean) => void
+  setCareMode: (v: boolean) => void
+  setDifficulty: (d: Difficulty) => void
+  careStatus: () => Promise<CareStatus | null>
+  careAction: (action: CareAction) => void
   setDisabledAnims: (disabled: ClipName[]) => void
   setTrait: (petId: string, key: keyof Personality, value: number) => void
   resetTraits: (petId: string) => void
@@ -508,6 +513,71 @@ function buildAi(): void {
   })
 }
 
+const needColor = (v: number): string => (v > 0.5 ? '#7bbf5e' : v > 0.28 ? '#e0a94e' : '#e06a5a')
+
+function buildCare(): void {
+  const toggle = $<HTMLButtonElement>('caremode')
+  const body = $('carebody')
+  const diffBar = $('difficulty')
+  const bars = $('needbars')
+
+  const paintToggle = (on: boolean): void => {
+    toggle.classList.toggle('on', on)
+    toggle.setAttribute('aria-pressed', String(on))
+    toggle.textContent = on ? 'On' : 'Off'
+    body.classList.toggle('off', !on)
+  }
+  paintToggle(state.careMode ?? false)
+  toggle.addEventListener('click', () => {
+    state.careMode = !state.careMode
+    paintToggle(state.careMode)
+    window.settings.setCareMode(state.careMode)
+    if (state.careMode) refreshCare()
+  })
+
+  for (const b of Array.from(diffBar.querySelectorAll('button'))) {
+    b.classList.toggle('on', (b as HTMLElement).dataset.d === (state.difficulty ?? 'normal'))
+    b.addEventListener('click', () => {
+      const d = (b as HTMLElement).dataset.d as Difficulty
+      state.difficulty = d
+      for (const c of diffBar.children) c.classList.toggle('on', c === b)
+      window.settings.setDifficulty(d)
+    })
+  }
+
+  for (const b of Array.from(document.querySelectorAll('.careactions .btn'))) {
+    b.addEventListener('click', () => {
+      window.settings.careAction((b as HTMLElement).dataset.a as CareAction)
+      setTimeout(refreshCare, 120) // reflect the boost promptly
+    })
+  }
+
+  // Render the need bars once; refreshCare updates their fills.
+  const ORDER: Array<keyof Needs> = [...NEED_KEYS, 'health']
+  for (const key of ORDER) {
+    const row = document.createElement('div')
+    row.className = 'needbar'
+    row.innerHTML = `<div class="nn">${key}</div><div class="track"><div class="fill" data-k="${key}"></div></div><div class="nv" data-v="${key}"></div>`
+    bars.append(row)
+  }
+
+  refreshCare()
+  setInterval(() => { if (state.careMode) refreshCare() }, 1600)
+}
+
+async function refreshCare(): Promise<void> {
+  const st = await window.settings.careStatus()
+  if (!st) return
+  $('caremood').textContent = `${st.state.emoji} ${st.state.label}`
+  for (const key of [...NEED_KEYS, 'health'] as Array<keyof Needs>) {
+    const v = st.needs[key]
+    const fill = document.querySelector<HTMLElement>(`.fill[data-k="${key}"]`)
+    const val = document.querySelector<HTMLElement>(`.nv[data-v="${key}"]`)
+    if (fill) { fill.style.width = `${Math.round(v * 100)}%`; fill.style.background = needColor(v) }
+    if (val) val.textContent = `${Math.round(v * 100)}`
+  }
+}
+
 async function init(): Promise<void> {
   state = await window.settings.get()
   buildGridFilter()
@@ -515,6 +585,7 @@ async function init(): Promise<void> {
   buildPoses()
   buildSizes()
   buildAnimation()
+  buildCare()
   buildAi()
   buildTraits()
   refreshMeta()

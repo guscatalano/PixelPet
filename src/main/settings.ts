@@ -11,6 +11,7 @@ import { DEFAULT_SCALE, MIN_SCALE, MAX_SCALE } from '../shared/constants'
 import { DEFAULT_FRONT_SCALE } from '../shared/catgen'
 import { DEFAULT_PET, PETS, type AppPet } from '../shared/pets'
 import { MARKING_NAMES, naturalWhisker } from '../shared/petdna'
+import { DIFFICULTIES } from '../shared/care'
 import { DEFAULT_MODEL } from './ai/providers'
 
 function settingsPath(): string {
@@ -33,7 +34,7 @@ function defaultAi(): AiConfig {
 function defaults(): AppSettings {
   return {
     activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS,
-    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, disabledAnims: [],
+    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, careMode: false, difficulty: 'normal', disabledAnims: [],
     ai: defaultAi(), userPets: [], overrides: {}
   }
 }
@@ -98,6 +99,8 @@ function sanitize(raw: unknown): AppSettings {
   }
   if (typeof r.stayPut === 'boolean') s.stayPut = r.stayPut
   if (typeof r.pupilsByTime === 'boolean') s.pupilsByTime = r.pupilsByTime
+  if (typeof r.careMode === 'boolean') s.careMode = r.careMode
+  if (typeof r.difficulty === 'string' && (DIFFICULTIES as string[]).includes(r.difficulty)) s.difficulty = r.difficulty as AppSettings['difficulty']
   if (typeof r.frontScale === 'number' && Number.isFinite(r.frontScale)) {
     s.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, r.frontScale))
   }

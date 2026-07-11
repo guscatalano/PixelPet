@@ -169,6 +169,22 @@
       .keystate { font-size: 12px; font-family: var(--mono); color: var(--faint); margin-top: 4px; }
       .keystate.saved { color: #8fd08a; }
       .hint { font-size: 11.5px; color: var(--faint); margin-top: 10px; line-height: 1.45; }
+
+      /* Care mode */
+      .care { background: var(--panel); border: 1px solid var(--hair); border-radius: 12px; padding: 16px 18px; }
+      .carehead { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+      .care .seg button { padding: 6px 12px; font-size: 12.5px; }
+      .carebody { margin-top: 14px; }
+      .carebody.off { opacity: 0.4; pointer-events: none; }
+      .caremood { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+      .needbars { display: grid; gap: 8px; }
+      .needbar { display: grid; grid-template-columns: 74px 1fr 38px; align-items: center; gap: 10px; }
+      .needbar .nn { font-size: 12.5px; color: var(--dim); text-transform: capitalize; }
+      .needbar .track { height: 8px; border-radius: 5px; background: var(--panel-2); overflow: hidden; }
+      .needbar .fill { height: 100%; border-radius: 5px; transition: width 0.3s, background 0.3s; }
+      .needbar .nv { font-family: var(--mono); font-size: 11px; color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; }
+      .careactions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+      .careactions .btn { font-size: 13px; }
     </style>
   </head>
   <body>
@@ -266,6 +282,32 @@
             <div class="tn">Eyes by time</div>
             <button class="toggle" id="pupils" aria-pressed="false">Off — fixed pupils</button>
             <div class="tv"></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="label">Care mode</div>
+        <div class="care">
+          <div class="carehead">
+            <button class="toggle" id="caremode" aria-pressed="false">Off</button>
+            <div class="seg" id="difficulty">
+              <button data-d="relaxed">Relaxed</button>
+              <button data-d="normal" class="on">Normal</button>
+              <button data-d="demanding">Demanding</button>
+            </div>
+          </div>
+          <div class="carebody off" id="carebody">
+            <div class="caremood" id="caremood">😻 Content</div>
+            <div class="needbars" id="needbars"></div>
+            <div class="careactions">
+              <button class="btn" data-a="feed">🍽️ Feed</button>
+              <button class="btn" data-a="play">🪶 Play</button>
+              <button class="btn" data-a="rest">😴 Rest</button>
+              <button class="btn" data-a="groom">🧼 Groom</button>
+              <button class="btn" data-a="heal">💊 Heal</button>
+            </div>
+            <div class="hint">The cat has needs that slowly drain over real time — even while PixelPet is closed. Tend them and it thrives; neglect it and it gets hungry, sleepy, then unwell (but always bounces back). Its mood shapes how it behaves.</div>
           </div>
         </div>
       </section>

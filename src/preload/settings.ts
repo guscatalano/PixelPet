@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality } from '../shared/types'
 import type { AppPet } from '../shared/pets'
+import type { CareStatus, CareAction, Difficulty } from '../shared/care'
 
 type GenResult = { ok: true; pet: AppPet } | { ok: false; error: string }
 
@@ -20,6 +21,16 @@ const api = {
   setFrontScale: (k: number): void => ipcRenderer.send('settings:set-frontscale', k),
   /** Toggle time-of-day pupil dilation. */
   setPupilsByTime: (v: boolean): void => ipcRenderer.send('settings:set-pupils', v),
+
+  // ---- Care Mode ----
+  /** Turn Care ("Tamagotchi") mode on/off. */
+  setCareMode: (v: boolean): void => ipcRenderer.send('settings:set-caremode', v),
+  /** Set how fast needs decay. */
+  setDifficulty: (d: Difficulty): void => ipcRenderer.send('settings:set-difficulty', d),
+  /** Current needs + felt state (null if the engine isn't up yet). */
+  careStatus: (): Promise<CareStatus | null> => ipcRenderer.invoke('care:get'),
+  /** Feed / play / rest / groom / heal the cat. */
+  careAction: (action: CareAction): void => ipcRenderer.send('care:action', action),
   /** Replace the set of turned-off animations. */
   setDisabledAnims: (disabled: ClipName[]): void => ipcRenderer.send('settings:set-anims', disabled),
   /** Override one personality trait of a pet (live if it's the active pet). */
