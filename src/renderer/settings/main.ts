@@ -126,9 +126,14 @@ function reactState(t: number): AnimState {
 const easeIn = (k: number): number => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2)
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
 
+// The four sleep positions the live cat rotates through — the preview cycles
+// them so you can see the variety (tight curl / loose curl / donut / loaf-sleep).
+const SLEEP_VARIANTS = [RIG.curl, RIG.curlLoose, RIG.curlTight, RIG.loafLow]
 function sleepPose(t: number): ReturnType<typeof lerpPose> {
+  const base = SLEEP_VARIANTS[Math.floor(t / 3600) % SLEEP_VARIANTS.length]
   const br = Math.sin(t / 900)
-  const p = lerpPose(RIG.curl, RIG.curl, 0)
+  const p = lerpPose(base, base, 0)
+  p.eye = 0
   p.body = [p.body[0], p.body[1] - br * 0.25, p.body[2], p.body[3] + br * 0.5]
   return p
 }

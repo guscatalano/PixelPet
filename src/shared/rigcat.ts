@@ -244,6 +244,7 @@ export function lerpPose(A: RigPose, B: RigPose, k: number): RigPose {
     earPerk: lerp(A.earPerk ?? 0, B.earPerk ?? 0, k),
     earsBack: lerp(A.earsBack ?? 0, B.earsBack ?? 0, k),
     headFace: lerp(A.headFace ?? 0, B.headFace ?? 0, k),
+    cone: k >= 0.5 ? B.cone : A.cone, // the cone appears/vanishes at the midpoint of a transition
     eye: lerp(A.eye, B.eye, k),
     legs: A.legs.map((l, i) => lerpLeg(l, B.legs[i], k))
   }
