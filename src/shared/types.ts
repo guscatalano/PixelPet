@@ -11,7 +11,7 @@ import type { Difficulty } from './care'
  */
 export type ClipName =
   | 'idle' | 'sit' | 'walk' | 'sleep' | 'react' | 'fall'
-  | 'loaf' | 'sphinx' | 'groom' | 'teeter' | 'poof' | 'pounce' | 'yawn' | 'stretch' | 'paw' | 'sick'
+  | 'loaf' | 'sphinx' | 'groom' | 'teeter' | 'poof' | 'pounce' | 'yawn' | 'stretch' | 'paw' | 'sick' | 'sulk'
 
 /** Which way the pet faces (affects horizontal flip). */
 export type Facing = 'left' | 'right'

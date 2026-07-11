@@ -91,9 +91,11 @@ export function generateRigGrid(pet, pose) {
   ellipse(set, hcx, hcy, hr * 1.02, hr * 0.98) // round head (our cat's head)
   if (g.cheekFluff > 0) ellipse(set, hcx - hr * 0.72, hcy + hr * 0.42, g.cheekFluff * 0.45, g.cheekFluff * 0.35)
   const perk = pose.earPerk ?? 0 // 0 = normal; 1 = ears fully perked (taller, more upright)
-  const earTipL = hcy - hr - (3.4 + perk * 1.2) * eH
-  triangle(set, hcx - 4 * eW, hcy - hr + 2, hcx, hcy - hr + 2, hcx + (-4.5 + perk * 0.8) * eW, earTipL)
-  triangle(set, hcx + 1 * eW, hcy - hr + 2, hcx + 5 * eW, hcy - hr + 2, hcx + (4 - perk * 0.8) * eW, earTipL)
+  const back = pose.earsBack ?? 0
+  const earTipL = hcy - hr - (3.4 + perk * 1.2) * eH * (1 - back * 0.6) + back * 2
+  const bk = back * 5 * eW
+  triangle(set, hcx - 4 * eW, hcy - hr + 2, hcx, hcy - hr + 2, hcx + (-4.5 + perk * 0.8) * eW - bk, earTipL)
+  triangle(set, hcx + 1 * eW, hcy - hr + 2, hcx + 5 * eW, hcy - hr + 2, hcx + (4 - perk * 0.8) * eW - bk, earTipL)
   if (g.earStyle === 'tufted') {
     triangle(set, hcx - 5 * eW, earTipL + 1.5, hcx - 3.5 * eW, earTipL + 1.5, hcx - 5 * eW, earTipL - 1.5)
     triangle(set, hcx + 3.3 * eW, earTipL + 1.5, hcx + 4.8 * eW, earTipL + 1.5, hcx + 4.6 * eW, earTipL - 1.5)
@@ -196,6 +198,16 @@ export const POSES = {
     legs: [
       { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false }, // hind folded
       { hip: [25, 33], mid: [25, 38], foot: [25, GROUND], near: false }, // front straight
+      { hip: [16, 34], mid: [12, 39], foot: [21, 42], near: true },
+      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: true }
+    ]
+  },
+  sulk: {
+    body: [17, 31.5, 11, 8], head: [33, 23, 6.8], neck: [27, 27, 6, 5.5], eye: 1, earsBack: 1,
+    tail: { root: [7, 35], ctrl: [4, 43], tip: [17, 43] },
+    legs: [
+      { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false },
+      { hip: [25, 33], mid: [25, 38], foot: [25, GROUND], near: false },
       { hip: [16, 34], mid: [12, 39], foot: [21, 42], near: true },
       { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: true }
     ]

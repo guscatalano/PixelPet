@@ -517,9 +517,11 @@ export class PetEngine {
     const bored = n ? 1 - n.fun : 0
     const dirty = n ? 1 - n.hygiene : 0
     const sick = n && n.health < 0.5 ? 1 - n.health : 0
-    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick'>([
+    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick' | 'sulk'>([
       // When genuinely unwell, lying down with the cone dominates everything.
       { item: 'sick', weight: n && n.health < 0.35 ? 4 + (0.35 - n.health) * 12 : 0 },
+      // Bored & not unwell: sulk (ears back) some of the time.
+      { item: 'sulk', weight: n && n.fun < 0.25 && n.health >= 0.35 ? 0.8 + bored * 1.4 : 0 },
       // Stay-put drops the moving actions; per-animation opt-outs drop theirs.
       { item: 'wander', weight: this.stayPut ? 0 : (0.3 + p.energy * 0.8 + p.curiosity * 0.3 + bored * 0.6 + lowHunger * 0.3) * (1 - tired * 0.6) * (1 - sick) },
       { item: 'sleep', weight: this.allowed('sleep') ? 0.12 + p.sleepiness * 0.9 - p.energy * 0.2 + tired * 0.9 + sick * 1.4 : 0 },
@@ -555,6 +557,10 @@ export class PetEngine {
         case 'sick':
           this.setClip('sick')
           this.scheduleAmbient(this.dwellFor('sleep')) // a long, lethargic lie
+          break
+        case 'sulk':
+          this.setClip('sulk')
+          this.scheduleAmbient(this.dwellFor('sit'))
           break
         case 'pounce':
           this.startPounce()
