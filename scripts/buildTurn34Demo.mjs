@@ -51,7 +51,22 @@ const sleep = Array.from({ length: 6 }, (_, i) => {
 })
 // the wake-up stretch: stand -> stretch (chest sinks, butt up, front legs slide out)
 const stretch = Array.from({ length: 6 }, (_, i) => uri(render(generateRigGrid(ash, lerpPose(POSES.stand, POSES.stretch, ease(i / 5))), ash.coat)))
-const data = JSON.stringify({ w: W, h: H, walk, sitdown, turn, front, yawn, lie, sleep, stretch })
+// teetering at an edge: enter from stand, wobble teeter <-> teeterFwd, recover
+const teeterIn = Array.from({ length: 4 }, (_, i) => uri(render(generateRigGrid(ash, lerpPose(POSES.stand, POSES.teeter, ease(i / 3))), ash.coat)))
+const wobble = Array.from({ length: 8 }, (_, i) => {
+  const k = 0.5 + 0.5 * Math.sin((i / 8) * Math.PI * 2)
+  return uri(render(generateRigGrid(ash, lerpPose(POSES.teeter, POSES.teeterFwd, k)), ash.coat))
+})
+// the bread loaf: settle from sit (front legs slide back under the chest), then loaf idle (breath + a slow blink)
+const loafdown = Array.from({ length: 6 }, (_, i) => uri(render(generateRigGrid(ash, lerpPose(POSES.sit, POSES.loaf, ease(i / 5))), ash.coat)))
+const loaf = Array.from({ length: 8 }, (_, i) => {
+  const br = Math.sin((i / 8) * Math.PI * 2)
+  const p = lerpPose(POSES.loaf, POSES.loaf, 0)
+  p.body = [p.body[0], p.body[1] - br * 0.2, p.body[2], p.body[3] + br * 0.35]
+  if (i === 5) p.eye = 0 // a slow content blink
+  return uri(render(generateRigGrid(ash, p), ash.coat))
+})
+const data = JSON.stringify({ w: W, h: H, walk, sitdown, turn, front, yawn, lie, sleep, stretch, teeterIn, wobble, loafdown, loaf })
 
 const html = `<title>Ash · walk → sit → face you</title>
 <style>
@@ -86,6 +101,7 @@ const ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
 const mk=a=>a.map(u=>{const i=new Image();i.src=(typeof u==='string')?u:u.u;return i});
 const WALK=mk(D.walk), SIT=mk(D.sitdown), TURN=mk(D.turn), FRONT=mk(D.front);
 const YAWN=mk(D.yawn), LIE=mk(D.lie), SLEEP=mk(D.sleep), STRETCH=mk(D.stretch);
+const TEETIN=mk(D.teeterIn), WOBBLE=mk(D.wobble), LOAFDOWN=mk(D.loafdown), LOAF=mk(D.loaf);
 const TOFF=D.turn.map(t=>({ox:t.ox,oy:t.oy}));
 function draw(img, ox=0, oy=0){ if(!img||!img.complete) return; ctx.clearRect(0,0,cv.width,cv.height);
   ctx.drawImage(img,0,0,D.w,D.h, ox*S, (2+oy)*S, D.w*S, D.h*S); }
@@ -94,7 +110,13 @@ const nowEl=document.getElementById('now');
 // timeline: phases with per-frame timing
 function phases(){ return [
   { n:'walking',        frames: WALK.map((f,i)=>({img:f})), ms:110, loop: 3 },
+  { n:'ooh, an edge…',  frames: TEETIN.map(f=>({img:f})), ms:100 },
+  { n:'teetering!',     frames: WOBBLE.map(f=>({img:f})), ms:90, loop: 2 },
+  { n:'nope — backing up', frames: [...TEETIN].reverse().map(f=>({img:f})), ms:100 },
   { n:'sitting down',   frames: SIT.map(f=>({img:f})), ms:95 },
+  { n:'bread mode',     frames: LOAFDOWN.map(f=>({img:f})), ms:105 },
+  { n:'loafing',        frames: LOAF.map(f=>({img:f})), ms:260, loop: 2 },
+  { n:'un-loafing',     frames: [...LOAFDOWN].reverse().map(f=>({img:f})), ms:105 },
   { n:'turning to you', frames: TURN.map((f,i)=>({img:f,ox:TOFF[i].ox,oy:TOFF[i].oy})), ms:turnMs },
   { n:'resting',        frames: FRONT.map(f=>({img:f})), ms:280, loop: 2 },
   { n:'yawning',        frames: YAWN.map(f=>({img:f})), ms:130 },

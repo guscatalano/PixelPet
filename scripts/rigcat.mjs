@@ -133,6 +133,43 @@ export const POSES = {
       { hip: [28, 39], mid: [29, 41], foot: [27, 42], near: true }
     ]
   },
+  // The bread loaf: a smooth mound with all four paws tucked underneath
+  // (the legs are posed fully inside the body silhouette, so they vanish),
+  // head up and content, tail wrapped along the base.
+  loaf: {
+    body: [21, 36, 13.5, 6.8], head: [33, 26, 7], neck: [29, 31, 6, 5],
+    tail: { root: [8, 38], ctrl: [9, 44], tip: [25, 42.5] }, eye: 1,
+    legs: [
+      { hip: [15, 37], mid: [13, 40], foot: [16, 41.5], near: false }, // all tucked under —
+      { hip: [28, 37], mid: [28, 40], foot: [27, 41.5], near: false }, // inside the mound
+      { hip: [17, 37], mid: [15, 40], foot: [18, 41.5], near: true },
+      { hip: [30, 37], mid: [30, 40], foot: [29, 41.5], near: true }
+    ]
+  },
+  // Teetering at a ledge edge (the edge is to the RIGHT): weight rocked back on
+  // crouched hind legs, one front paw braced, the other raised over the void,
+  // head craned forward-down, tail high as a counterbalance. Lerp teeter <->
+  // teeterFwd for the wobble.
+  teeter: {
+    body: [18, 32, 11, 7], head: [32, 26, 7], neck: [27, 29, 5.5, 5],
+    tail: { root: [8, 30], ctrl: [2, 21], tip: [8, 12] }, eye: 1,
+    legs: [
+      { hip: [14, 35], mid: [11, 39], foot: [14, GROUND], near: false }, // hind crouched
+      { hip: [26, 35], mid: [28, 39], foot: [29, GROUND], near: false }, // front braced
+      { hip: [16, 35], mid: [13, 39], foot: [16, GROUND], near: true },
+      { hip: [28, 34], mid: [32, 36], foot: [35, 39], near: true }       // paw raised over the edge
+    ]
+  },
+  teeterFwd: {
+    body: [19.5, 32.5, 11, 7], head: [34, 28, 7], neck: [28.5, 30.5, 5.5, 5],
+    tail: { root: [9, 30], ctrl: [4, 20], tip: [11, 11] }, eye: 1,
+    legs: [
+      { hip: [15.5, 35.5], mid: [12.5, 39.5], foot: [14, GROUND], near: false },
+      { hip: [27.5, 35.5], mid: [29.5, 39.5], foot: [29, GROUND], near: false },
+      { hip: [17.5, 35.5], mid: [14.5, 39.5], foot: [16, GROUND], near: true },
+      { hip: [29.5, 34.5], mid: [34, 37], foot: [37.5, 40.5], near: true }   // reaching further out
+    ]
+  },
   // The classic wake-up stretch: chest low, butt up, front legs extended flat
   // forward, tail high. Eyes closed (cats squeeze them shut mid-stretch).
   stretch: {
