@@ -112,6 +112,13 @@
         background: radial-gradient(60% 60% at 50% 55%, #30323f, #23252f); border-radius: 8px;
       }
       .pose .pl { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+      /* Toggleable behavior tiles: click to turn an animation on/off */
+      .pose.togglable { cursor: pointer; transition: border-color 0.12s; }
+      .pose.togglable:hover { border-color: var(--accent); }
+      .pose.togglable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      .pose.off canvas { opacity: 0.3; filter: grayscale(1); }
+      .pose.off .pl { text-decoration: line-through; }
+      .pose.off .pl::after { content: ' · off'; text-decoration: none; color: var(--accent); }
     </style>
   </head>
   <body>
@@ -126,7 +133,7 @@
       </section>
 
       <section>
-        <div class="label">Poses &middot; <span id="poseWho">Ash</span></div>
+        <div class="label">Poses &middot; <span id="poseWho">Ash</span> &middot; <span style="text-transform: none; letter-spacing: 0">click a tile to turn that animation on/off</span></div>
         <div class="poses" id="poses"></div>
       </section>
 

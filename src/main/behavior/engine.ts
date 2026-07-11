@@ -31,6 +31,7 @@ export class PetEngine {
   private clip: ClipName = 'idle'
   private facing: Facing = 'right'
   private stayPut = false // settings: hold this spot (no wandering / leaping)
+  private disabled = new Set<ClipName>() // settings: animations the user turned off
   private dragging = false
   private busy = false // a one-shot (react/yawn/stretch) is playing
   private visualReady = false // renderer's graph has arrived at this.clip
@@ -106,6 +107,20 @@ export class PetEngine {
     if (v && this.clip === 'walk') this.finishWander()
   }
 
+  /** Per-animation opt-outs from settings. */
+  setDisabled(anims: ClipName[]): void {
+    this.disabled = new Set(anims)
+    // If the cat is currently doing something the user just turned off, wind it down.
+    if (this.disabled.has(this.clip) && (this.clip === 'sleep' || this.clip === 'loaf' || this.clip === 'sphinx' || this.clip === 'groom')) {
+      this.setClip('idle')
+      this.scheduleAmbient(600)
+    }
+  }
+
+  private allowed(clip: ClipName): boolean {
+    return !this.disabled.has(clip)
+  }
+
   // ---- trigger intake ----------------------------------------------------------
 
   emit(ev: TriggerEvent): void {
@@ -134,28 +149,31 @@ export class PetEngine {
   onDragEnd(): void {
     this.dragging = false
     // A little startled shake after being put down, then resume ambient life.
-    this.playOneShot('react')
+    if (this.allowed('react')) this.playOneShot('react')
+    else this.scheduleAmbient(800)
   }
 
   // ---- reactions ---------------------------------------------------------------
 
   private onHover(): void {
     if (this.busy || this.dragging) return
-    // The sleeping/loafing hover response is the renderer's ear-perk — don't wake.
-    if (this.clip === 'sleep' || this.clip === 'loaf') return
+    // Sleep/loaf/sphinx hover responses are renderer-local (ear-perk, head-turn) — don't wake.
+    if (this.clip === 'sleep' || this.clip === 'loaf' || this.clip === 'sphinx') return
     if (this.clip !== 'idle' && this.clip !== 'sit') return
     // Affectionate cats greet you; independent ones often ignore a hover.
     const chance = 0.35 + this.personality.affection * 0.5 - this.personality.independence * 0.25
     if (Math.random() < chance) {
       // Sometimes the greeting is a paw reaching at you instead of a glance.
       const pawChance = 0.25 + this.personality.affection * 0.4
-      this.playOneShot(Math.random() < pawChance ? 'paw' : 'react')
+      const usePaw = this.allowed('paw') && (Math.random() < pawChance || !this.allowed('react'))
+      if (usePaw) this.playOneShot('paw')
+      else if (this.allowed('react')) this.playOneShot('react')
     }
   }
 
   private onClick(): void {
     if (this.dragging) return
-    this.playOneShot('react')
+    if (this.allowed('react')) this.playOneShot('react')
   }
 
   /** Play a one-shot (react/yawn/stretch); `after` chains the next action. */
@@ -218,7 +236,15 @@ export class PetEngine {
         const dir = this.facing === 'right' ? 1 : -1
         const aheadT = supportY(feetX + dir * EDGE_LOOKAHEAD, feetY)
         if (aheadT - feetY > EDGE_DROP && this.airMode === 'none') {
-          this.startTeeter()
+          if (this.allowed('teeter')) {
+            this.startTeeter()
+          } else {
+            // Teeter turned off: just turn around at the edge.
+            this.cancelWander()
+            this.facing = this.facing === 'right' ? 'left' : 'right'
+            this.setClip('idle', this.facing)
+            this.scheduleAmbient(700)
+          }
           return
         }
         const dx = this.wanderTarget - this.curX
@@ -279,7 +305,7 @@ export class PetEngine {
     this.vx = 0
     this.curY = T - feetOff
     if (this.clip === 'fall' || this.clip === 'pounce' || wasLeap) {
-      if (!wasLeap && dropped > BIG_FALL) {
+      if (!wasLeap && dropped > BIG_FALL && this.allowed('poof')) {
         // That was a long way down — Halloween-cat moment, then compose yourself.
         this.setClip('poof')
         if (this.actionTimer) clearTimeout(this.actionTimer)
@@ -375,14 +401,14 @@ export class PetEngine {
     const p = this.personality
     const wasAsleep = this.clip === 'sleep'
     const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger'>([
-      // In stay-put mode the cat holds its spot: no wandering, no pounce leaps.
+      // Stay-put drops the moving actions; per-animation opt-outs drop theirs.
       { item: 'wander', weight: this.stayPut ? 0 : 0.3 + p.energy * 0.8 + p.curiosity * 0.3 },
-      { item: 'sleep', weight: 0.12 + p.sleepiness * 0.9 - p.energy * 0.2 },
-      { item: 'loaf', weight: 0.14 + p.sleepiness * 0.35 + (1 - p.energy) * 0.25 },
-      { item: 'sphinx', weight: 0.14 + p.sleepiness * 0.25 + (1 - p.energy) * 0.25 },
-      { item: 'groom', weight: 0.15 + p.independence * 0.2 },
-      { item: 'pounce', weight: this.stayPut ? 0 : 0.06 + p.energy * 0.35 + p.mischief * 0.35 },
-      { item: 'paw', weight: 0.05 + p.affection * 0.22 },
+      { item: 'sleep', weight: this.allowed('sleep') ? 0.12 + p.sleepiness * 0.9 - p.energy * 0.2 : 0 },
+      { item: 'loaf', weight: this.allowed('loaf') ? 0.14 + p.sleepiness * 0.35 + (1 - p.energy) * 0.25 : 0 },
+      { item: 'sphinx', weight: this.allowed('sphinx') ? 0.14 + p.sleepiness * 0.25 + (1 - p.energy) * 0.25 : 0 },
+      { item: 'groom', weight: this.allowed('groom') ? 0.15 + p.independence * 0.2 : 0 },
+      { item: 'pounce', weight: this.stayPut || !this.allowed('pounce') ? 0 : 0.06 + p.energy * 0.35 + p.mischief * 0.35 },
+      { item: 'paw', weight: this.allowed('paw') ? 0.05 + p.affection * 0.22 : 0 },
       { item: 'sit', weight: 0.2 + (1 - p.energy) * 0.2 },
       { item: 'linger', weight: 0.3 + (1 - p.energy) * 0.3 }
     ])
@@ -424,9 +450,9 @@ export class PetEngine {
       }
     }
     // Flourishes: a yawn on the way to a nap; a stretch on waking up to move.
-    if (action === 'sleep' && this.clip === 'idle' && Math.random() < 0.45 + p.sleepiness * 0.45) {
+    if (action === 'sleep' && this.clip === 'idle' && this.allowed('yawn') && Math.random() < 0.45 + p.sleepiness * 0.45) {
       this.playOneShot('yawn', go)
-    } else if (wasAsleep && (action === 'wander' || action === 'pounce') ) {
+    } else if (wasAsleep && (action === 'wander' || action === 'pounce') && this.allowed('stretch')) {
       this.playOneShot('stretch', go)
     } else {
       go()

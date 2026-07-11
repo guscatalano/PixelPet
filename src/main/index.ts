@@ -71,6 +71,7 @@ function createPetWindow(): BrowserWindow {
     engine?.dispose()
     engine = new PetEngine(win, effectivePersonality(settings, settings.activePetId))
     engine.setStayPut(settings.stayPut)
+    engine.setDisabled(settings.disabledAnims)
     engine.start()
     // Tell the renderer which pet to draw (it boots on the default cat) and
     // push the live-tunable animation config.
@@ -241,6 +242,11 @@ function registerIpc(): void {
     settings.stayPut = !!v
     saveSettings(settings)
     engine?.setStayPut(settings.stayPut)
+  })
+  ipcMain.on('settings:set-anims', (_e, disabled: ClipName[]) => {
+    settings.disabledAnims = Array.isArray(disabled) ? disabled : []
+    saveSettings(settings)
+    engine?.setDisabled(settings.disabledAnims)
   })
   ipcMain.on('settings:set-frontscale', (_e, k: number) => {
     settings.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, k))

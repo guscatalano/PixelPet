@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppSettings, Personality } from '../shared/types'
+import type { AppSettings, ClipName, Personality } from '../shared/types'
 
 // Typed bridge exposed to the settings window as `window.settings`.
 const api = {
@@ -15,6 +15,8 @@ const api = {
   setStayPut: (v: boolean): void => ipcRenderer.send('settings:set-stayput', v),
   /** Set the facing-you view scale (0.65 small .. 1.0 "coming at you"). */
   setFrontScale: (k: number): void => ipcRenderer.send('settings:set-frontscale', k),
+  /** Replace the set of turned-off animations. */
+  setDisabledAnims: (disabled: ClipName[]): void => ipcRenderer.send('settings:set-anims', disabled),
   /** Override one personality trait of a pet (live if it's the active pet). */
   setTrait: (petId: string, key: keyof Personality, value: number): void =>
     ipcRenderer.send('settings:set-trait', { petId, key, value }),

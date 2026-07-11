@@ -6,7 +6,7 @@ import { app } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AppSettings, Personality } from '../shared/types'
-import { TRAIT_KEYS } from '../shared/types'
+import { TRAIT_KEYS, TOGGLEABLE_ANIMS } from '../shared/types'
 import { DEFAULT_SCALE, MIN_SCALE, MAX_SCALE } from '../shared/constants'
 import { DEFAULT_FRONT_SCALE } from '../shared/catgen'
 import { DEFAULT_PET, PETS } from '../shared/pets'
@@ -23,7 +23,7 @@ export const MIN_FRONT_SCALE = 0.65
 export const MAX_FRONT_SCALE = 1.0
 
 function defaults(): AppSettings {
-  return { activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS, stayPut: false, frontScale: DEFAULT_FRONT_SCALE, overrides: {} }
+  return { activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS, stayPut: false, frontScale: DEFAULT_FRONT_SCALE, disabledAnims: [], overrides: {} }
 }
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n))
@@ -43,6 +43,11 @@ function sanitize(raw: unknown): AppSettings {
   if (typeof r.stayPut === 'boolean') s.stayPut = r.stayPut
   if (typeof r.frontScale === 'number' && Number.isFinite(r.frontScale)) {
     s.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, r.frontScale))
+  }
+  if (Array.isArray(r.disabledAnims)) {
+    s.disabledAnims = (r.disabledAnims as unknown[]).filter(
+      (a): a is AppSettings['disabledAnims'][number] => typeof a === 'string' && (TOGGLEABLE_ANIMS as string[]).includes(a)
+    )
   }
   if (r.overrides && typeof r.overrides === 'object') {
     for (const [petId, ov] of Object.entries(r.overrides as Record<string, unknown>)) {

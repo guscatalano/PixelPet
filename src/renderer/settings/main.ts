@@ -3,7 +3,7 @@ import { generateRigGrid, lerpPose, POSES as RIG } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
 import { PETS, type AppPet } from '../../shared/pets'
 import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
-import { TRAIT_KEYS, type AppSettings, type Personality } from '../../shared/types'
+import { TRAIT_KEYS, TOGGLEABLE_ANIMS, type AppSettings, type ClipName, type Personality } from '../../shared/types'
 
 // ---- Bridge typing (exposed by preload/settings.ts) ------------------------
 interface SettingsApi {
@@ -13,6 +13,7 @@ interface SettingsApi {
   setTurnMs: (ms: number) => void
   setStayPut: (v: boolean) => void
   setFrontScale: (k: number) => void
+  setDisabledAnims: (disabled: ClipName[]) => void
   setTrait: (petId: string, key: keyof Personality, value: number) => void
   resetTraits: (petId: string) => void
 }
@@ -139,9 +140,11 @@ const poseCanvases: CanvasRenderingContext2D[] = []
 function buildPoses(): void {
   posesEl.innerHTML = ''
   poseCanvases.length = 0
+  const disabled = new Set<string>(state.disabledAnims ?? [])
   for (const pose of POSES) {
     const tile = document.createElement('div')
-    tile.className = 'pose'
+    const togglable = (TOGGLEABLE_ANIMS as string[]).includes(pose.key)
+    tile.className = 'pose' + (togglable ? ' togglable' : '') + (disabled.has(pose.key) ? ' off' : '')
     const c = document.createElement('canvas')
     c.width = SPRITE_W
     c.height = SPRITE_H
@@ -149,6 +152,25 @@ function buildPoses(): void {
     label.className = 'pl'
     label.textContent = pose.label
     tile.append(c, label)
+    if (togglable) {
+      tile.tabIndex = 0
+      tile.setAttribute('role', 'switch')
+      tile.title = `Click to turn the ${pose.label.toLowerCase()} animation on/off`
+      const flip = (): void => {
+        const nowOff = !tile.classList.contains('off')
+        tile.classList.toggle('off', nowOff)
+        tile.setAttribute('aria-checked', String(!nowOff))
+        if (nowOff) disabled.add(pose.key)
+        else disabled.delete(pose.key)
+        state.disabledAnims = [...disabled] as AppSettings['disabledAnims']
+        window.settings.setDisabledAnims(state.disabledAnims)
+      }
+      tile.setAttribute('aria-checked', String(!disabled.has(pose.key)))
+      tile.addEventListener('click', flip)
+      tile.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip() }
+      })
+    }
     posesEl.append(tile)
     poseCanvases.push(c.getContext('2d')!)
   }

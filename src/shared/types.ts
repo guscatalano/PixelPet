@@ -58,8 +58,15 @@ export interface AppSettings {
   stayPut: boolean
   /** Facing-you view scale (0.65 small .. 1.0 = big, "coming at you"). */
   frontScale: number
+  /** Animations the user turned off (subset of TOGGLEABLE_ANIMS). */
+  disabledAnims: ClipName[]
   overrides: Record<string, Partial<Personality>>
 }
+
+/** Behaviors the user may turn off in settings (core locomotion is not toggleable). */
+export const TOGGLEABLE_ANIMS: ClipName[] = [
+  'sleep', 'loaf', 'sphinx', 'groom', 'stretch', 'pounce', 'teeter', 'poof', 'yawn', 'paw', 'react'
+]
 
 /** Live-tunable renderer config pushed over pet:set-config. */
 export interface PetConfig {
