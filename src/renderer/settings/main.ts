@@ -1,5 +1,6 @@
 import { generateGrid, generateWalkGrid, render as renderPet, type AnimState } from '../../shared/catgen'
 import { generateRigGrid, lerpPose, POSES as RIG } from '../../shared/rigcat'
+import { generate34Grid } from '../../shared/turn34'
 import { PETS, type AppPet } from '../../shared/pets'
 import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
 import { TRAIT_KEYS, type AppSettings, type Personality } from '../../shared/types'
@@ -56,6 +57,9 @@ function reactState(t: number): AnimState {
   if (p < 950) return { eyeOpen: true, tailPhase: 0.3, look: 1, earPhase: 0 }
   return { eyeOpen: true, tailPhase: Math.sin(t / 1400), look: 0, earPhase: 0 }
 }
+const easeIn = (k: number): number => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2)
+const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
+
 function sleepPose(t: number): ReturnType<typeof lerpPose> {
   const br = Math.sin(t / 900)
   const p = lerpPose(RIG.curl, RIG.curl, 0)
@@ -63,17 +67,62 @@ function sleepPose(t: number): ReturnType<typeof lerpPose> {
   return p
 }
 function loafPose(t: number): ReturnType<typeof lerpPose> {
+  // Breathes, and slowly settles into the dozy low loaf and back.
+  const relax = 0.5 + 0.5 * Math.sin(t / 2600 - Math.PI / 2)
+  const p = lerpPose(RIG.loaf, RIG.loafLow, relax)
   const br = Math.sin(t / 1100)
-  const p = lerpPose(RIG.loaf, RIG.loaf, 0)
   p.body = [p.body[0], p.body[1] - br * 0.2, p.body[2], p.body[3] + br * 0.35]
+  p.eye = relax > 0.7 ? 0 : (t % 4200 > 160 ? 1 : 0)
+  return p
+}
+function sitPose(t: number): ReturnType<typeof lerpPose> {
+  const p = lerpPose(RIG.sit, RIG.sit, 0)
   p.eye = t % 4200 > 160 ? 1 : 0
   return p
 }
+function stretchPose(t: number): ReturnType<typeof lerpPose> {
+  const ph = t % 3000
+  if (ph < 700) return lerpPose(RIG.stand, RIG.stretch, easeIn(ph / 700))
+  if (ph < 1800) return lerpPose(RIG.stretch, RIG.stretch, 0)
+  if (ph < 2500) return lerpPose(RIG.stretch, RIG.stand, easeIn((ph - 1800) / 700))
+  return lerpPose(RIG.stand, RIG.stand, 0)
+}
+function pouncePose(t: number): ReturnType<typeof lerpPose> {
+  const ph = t % 2400
+  if (ph < 1300) return lerpPose(RIG.crouch, RIG.crouchWiggle, 0.5 + 0.5 * Math.sin(ph / 150)) // butt wiggle…
+  if (ph < 1500) return lerpPose(RIG.crouch, RIG.pounce, easeIn((ph - 1300) / 200))
+  if (ph < 2100) return lerpPose(RIG.pounce, RIG.pounce, 0) // airborne!
+  return lerpPose(RIG.pounce, RIG.crouch, easeIn((ph - 2100) / 300))
+}
+function poofPose(t: number): ReturnType<typeof lerpPose> {
+  const ph = t % 2800
+  if (ph < 350) return lerpPose(RIG.stand, RIG.poof, easeIn(ph / 350)) // !!!
+  if (ph < 2000) return lerpPose(RIG.poof, RIG.poof, 0)
+  if (ph < 2600) return lerpPose(RIG.poof, RIG.stand, easeIn((ph - 2000) / 600))
+  return lerpPose(RIG.stand, RIG.stand, 0)
+}
+const yawnK = (t: number): number => clamp01(Math.sin(((t % 3400) / 3400) * Math.PI * 2) * 1.4)
+function pawState(t: number): { paw: number; pawX: number } {
+  const ph = t % 2600
+  if (ph < 400) return { paw: easeIn(ph / 400), pawX: 0 }
+  if (ph < 1800) return { paw: 1, pawX: Math.sin((ph - 400) / 170) }
+  if (ph < 2200) return { paw: 1 - easeIn((ph - 1800) / 400), pawX: 0 }
+  return { paw: 0, pawX: 0 }
+}
+
 const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) => Uint8ClampedArray }> = [
   { key: 'idle', label: 'Idle', rgba: (pet, t) => renderPet(generateGrid(pet, idleState(t)), pet.coat) },
   { key: 'walk', label: 'Walk', rgba: (pet, t) => renderPet(generateWalkGrid(pet, (t / 900) % 1), pet.coat) },
+  { key: 'sit', label: 'Sit', rgba: (pet, t) => renderPet(generateRigGrid(pet, sitPose(t)), pet.coat) },
   { key: 'loaf', label: 'Loaf', rgba: (pet, t) => renderPet(generateRigGrid(pet, loafPose(t)), pet.coat) },
   { key: 'sleep', label: 'Sleep', rgba: (pet, t) => renderPet(generateRigGrid(pet, sleepPose(t)), pet.coat) },
+  { key: 'groom', label: 'Groom', rgba: (pet, t) => renderPet(generateRigGrid(pet, lerpPose(RIG.groom, RIG.groomLick, 0.5 + 0.5 * Math.sin(t / 140))), pet.coat) },
+  { key: 'stretch', label: 'Stretch', rgba: (pet, t) => renderPet(generateRigGrid(pet, stretchPose(t)), pet.coat) },
+  { key: 'pounce', label: 'Pounce', rgba: (pet, t) => renderPet(generateRigGrid(pet, pouncePose(t)), pet.coat) },
+  { key: 'teeter', label: 'Teeter', rgba: (pet, t) => renderPet(generateRigGrid(pet, lerpPose(RIG.teeter, RIG.teeterFwd, 0.5 + 0.5 * Math.sin(t / 260))), pet.coat) },
+  { key: 'poof', label: 'Poof!', rgba: (pet, t) => renderPet(generateRigGrid(pet, poofPose(t)), pet.coat) },
+  { key: 'yawn', label: 'Yawn', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { yawn: yawnK(t) }), pet.coat) },
+  { key: 'paw', label: 'Paw', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, pawState(t)), pet.coat) },
   { key: 'react', label: 'React', rgba: (pet, t) => renderPet(generateGrid(pet, reactState(t)), pet.coat) }
 ]
 const poseCanvases: CanvasRenderingContext2D[] = []

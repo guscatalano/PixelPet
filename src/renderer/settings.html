@@ -101,14 +101,14 @@
       .petid b { color: var(--accent); font-weight: 600; }
       .traits-head .mod { color: var(--accent); font-size: 11px; font-family: var(--mono); letter-spacing: 0.06em; margin-left: 6px; }
 
-      /* Pose previews */
-      .poses { display: flex; gap: 12px; flex-wrap: wrap; }
+      /* Pose previews — the full move gallery */
+      .poses { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
       .pose {
         background: var(--panel); border: 1px solid var(--hair); border-radius: 12px;
-        padding: 10px 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 7px; flex: 1; min-width: 104px;
+        padding: 8px 8px 7px; display: flex; flex-direction: column; align-items: center; gap: 6px;
       }
       .pose canvas {
-        width: 104px; height: 104px; image-rendering: pixelated;
+        width: 84px; height: 84px; image-rendering: pixelated;
         background: radial-gradient(60% 60% at 50% 55%, #30323f, #23252f); border-radius: 8px;
       }
       .pose .pl { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
