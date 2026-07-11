@@ -47,16 +47,30 @@ const poseCanvas = (pose: RigPose): HTMLCanvasElement =>
 // Front-idle frames, cached by quantized state (tail sways continuously while
 // eye/ear expressions layer on top without snapping).
 const frontCache = new Map<string, HTMLCanvasElement>()
-function getFrontFrame(eyeOpen: boolean, tailPhase: number, look: number, earPhase: number): HTMLCanvasElement {
+function getFrontFrame(eyeOpen: boolean, tailPhase: number, look: number, earPhase: number, dilation?: number): HTMLCanvasElement {
   const tailStep = Math.round(tailPhase * 8)
-  const key = `${eyeOpen ? 1 : 0}|${tailStep}|${look}|${earPhase}`
+  const key = `${eyeOpen ? 1 : 0}|${tailStep}|${look}|${earPhase}|${dQuant(dilation)}`
   let c = frontCache.get(key)
   if (!c) {
-    c = rgbaToCanvas(frontRGBA({ eyeOpen, tailPhase: tailStep / 8, look, earPhase }))
+    c = rgbaToCanvas(frontRGBA({ eyeOpen, tailPhase: tailStep / 8, look, earPhase, dilation }))
     frontCache.set(key, c)
   }
   return c
 }
+
+// ---- Pupil dilation by time of day (Settings toggle) ------------------------
+// Off -> undefined (generators use the resting pupil). On -> a value that eases
+// from a narrow slit at bright midday to a big round pupil in the dark.
+let pupilsByTime = false
+let lastDilaQuant = -1
+function currentDilation(): number | undefined {
+  if (!pupilsByTime) return undefined
+  const d = new Date()
+  const hour = d.getHours() + d.getMinutes() / 60
+  const daylight = 0.5 + 0.5 * Math.cos(((hour - 13) / 12) * Math.PI) // 1 at 13:00, 0 at 01:00
+  return 0.12 + 0.8 * (1 - daylight)
+}
+const dQuant = (d: number | undefined): number => (d === undefined ? -1 : Math.round(d * 6))
 const tailAt = (now: number, speed: number): number => Math.sin(now / speed)
 
 // Side-profile walk frames, cached by quantized step of the gait cycle (also
@@ -120,7 +134,7 @@ const TURN_KEYS = [
   { t: 0.28, blink: false, ox: 1, oy: 0 }
 ]
 const turnFrames = (): Frame[] => TURN_KEYS.map((k) => ({
-  img: rgbaToCanvas(renderPet(generate34Grid(activePet, k.t, { eyeOpen: !k.blink }), activePet.coat)),
+  img: rgbaToCanvas(renderPet(generate34Grid(activePet, k.t, { eyeOpen: !k.blink, dilation: currentDilation() }), activePet.coat)),
   ms: turnMs, ox: k.ox, oy: k.oy
 }))
 window.pet.onConfig((cfg) => {
@@ -128,6 +142,13 @@ window.pet.onConfig((cfg) => {
     turnMs = cfg.turnMs
     seqCache.delete('sit>front') // rebuilt with the new timing on next use
     seqCache.delete('front>sit')
+  }
+  if (typeof cfg.pupilsByTime === 'boolean' && cfg.pupilsByTime !== pupilsByTime) {
+    pupilsByTime = cfg.pupilsByTime
+    frontCache.clear() // front frames are keyed by dilation; the turn is rebuilt below
+    seqCache.delete('sit>front')
+    seqCache.delete('front>sit')
+    lastDilaQuant = dQuant(currentDilation())
   }
   if (typeof cfg.frontScale === 'number') {
     setFrontScale(cfg.frontScale)
@@ -391,7 +412,7 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
   switch (curNode) {
     case 'front': {
       const e = idleExpr(now)
-      return { img: getFrontFrame(e.eyeOpen, tailAt(now, 1600), e.look, e.earPhase) }
+      return { img: getFrontFrame(e.eyeOpen, tailAt(now, 1600), e.look, e.earPhase, currentDilation()) }
     }
     case 'sit': {
       const open = restBlink(now)
@@ -565,6 +586,16 @@ function drawSprite(frame: HTMLCanvasElement, fc: Facing, ox = 0, oy = 0): void 
 }
 
 function render(now: number): void {
+  // As the time-of-day dilation drifts across a quantized step, rebuild the
+  // cached turn so its baked pupils stay in sync with the live front idle.
+  if (pupilsByTime) {
+    const q = dQuant(currentDilation())
+    if (q !== lastDilaQuant) {
+      lastDilaQuant = q
+      seqCache.delete('sit>front')
+      seqCache.delete('front>sit')
+    }
+  }
   // Advance the active transition sequence.
   if (seq && now >= seq.nextAt) {
     seq.i++

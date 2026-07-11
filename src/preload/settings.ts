@@ -18,6 +18,8 @@ const api = {
   setStayPut: (v: boolean): void => ipcRenderer.send('settings:set-stayput', v),
   /** Set the facing-you view scale (0.65 small .. 1.0 "coming at you"). */
   setFrontScale: (k: number): void => ipcRenderer.send('settings:set-frontscale', k),
+  /** Toggle time-of-day pupil dilation. */
+  setPupilsByTime: (v: boolean): void => ipcRenderer.send('settings:set-pupils', v),
   /** Replace the set of turned-off animations. */
   setDisabledAnims: (disabled: ClipName[]): void => ipcRenderer.send('settings:set-anims', disabled),
   /** Override one personality trait of a pet (live if it's the active pet). */

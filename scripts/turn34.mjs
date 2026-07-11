@@ -210,7 +210,9 @@ export function generate34Grid(preset, t, state = {}) {
     if (!eyeOpen) { for (let x = Math.round(e.ex - e.rx); x <= Math.round(e.ex + e.rx); x++) put(overlay, x, Math.round(eyeY), O.OUTLINE); continue }
     ellipse((x, y) => put(overlay, x, y, O.IRIS), e.ex, eyeY, e.rx, e.ry)
     const look = (state.look ?? 0.35 * t) * (e.rx * 0.9) // pupils drift toward facing side mid-turn
-    ellipse((x, y) => put(overlay, x, y, O.PUPIL), e.ex + look, eyeY + 0.3, Math.max(0.85, e.rx * 0.45), e.ry * 0.72)
+    let pupRx = Math.max(0.85, e.rx * 0.45), pupRy = e.ry * 0.72
+    if (state.dilation !== undefined) { const d = state.dilation; pupRx = Math.max(0.6, e.rx * (0.28 + 0.46 * d)); pupRy = e.ry * (0.96 - 0.24 * d) }
+    ellipse((x, y) => put(overlay, x, y, O.PUPIL), e.ex + look, eyeY + 0.3, pupRx, pupRy)
     put(overlay, Math.round(e.ex + look - e.rx * 0.35), Math.round(eyeY - e.ry * 0.4), O.GLINT)
   }
   triangle((x, y) => put(overlay, x, y, O.NOSE), noseX - 1.6, noseY - 1, noseX + 1.6, noseY - 1, noseX, noseY + 1.2)

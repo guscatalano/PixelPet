@@ -39,7 +39,7 @@ export interface Pet {
   geom?: Partial<Geom>; marking?: string; coat: CoatSpec
   personality?: Record<string, number>
 }
-export interface AnimState { eyeOpen?: boolean; tailPhase?: number; earPhase?: number; look?: number }
+export interface AnimState { eyeOpen?: boolean; tailPhase?: number; earPhase?: number; look?: number; dilation?: number }
 export interface Parts { shade: Uint8Array; region: Uint8Array; overlay: Uint8Array; geom: Geom; fur: Uint8Array }
 
 type SetFn = (x: number, y: number) => void
@@ -339,7 +339,17 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
       }
     const pupRy = g.eyeStyle === 'round' ? g.eyeRy * 0.72 : g.eyeRy * 0.9
     const look = (state.look || 0) * (g.eyeRx * 0.5)
-    ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex + look, ey + 0.3, Math.max(0.85, g.eyeRx * 0.45), pupRy)
+    // Pupil dilation (state.dilation 0..1): a narrow vertical slit in bright light
+    // (0) widening to a big round pupil in the dark (1). Undefined = the default
+    // resting shape, so the feature toggled off looks exactly as before.
+    let pupRx = Math.max(0.85, g.eyeRx * 0.45)
+    let pRy = pupRy
+    if (state.dilation !== undefined) {
+      const d = state.dilation
+      pupRx = Math.max(0.6, g.eyeRx * (0.26 + 0.42 * d))
+      pRy = g.eyeRy * (0.96 - 0.24 * d)
+    }
+    ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex + look, ey + 0.3, pupRx, pRy)
     put(overlay, Math.round(ex + look - g.eyeRx * 0.35), Math.round(ey - g.eyeRy * 0.4), O.GLINT)
   }
 

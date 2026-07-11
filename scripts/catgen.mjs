@@ -342,7 +342,10 @@ function drawFace(overlay, fur, g, state) {
       }
     const pupRy = g.eyeStyle === 'round' ? g.eyeRy * 0.72 : g.eyeRy * 0.9
     const look = (state.look || 0) * (g.eyeRx * 0.5) // horizontal glance
-    ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex + look, ey + 0.3, Math.max(0.85, g.eyeRx * 0.45), pupRy)
+    // Pupil dilation (state.dilation 0..1): slit in bright light, round in the dark.
+    let pupRx = Math.max(0.85, g.eyeRx * 0.45), pRy = pupRy
+    if (state.dilation !== undefined) { const d = state.dilation; pupRx = Math.max(0.6, g.eyeRx * (0.26 + 0.42 * d)); pRy = g.eyeRy * (0.96 - 0.24 * d) }
+    ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex + look, ey + 0.3, pupRx, pRy)
     put(overlay, Math.round(ex + look - g.eyeRx * 0.35), Math.round(ey - g.eyeRy * 0.4), O.GLINT)
   }
 

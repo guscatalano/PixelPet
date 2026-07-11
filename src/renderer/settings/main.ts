@@ -15,6 +15,7 @@ interface SettingsApi {
   setTurnMs: (ms: number) => void
   setStayPut: (v: boolean) => void
   setFrontScale: (k: number) => void
+  setPupilsByTime: (v: boolean) => void
   setDisabledAnims: (disabled: ClipName[]) => void
   setTrait: (petId: string, key: keyof Personality, value: number) => void
   resetTraits: (petId: string) => void
@@ -377,6 +378,19 @@ function buildAnimation(): void {
     state.stayPut = !state.stayPut
     paint(state.stayPut)
     window.settings.setStayPut(state.stayPut)
+  })
+
+  const pupils = $<HTMLButtonElement>('pupils')
+  const paintPupils = (on: boolean): void => {
+    pupils.classList.toggle('on', on)
+    pupils.setAttribute('aria-pressed', String(on))
+    pupils.textContent = on ? 'On — dilate with the day' : 'Off — fixed pupils'
+  }
+  paintPupils(state.pupilsByTime ?? false)
+  pupils.addEventListener('click', () => {
+    state.pupilsByTime = !state.pupilsByTime
+    paintPupils(state.pupilsByTime)
+    window.settings.setPupilsByTime(state.pupilsByTime)
   })
 }
 

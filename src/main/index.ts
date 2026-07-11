@@ -83,7 +83,7 @@ function createPetWindow(): BrowserWindow {
     // — absent from the built-in PETS the renderer imports — render too) and
     // push the live-tunable animation config.
     win.webContents.send('pet:set-pet', findPet(settings, settings.activePetId))
-    win.webContents.send('pet:set-config', { turnMs: settings.turnMs, frontScale: settings.frontScale })
+    win.webContents.send('pet:set-config', { turnMs: settings.turnMs, frontScale: settings.frontScale, pupilsByTime: settings.pupilsByTime })
   })
 
   win.on('closed', () => {
@@ -282,6 +282,11 @@ function registerIpc(): void {
     settings.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, k))
     saveSettings(settings)
     petWindow?.webContents.send('pet:set-config', { frontScale: settings.frontScale })
+  })
+  ipcMain.on('settings:set-pupils', (_e, v: boolean) => {
+    settings.pupilsByTime = !!v
+    saveSettings(settings)
+    petWindow?.webContents.send('pet:set-config', { pupilsByTime: settings.pupilsByTime })
   })
   ipcMain.on('settings:set-trait', (_e, p: { petId: string; key: keyof Personality; value: number }) => {
     const ov = settings.overrides[p.petId] ?? (settings.overrides[p.petId] = {})

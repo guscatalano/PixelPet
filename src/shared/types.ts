@@ -60,6 +60,8 @@ export interface AppSettings {
   stayPut: boolean
   /** Facing-you view scale (0.65 small .. 1.0 = big, "coming at you"). */
   frontScale: number
+  /** Pupils dilate/contract with the time of day (round at night, slits at midday). */
+  pupilsByTime: boolean
   /** Animations the user turned off (subset of TOGGLEABLE_ANIMS). */
   disabledAnims: ClipName[]
   /** Non-secret AI config (provider/model/endpoint). The API key lives elsewhere (safeStorage). */
@@ -97,4 +99,5 @@ export const TOGGLEABLE_ANIMS: ClipName[] = [
 export interface PetConfig {
   turnMs?: number
   frontScale?: number
+  pupilsByTime?: boolean
 }

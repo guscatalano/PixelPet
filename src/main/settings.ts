@@ -33,7 +33,7 @@ function defaultAi(): AiConfig {
 function defaults(): AppSettings {
   return {
     activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS,
-    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, disabledAnims: [],
+    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, disabledAnims: [],
     ai: defaultAi(), userPets: [], overrides: {}
   }
 }
@@ -97,6 +97,7 @@ function sanitize(raw: unknown): AppSettings {
     s.turnMs = Math.max(MIN_TURN_MS, Math.min(MAX_TURN_MS, Math.round(r.turnMs)))
   }
   if (typeof r.stayPut === 'boolean') s.stayPut = r.stayPut
+  if (typeof r.pupilsByTime === 'boolean') s.pupilsByTime = r.pupilsByTime
   if (typeof r.frontScale === 'number' && Number.isFinite(r.frontScale)) {
     s.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, r.frontScale))
   }

@@ -17,6 +17,8 @@ export interface State34 {
   eyeOpen?: boolean
   look?: number
   yawn?: number
+  /** Pupil dilation 0..1 — slit (bright) to round (dark). */
+  dilation?: number
   /** 0..1 — one front paw raised, reaching toward the viewer. */
   paw?: number
   /** -1..1 — lateral pat offset of the raised paw (animate for pat-pat-pat). */
@@ -187,7 +189,10 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     }
     ellipse((x, y) => put(overlay, x, y, O.IRIS), e.ex, eyeY, e.rx, e.ry)
     const look = (state.look ?? 0.35 * t) * (e.rx * 0.9) // pupils drift toward the facing side mid-turn
-    ellipse((x, y) => put(overlay, x, y, O.PUPIL), e.ex + look, eyeY + 0.3, Math.max(0.85, e.rx * 0.45), e.ry * 0.72)
+    // Pupil dilation (state.dilation 0..1): slit in bright light, round in the dark.
+    let pupRx = Math.max(0.85, e.rx * 0.45), pupRy = e.ry * 0.72
+    if (state.dilation !== undefined) { const d = state.dilation; pupRx = Math.max(0.6, e.rx * (0.28 + 0.46 * d)); pupRy = e.ry * (0.96 - 0.24 * d) }
+    ellipse((x, y) => put(overlay, x, y, O.PUPIL), e.ex + look, eyeY + 0.3, pupRx, pupRy)
     put(overlay, Math.round(e.ex + look - e.rx * 0.35), Math.round(eyeY - e.ry * 0.4), O.GLINT)
   }
   triangle((x, y) => put(overlay, x, y, O.NOSE), noseX - 1.6, noseY - 1, noseX + 1.6, noseY - 1, noseX, noseY + 1.2)
