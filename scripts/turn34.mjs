@@ -43,21 +43,23 @@ export function generate34Grid(preset, t, state = {}) {
     for (let k = 0; k <= 1.001; k += 0.05) { const it = 1 - k
       ellipse(set, it * it * p0[0] + 2 * it * k * p1[0] + k * k * p2[0], it * it * p0[1] + 2 * it * k * p1[1] + k * k * p2[1], (3.0 - k * 1.2) * Math.min(1, ta + 0.4), (3.0 - k * 1.2) * Math.min(1, ta + 0.4)) }
   }
+  // Pawing at you (ref: a cat reaching a foreleg toward the camera): the leg is
+  // FORESHORTENED — a short forearm ending in a BIG pad facing the viewer,
+  // toe beans out. Reaching = the pad growing toward you.
   const pawAmt = state.paw || 0, pawX = state.pawX || 0
   const pawMask = new Uint8Array(W * H)
+  const pawReach = 0.55 + 0.45 * pawAmt
+  const pawPx = bx + 4.5 + 1.8 * pawAmt
+  const pawPy = g.bodyCy + g.bodyRy * 0.32 - 4.5 * pawAmt + pawX * 1.6
   { // front legs, shifted with the chest
     const legDX = g.bodyRx * 0.3
     const legTop = g.bodyCy + g.bodyRy * 0.32, pawY = g.bodyCy + g.bodyRy * 0.98
     for (const s of [-1, 1]) {
       const lx = bx + 0.9 * t + s * legDX
       if (s === 1 && pawAmt > 0.05) {
-        // One paw raised at you: reaches up and OUT past the body silhouette
-        // (outlined against the background). pawX = bat stroke (0 up, 1 down-pat).
-        const px = bx + g.bodyRx * (0.8 + 0.45 * pawAmt) + 0.6
-        const py = legTop + 2 - pawAmt * 12.5 + pawX * 2.4
         const setPaw = (x, y) => { set(x, y); if (inB(x, y)) pawMask[idx(x, y)] = 1 }
-        for (let k = 0; k <= 1.001; k += 0.2) ellipse(setPaw, lx + 0.5 + (px - (lx + 0.5)) * k, legTop + 1.5 + (py + 1.5 - (legTop + 1.5)) * k, 1.9 - k * 0.4, 1.7 - k * 0.3)
-        ellipse(setPaw, px, py, 2.9, 2.6)
+        for (let k = 0; k <= 1.001; k += 0.25) ellipse(setPaw, bx + 3 + (pawPx - 0.4 - (bx + 3)) * k, legTop + 1.5 + (pawPy + 2 - (legTop + 1.5)) * k, 1.8, 1.6)
+        ellipse(setPaw, pawPx, pawPy, 3.4 * pawReach, 3.1 * pawReach) // the pad, toward you
         continue
       }
       for (let y = legTop; y <= pawY; y += 0.5) ellipse(set, lx, y, 2.3, 1.6)
@@ -104,22 +106,26 @@ export function generate34Grid(preset, t, state = {}) {
       if (inB(px, pawY) && fur[idx(px, pawY)]) shade[idx(px, pawY)] = DEEP }
   }
   if (pawAmt > 0.05) {
-    // Shadow crease where the forearm crosses the chest.
+    // A dark ring around the raised limb where it overlaps the body.
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       if (!pawMask[idx(x, y)]) continue
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const nx2 = x + dx, ny2 = y + dy
         if (!inB(nx2, ny2) || pawMask[idx(nx2, ny2)] || !fur[idx(nx2, ny2)]) continue
-        if (overlay[idx(nx2, ny2)] === O.OUTLINE) continue
-        if (shade[idx(nx2, ny2)] < SHADOW) shade[idx(nx2, ny2)] = SHADOW
+        put(overlay, nx2, ny2, O.OUTLINE)
       }
     }
-    // Toe notches on the pad — the detail that makes it read as a paw.
-    const tpx = Math.round(bx + g.bodyRx * (0.8 + 0.45 * pawAmt) + 0.6)
-    const tpy = Math.round(g.bodyCy + g.bodyRy * 0.32 + 2 - pawAmt * 12.5 + pawX * 2.4)
-    for (const dx of [-1, 1]) {
-      const x = tpx + dx, y = tpy - 2
-      if (inB(x, y) && pawMask[idx(x, y)]) put(overlay, x, y, O.OUTLINE)
+    // Toe beans — the "paw at the glass" signature.
+    if (pawAmt > 0.6) {
+      const bean = (x, y) => {
+        const rx2 = Math.round(x), ry2 = Math.round(y)
+        if (inB(rx2, ry2) && pawMask[idx(rx2, ry2)] && overlay[idx(rx2, ry2)] === O.NONE) put(overlay, rx2, ry2, O.NOSE)
+      }
+      bean(pawPx - 1.8 * pawReach, pawPy - 1.2 * pawReach)
+      bean(pawPx, pawPy - 1.8 * pawReach)
+      bean(pawPx + 1.8 * pawReach, pawPy - 1.2 * pawReach)
+      ellipse((x, y) => { if (pawMask[idx(x, y)] && overlay[idx(x, y)] === O.NONE) put(overlay, x, y, O.NOSE) },
+        pawPx, pawPy + 1.1 * pawReach, 1.3 * pawReach, 0.9 * pawReach)
     }
   }
 
