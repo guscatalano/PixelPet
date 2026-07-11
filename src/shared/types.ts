@@ -81,6 +81,8 @@ export interface AppSettings {
   userPets: AppPet[]
   /** User-chosen display names, keyed by pet id (overrides the built-in/generated name). */
   nameOverrides: Record<string, string>
+  /** Remembered pet-picker filter (All / Built-in / Yours). */
+  petFilter: 'all' | 'builtin' | 'user'
   overrides: Record<string, Partial<Personality>>
 }
 

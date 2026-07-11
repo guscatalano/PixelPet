@@ -24,6 +24,8 @@ interface SettingsApi {
   careStatus: () => Promise<CareStatus | null>
   careAction: (action: CareAction) => void
   setDisabledAnims: (disabled: ClipName[]) => void
+  setPetFilter: (f: 'all' | 'builtin' | 'user') => void
+  playClip: (clip: ClipName) => void
   setTrait: (petId: string, key: keyof Personality, value: number) => void
   resetTraits: (petId: string) => void
   aiStatus: () => Promise<AiStatus>
@@ -195,10 +197,14 @@ const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) 
   { key: 'poof', label: 'Poof!', rgba: (pet, t) => renderPet(generateRigGrid(pet, poofPose(t)), pet.coat) },
   { key: 'yawn', label: 'Yawn', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { yawn: yawnK(t) }), pet.coat) },
   { key: 'paw', label: 'Paw', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, pawState(t)), pet.coat) },
-  { key: 'react', label: 'React', rgba: (pet, t) => renderPet(generateGrid(pet, reactState(t)), pet.coat) }
+  { key: 'react', label: 'React', rgba: (pet, t) => renderPet(generateGrid(pet, reactState(t)), pet.coat) },
+  { key: 'sulk', label: 'Sulk', rgba: (pet, t) => renderPet(generateRigGrid(pet, { ...RIG.sulk, eye: t % 4200 > 160 ? 1 : 0 }), pet.coat) },
+  { key: 'sick', label: 'Sick', rgba: (pet, t) => renderPet(generateRigGrid(pet, { ...RIG.sick, eye: t % 5000 > 320 ? 1 : 0 }), pet.coat) }
 ]
 const poseCanvases: CanvasRenderingContext2D[] = []
 
+// Each tile PLAYS its animation on the live cat when clicked; toggleable ones
+// carry a small corner dot to turn the animation on/off in the ambient loop.
 function buildPoses(): void {
   posesEl.innerHTML = ''
   poseCanvases.length = 0
@@ -206,7 +212,7 @@ function buildPoses(): void {
   for (const pose of POSES) {
     const tile = document.createElement('div')
     const togglable = (TOGGLEABLE_ANIMS as string[]).includes(pose.key)
-    tile.className = 'pose' + (togglable ? ' togglable' : '') + (disabled.has(pose.key) ? ' off' : '')
+    tile.className = 'pose playable' + (disabled.has(pose.key) ? ' off' : '')
     const c = document.createElement('canvas')
     c.width = SPRITE_W
     c.height = SPRITE_H
@@ -214,24 +220,34 @@ function buildPoses(): void {
     label.className = 'pl'
     label.textContent = pose.label
     tile.append(c, label)
+    tile.tabIndex = 0
+    tile.setAttribute('role', 'button')
+    tile.title = `Play the ${pose.label.toLowerCase()} animation on your cat`
+    const play = (): void => window.settings.playClip(pose.key as ClipName)
+    tile.addEventListener('click', play)
+    tile.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play() }
+    })
     if (togglable) {
-      tile.tabIndex = 0
-      tile.setAttribute('role', 'switch')
-      tile.title = `Click to turn the ${pose.label.toLowerCase()} animation on/off`
-      const flip = (): void => {
+      const dot = document.createElement('button')
+      dot.className = 'posetoggle'
+      const paint = (): void => {
+        const off = tile.classList.contains('off')
+        dot.textContent = off ? '○' : '●'
+        dot.title = off ? `${pose.label} is off — click to enable` : `Turn ${pose.label.toLowerCase()} off`
+      }
+      paint()
+      dot.addEventListener('click', (e) => {
+        e.stopPropagation()
         const nowOff = !tile.classList.contains('off')
         tile.classList.toggle('off', nowOff)
-        tile.setAttribute('aria-checked', String(!nowOff))
         if (nowOff) disabled.add(pose.key)
         else disabled.delete(pose.key)
         state.disabledAnims = [...disabled] as AppSettings['disabledAnims']
         window.settings.setDisabledAnims(state.disabledAnims)
-      }
-      tile.setAttribute('aria-checked', String(!disabled.has(pose.key)))
-      tile.addEventListener('click', flip)
-      tile.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip() }
+        paint()
       })
+      tile.append(dot)
     }
     posesEl.append(tile)
     poseCanvases.push(c.getContext('2d')!)
@@ -279,10 +295,14 @@ type GridFilter = 'all' | 'builtin' | 'user'
 let gridFilter: GridFilter = 'all'
 
 function buildGridFilter(): void {
+  gridFilter = state.petFilter ?? 'all'
   const bar = $('gridfilter')
   for (const b of Array.from(bar.querySelectorAll('button'))) {
+    b.classList.toggle('on', (b as HTMLElement).dataset.f === gridFilter)
     b.addEventListener('click', () => {
       gridFilter = (b as HTMLElement).dataset.f as GridFilter
+      state.petFilter = gridFilter
+      window.settings.setPetFilter(gridFilter)
       for (const child of bar.children) child.classList.toggle('on', child === b)
       buildGrid()
     })

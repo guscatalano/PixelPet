@@ -45,6 +45,10 @@ const api = {
   careAction: (action: CareAction): void => ipcRenderer.send('care:action', action),
   /** Replace the set of turned-off animations. */
   setDisabledAnims: (disabled: ClipName[]): void => ipcRenderer.send('settings:set-anims', disabled),
+  /** Remember the pet-picker filter. */
+  setPetFilter: (f: 'all' | 'builtin' | 'user'): void => ipcRenderer.send('settings:set-petfilter', f),
+  /** Play a clip on the live desktop cat (the "try an animation" gallery). */
+  playClip: (clip: ClipName): void => ipcRenderer.send('settings:play-clip', clip),
   /** Override one personality trait of a pet (live if it's the active pet). */
   setTrait: (petId: string, key: keyof Personality, value: number): void =>
     ipcRenderer.send('settings:set-trait', { petId, key, value }),

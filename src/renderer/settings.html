@@ -41,6 +41,20 @@
         font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
         text-transform: uppercase; color: var(--faint); margin-bottom: 12px;
       }
+      /* Collapsible sections */
+      details.sec { margin-top: 22px; border-top: 1px solid var(--hair); padding-top: 16px; }
+      details.sec:first-of-type { border-top: 0; padding-top: 0; }
+      details.sec > summary.label {
+        list-style: none; cursor: pointer; display: flex; align-items: center; gap: 7px;
+        margin-bottom: 0; padding: 2px 0;
+      }
+      details.sec > summary.label::-webkit-details-marker { display: none; }
+      details.sec > summary.label::before {
+        content: '▸'; color: var(--faint); font-size: 9px; transition: transform 0.15s; display: inline-block;
+      }
+      details.sec[open] > summary.label::before { transform: rotate(90deg); }
+      details.sec[open] > summary.label { margin-bottom: 14px; }
+      details.sec > summary.label:hover { color: var(--dim); }
 
       /* Pet grid — scrolls within itself so the controls below stay in view */
       .grid {
@@ -120,13 +134,21 @@
         background: radial-gradient(60% 60% at 50% 55%, #30323f, #23252f); border-radius: 8px;
       }
       .pose .pl { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
-      /* Toggleable behavior tiles: click to turn an animation on/off */
-      .pose.togglable { cursor: pointer; transition: border-color 0.12s; }
-      .pose.togglable:hover { border-color: var(--accent); }
-      .pose.togglable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      /* Pose tiles: click to PLAY on the live cat; corner dot toggles on/off */
+      .pose.playable { position: relative; cursor: pointer; transition: border-color 0.12s, transform 0.08s; }
+      .pose.playable:hover { border-color: var(--accent); transform: translateY(-1px); }
+      .pose.playable:active { transform: translateY(0); }
+      .pose.playable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
       .pose.off canvas { opacity: 0.3; filter: grayscale(1); }
       .pose.off .pl { text-decoration: line-through; }
       .pose.off .pl::after { content: ' · off'; text-decoration: none; color: var(--accent); }
+      .posetoggle {
+        position: absolute; top: 4px; right: 4px; width: 17px; height: 17px; line-height: 15px;
+        border-radius: 50%; border: 1px solid var(--hair); background: var(--panel-2); color: var(--accent);
+        font-size: 9px; cursor: pointer; padding: 0; opacity: 0; transition: opacity 0.12s;
+      }
+      .pose:hover .posetoggle, .pose.off .posetoggle { opacity: 1; }
+      .pose.off .posetoggle { color: var(--faint); }
 
       /* Delete affordance on user-generated pet cards */
       .card { position: relative; }
@@ -198,8 +220,8 @@
       <h1>PixelPet Settings</h1>
       <div class="sub">Pick your desktop cat, size it, and tune how it behaves.</div>
 
-      <section>
-        <div class="label">Your pet</div>
+      <details class="sec" open>
+        <summary class="label">Your pet</summary>
         <div class="seg" id="gridfilter" style="margin-bottom: 10px">
           <button data-f="all" class="on">All</button>
           <button data-f="builtin">Built-in</button>
@@ -208,10 +230,10 @@
         <div class="grid" id="grid"></div>
         <div class="gridempty" id="gridempty" style="display: none">No generated cats yet — make one below.</div>
         <div class="petid" id="petid"></div>
-      </section>
+      </details>
 
-      <section>
-        <div class="label">Create from a photo</div>
+      <details class="sec">
+        <summary class="label">Create from a photo</summary>
         <div class="ai">
           <div class="field">
             <label for="aiprovider">Provider</label>
@@ -254,20 +276,20 @@
             that provider.
           </div>
         </div>
-      </section>
+      </details>
 
-      <section>
-        <div class="label">Poses &middot; <span id="poseWho">Ash</span> &middot; <span style="text-transform: none; letter-spacing: 0">click a tile to turn that animation on/off</span></div>
+      <details class="sec" open>
+        <summary class="label">Animations &middot; <span id="poseWho">Ash</span> &middot; <span style="text-transform: none; letter-spacing: 0">click a tile to play it on your cat &middot; corner dot turns it on/off</span></summary>
         <div class="poses" id="poses"></div>
-      </section>
+      </details>
 
-      <section>
-        <div class="label">Size</div>
+      <details class="sec" open>
+        <summary class="label">Size</summary>
         <div class="seg" id="sizes"></div>
-      </section>
+      </details>
 
-      <section>
-        <div class="label">Animation &amp; behavior</div>
+      <details class="sec" open>
+        <summary class="label">Animation &amp; behavior</summary>
         <div class="traits">
           <div class="trow">
             <div class="tn">Turn speed</div>
@@ -300,10 +322,10 @@
             <div class="tv" id="dreamchancev" style="width: 74px">55%</div>
           </div>
         </div>
-      </section>
+      </details>
 
-      <section>
-        <div class="label">Care mode</div>
+      <details class="sec">
+        <summary class="label">Care mode</summary>
         <div class="care">
           <div class="carehead">
             <button class="toggle" id="caremode" aria-pressed="false">Off</button>
@@ -326,10 +348,10 @@
             <div class="hint">The cat has needs that slowly drain over real time — even while PixelPet is closed. Tend them and it thrives; neglect it and it gets hungry, sleepy, then unwell (but always bounces back). Its mood shapes how it behaves.</div>
           </div>
         </div>
-      </section>
+      </details>
 
-      <section>
-        <div class="label">Dream photos &middot; Immich album</div>
+      <details class="sec">
+        <summary class="label">Dream photos &middot; Immich album</summary>
         <div class="ai">
           <div class="field">
             <label for="imserver">Server URL</label>
@@ -354,10 +376,10 @@
             photos plus random photos pulled from this Immich album. The key is stored encrypted on this PC.
           </div>
         </div>
-      </section>
+      </details>
 
-      <section>
-        <div class="label">Personality</div>
+      <details class="sec">
+        <summary class="label">Personality</summary>
         <div class="traits">
           <div class="traits-head">
             <div class="who">Tuning <b id="who">Ash</b><span class="mod" id="mod"></span></div>
@@ -365,7 +387,7 @@
           </div>
           <div id="rows"></div>
         </div>
-      </section>
+      </details>
     </div>
     <script type="module" src="./settings/main.ts"></script>
   </body>

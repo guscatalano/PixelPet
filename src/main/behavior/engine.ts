@@ -265,6 +265,26 @@ export class PetEngine {
     this.emoter = fn
   }
 
+  /** Manually play a clip on demand (the settings "try an animation" gallery). */
+  forcePlay(clip: ClipName): void {
+    if (this.dragging || this.win.isDestroyed()) return
+    this.cancelWander()
+    if (this.actionTimer) { clearTimeout(this.actionTimer); this.actionTimer = null }
+    this.busy = false
+    this.afterShot = null
+    this.airMode = 'none'; this.vx = 0; this.vy = 0
+    switch (clip) {
+      case 'yawn': case 'stretch': case 'react': case 'paw': this.playOneShot(clip); break
+      case 'pounce': this.startPounce(); break
+      case 'walk': this.startWander(); break
+      case 'sleep': this.setClip('sleep'); this.scheduleAmbient(this.dwellFor('sleep')); break
+      case 'loaf': this.setClip('loaf'); this.scheduleAmbient(this.dwellFor('loaf')); break
+      case 'sphinx': this.setClip('sphinx'); this.scheduleAmbient(this.dwellFor('sphinx')); break
+      case 'groom': this.setClip('groom'); this.scheduleAmbient(this.dwellFor('groom')); break
+      default: this.setClip(clip); this.scheduleAmbient(this.dwellFor('sit')); break // idle/sit/teeter/poof/sick/sulk
+    }
+  }
+
   /** Play a one-shot (react/yawn/stretch); `after` chains the next action. */
   private playOneShot(shot: ClipName, after?: () => void): void {
     this.cancelWander()

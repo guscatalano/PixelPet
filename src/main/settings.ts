@@ -36,7 +36,7 @@ function defaults(): AppSettings {
     activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS,
     stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, careMode: false, difficulty: 'normal', dreamMode: false, dreamChance: 0.55,
     immich: { serverUrl: '', albumId: '' }, disabledAnims: [],
-    ai: defaultAi(), userPets: [], nameOverrides: {}, overrides: {}
+    ai: defaultAi(), userPets: [], nameOverrides: {}, petFilter: 'all', overrides: {}
   }
 }
 
@@ -102,6 +102,7 @@ function sanitize(raw: unknown): AppSettings {
   if (typeof r.stayPut === 'boolean') s.stayPut = r.stayPut
   if (typeof r.pupilsByTime === 'boolean') s.pupilsByTime = r.pupilsByTime
   if (typeof r.careMode === 'boolean') s.careMode = r.careMode
+  if (r.petFilter === 'all' || r.petFilter === 'builtin' || r.petFilter === 'user') s.petFilter = r.petFilter
   if (typeof r.dreamMode === 'boolean') s.dreamMode = r.dreamMode
   if (typeof r.dreamChance === 'number' && Number.isFinite(r.dreamChance)) s.dreamChance = clamp01(r.dreamChance)
   if (r.immich && typeof r.immich === 'object') {

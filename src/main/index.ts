@@ -551,6 +551,10 @@ function registerIpc(): void {
     settings.dreamChance = Math.max(0, Math.min(1, v))
     saveSettings(settings)
   })
+  ipcMain.on('settings:set-petfilter', (_e, f: AppSettings['petFilter']) => {
+    if (f === 'all' || f === 'builtin' || f === 'user') { settings.petFilter = f; saveSettings(settings) }
+  })
+  ipcMain.on('settings:play-clip', (_e, clip: ClipName) => engine?.forcePlay(clip))
   ipcMain.handle('immich:status', () => immichStatus())
   ipcMain.on('immich:set-config', (_e, cfg: Partial<ImmichConfig>) => {
     if (typeof cfg.serverUrl === 'string') settings.immich.serverUrl = cfg.serverUrl.trim()
