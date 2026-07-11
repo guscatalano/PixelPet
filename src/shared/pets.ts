@@ -22,6 +22,14 @@ const KITTEN = { headRx: 12.5, headRy: 11.2, bodyRx: 9.8, bodyRy: 8.2, eyeRx: 3.
 const FLUFFY = { earH: 11, earStyle: 'tufted', cheekFluff: 5, bodyRx: 14, bodyRy: 12 }
 const BIGEARS = { earH: 12.5, earW: 8.5, earSpread: 8 }
 
+/**
+ * Named body archetypes, keyed for the DNA vocabulary (see petdna.ts). The AI
+ * "generate from photo" flow picks one of these by name rather than inventing
+ * raw geometry numbers, so every generated cat stays on-model.
+ */
+export const BUILDS = { normal: NORMAL, chonky: CHONKY, slim: SLIM, kitten: KITTEN, fluffy: FLUFFY, bigears: BIGEARS } as const
+export type BuildName = keyof typeof BUILDS
+
 const g = (arch: object, extra: object = {}): object => ({ ...arch, ...extra })
 
 export const PETS: AppPet[] = [
