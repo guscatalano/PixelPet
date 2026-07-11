@@ -318,6 +318,34 @@
       </section>
 
       <section>
+        <div class="label">Dream photos &middot; Immich album</div>
+        <div class="ai">
+          <div class="field">
+            <label for="imserver">Server URL</label>
+            <input type="text" id="imserver" spellcheck="false" autocomplete="off" placeholder="https://immich.example.com" />
+          </div>
+          <div class="field">
+            <label for="imalbum">Album id</label>
+            <input type="text" id="imalbum" spellcheck="false" autocomplete="off" placeholder="album UUID" />
+          </div>
+          <div class="field">
+            <label for="imkey">API key</label>
+            <div class="keyrow">
+              <input type="password" id="imkey" spellcheck="false" autocomplete="off" placeholder="Immich API key" />
+              <button class="btn" id="imsave">Save</button>
+              <button class="btn" id="imtest">Test</button>
+            </div>
+          </div>
+          <div class="keystate" id="imkeystate"></div>
+          <div class="status" id="imstatus"></div>
+          <div class="hint">
+            Turn on “Dream bubbles” (under Animation &amp; behavior) — a sleeping cat then dreams of its own source
+            photos plus random photos pulled from this Immich album. The key is stored encrypted on this PC.
+          </div>
+        </div>
+      </section>
+
+      <section>
         <div class="label">Personality</div>
         <div class="traits">
           <div class="traits-head">

@@ -32,6 +32,11 @@ interface SettingsApi {
   testAi: () => Promise<{ ok: boolean; message: string }>
   generateFromPhotos: (dataUrls: string[]) => Promise<GenResult>
   deleteUserPet: (petId: string) => void
+  immichStatus: () => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
+  setImmichConfig: (cfg: { serverUrl?: string; albumId?: string }) => void
+  setImmichKey: (key: string) => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
+  clearImmichKey: () => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
+  testImmich: () => Promise<{ ok: boolean; message: string }>
 }
 declare global {
   interface Window { settings: SettingsApi }
@@ -592,6 +597,40 @@ async function refreshCare(): Promise<void> {
   }
 }
 
+function buildImmich(): void {
+  const server = $<HTMLInputElement>('imserver'), album = $<HTMLInputElement>('imalbum'), key = $<HTMLInputElement>('imkey')
+  const save = $<HTMLButtonElement>('imsave'), test = $<HTMLButtonElement>('imtest')
+  const keystate = $('imkeystate'), status = $('imstatus')
+  const setStatus = (m: string, cls = ''): void => { status.textContent = m; status.className = 'status' + (cls ? ' ' + cls : '') }
+  const paintKey = (st: { hasKey: boolean }): void => {
+    keystate.textContent = st.hasKey ? '✓ key saved (encrypted on this PC)' : 'No key saved yet.'
+    keystate.className = 'keystate' + (st.hasKey ? ' saved' : '')
+  }
+  window.settings.immichStatus().then((st) => { server.value = st.serverUrl; album.value = st.albumId; paintKey(st) })
+
+  // Accept a pasted album URL — pull the UUID out of it.
+  const albumId = (): string => /([0-9a-fA-F-]{36})/.exec(album.value)?.[1] ?? album.value.trim()
+  const pushCfg = (): void => window.settings.setImmichConfig({ serverUrl: server.value.trim(), albumId: albumId() })
+  server.addEventListener('change', pushCfg)
+  album.addEventListener('change', () => { album.value = albumId(); pushCfg() })
+
+  const flushKey = async (): Promise<void> => {
+    if (!key.value.trim()) return
+    paintKey(await window.settings.setImmichKey(key.value.trim()))
+    key.value = ''
+  }
+  save.addEventListener('click', async () => {
+    if (!key.value.trim()) { setStatus('Enter a key first.', 'err'); return }
+    pushCfg(); await flushKey(); setStatus('Key saved.', 'ok')
+  })
+  test.addEventListener('click', async () => {
+    pushCfg(); await flushKey()
+    setStatus('Testing…', 'busy')
+    const r = await window.settings.testImmich()
+    setStatus(r.message, r.ok ? 'ok' : 'err')
+  })
+}
+
 async function init(): Promise<void> {
   state = await window.settings.get()
   buildGridFilter()
@@ -601,6 +640,7 @@ async function init(): Promise<void> {
   buildAnimation()
   buildCare()
   buildAi()
+  buildImmich()
   buildTraits()
   refreshMeta()
   // Make sure the current cat is visible even if it's far down the grid.

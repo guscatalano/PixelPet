@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality } from '../shared/types'
 import type { AppPet } from '../shared/pets'
 import type { CareStatus, CareAction, Difficulty } from '../shared/care'
+import type { ImmichStatus, ImmichConfig } from '../shared/types'
 
 type GenResult = { ok: true; pet: AppPet } | { ok: false; error: string }
 
@@ -23,6 +24,13 @@ const api = {
   setPupilsByTime: (v: boolean): void => ipcRenderer.send('settings:set-pupils', v),
   /** Toggle dream bubbles while the cat sleeps. */
   setDreamMode: (v: boolean): void => ipcRenderer.send('settings:set-dreammode', v),
+
+  // ---- Immich dream album ----
+  immichStatus: (): Promise<ImmichStatus> => ipcRenderer.invoke('immich:status'),
+  setImmichConfig: (cfg: Partial<ImmichConfig>): void => ipcRenderer.send('immich:set-config', cfg),
+  setImmichKey: (key: string): Promise<ImmichStatus> => ipcRenderer.invoke('immich:set-key', key),
+  clearImmichKey: (): Promise<ImmichStatus> => ipcRenderer.invoke('immich:clear-key'),
+  testImmich: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('immich:test'),
 
   // ---- Care Mode ----
   /** Turn Care ("Tamagotchi") mode on/off. */

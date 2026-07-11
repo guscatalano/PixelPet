@@ -34,7 +34,8 @@ function defaultAi(): AiConfig {
 function defaults(): AppSettings {
   return {
     activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS,
-    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, careMode: false, difficulty: 'normal', dreamMode: false, disabledAnims: [],
+    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, careMode: false, difficulty: 'normal', dreamMode: false,
+    immich: { serverUrl: '', albumId: '' }, disabledAnims: [],
     ai: defaultAi(), userPets: [], overrides: {}
   }
 }
@@ -102,6 +103,11 @@ function sanitize(raw: unknown): AppSettings {
   if (typeof r.pupilsByTime === 'boolean') s.pupilsByTime = r.pupilsByTime
   if (typeof r.careMode === 'boolean') s.careMode = r.careMode
   if (typeof r.dreamMode === 'boolean') s.dreamMode = r.dreamMode
+  if (r.immich && typeof r.immich === 'object') {
+    const im = r.immich as Record<string, unknown>
+    if (typeof im.serverUrl === 'string') s.immich.serverUrl = im.serverUrl.trim()
+    if (typeof im.albumId === 'string') s.immich.albumId = im.albumId.trim()
+  }
   if (typeof r.difficulty === 'string' && (DIFFICULTIES as string[]).includes(r.difficulty)) s.difficulty = r.difficulty as AppSettings['difficulty']
   if (typeof r.frontScale === 'number' && Number.isFinite(r.frontScale)) {
     s.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, r.frontScale))

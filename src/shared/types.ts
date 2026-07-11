@@ -69,6 +69,8 @@ export interface AppSettings {
   difficulty: Difficulty
   /** Dream mode: a sleeping cat shows a floating photo thumbnail it dreams of. */
   dreamMode: boolean
+  /** Optional Immich album to fold into the dream photo pool (non-secret; key stored apart). */
+  immich: ImmichConfig
   /** Animations the user turned off (subset of TOGGLEABLE_ANIMS). */
   disabledAnims: ClipName[]
   /** Non-secret AI config (provider/model/endpoint). The API key lives elsewhere (safeStorage). */
@@ -86,6 +88,19 @@ export interface AiConfig {
   provider: AiProviderId
   model: string
   endpoint?: string
+}
+
+/** Immich album config for Dream Mode (non-secret; the API key lives in safeStorage). */
+export interface ImmichConfig {
+  serverUrl: string
+  albumId: string
+}
+
+/** Immich status for the settings UI (never carries the key itself). */
+export interface ImmichStatus {
+  serverUrl: string
+  albumId: string
+  hasKey: boolean
 }
 
 /** AI status surfaced to the settings UI (never carries the key itself). */

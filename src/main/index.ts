@@ -16,6 +16,11 @@ import { saveApiKey, loadApiKey, hasApiKey, clearApiKey, encryptionAvailable } f
 import { loadNeeds, saveNeeds } from './care/needs'
 import { DIFFICULTIES, type CareAction, type Difficulty } from '../shared/care'
 import { saveSourcePhotos, readPhotoDataUrl, deletePetPhotos } from './dream/store'
+import {
+  fetchAlbumImageIds, fetchThumbnailDataUrl, testImmich,
+  saveImmichKey, loadImmichKey, hasImmichKey, clearImmichKey
+} from './dream/immich'
+import type { ImmichConfig, ImmichStatus } from '../shared/types'
 
 let petWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
@@ -285,10 +290,31 @@ function showPetMenu(): void {
 
 let dreamWindow: BrowserWindow | null = null
 let dreamTimer: ReturnType<typeof setInterval> | null = null
-let dreamPool: string[] = []
+let dreamPool: string[] = [] // local file paths (this pet's source photos)
+let dreamImmichIds: string[] = [] // Immich album asset ids (shared across pets)
+let dreamImmichAt = 0 // when the Immich list was last fetched
 let dreamIdx = 0
 let dreamLastSwap = 0
 let dreamShowing = false
+
+const IMMICH_TTL = 30 * 60_000 // re-fetch the album list every 30 min
+
+/** Refresh the Immich asset-id list if configured (fire-and-forget). */
+async function refreshImmich(): Promise<void> {
+  const im = settings.immich
+  const key = loadImmichKey()
+  if (!im.serverUrl || !im.albumId || !key) { dreamImmichIds = []; return }
+  try {
+    dreamImmichIds = await fetchAlbumImageIds(im.serverUrl, im.albumId, key)
+    dreamImmichAt = Date.now()
+  } catch (err) {
+    console.error('[dream] immich fetch failed', err)
+  }
+}
+
+function immichStatus(): ImmichStatus {
+  return { serverUrl: settings.immich.serverUrl, albumId: settings.immich.albumId, hasKey: hasImmichKey() }
+}
 
 function createDreamWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -313,15 +339,28 @@ function refreshDreamPool(): void {
   dreamIdx = 0
 }
 
-function showDreamPhoto(): void {
-  if (!dreamWindow || !dreamPool.length) return
-  const url = readPhotoDataUrl(dreamPool[dreamIdx % dreamPool.length])
+async function showDreamPhoto(): Promise<void> {
+  const total = dreamPool.length + dreamImmichIds.length
+  if (!dreamWindow || !total) return
+  const idx = dreamIdx % total
   dreamIdx++
-  if (url) dreamWindow.webContents.send('dream:photo', url)
+  let url: string | null = null
+  if (idx < dreamPool.length) {
+    url = readPhotoDataUrl(dreamPool[idx])
+  } else {
+    const key = loadImmichKey()
+    if (key) url = await fetchThumbnailDataUrl(settings.immich.serverUrl, dreamImmichIds[idx - dreamPool.length], key)
+  }
+  if (url && dreamWindow && !dreamWindow.isDestroyed()) dreamWindow.webContents.send('dream:photo', url)
 }
 
 function dreamTick(): void {
-  const active = settings.dreamMode && !!engine?.isSleeping() && dreamPool.length > 0 && !!petWindow
+  const hasPhotos = dreamPool.length + dreamImmichIds.length > 0
+  const active = settings.dreamMode && !!engine?.isSleeping() && hasPhotos && !!petWindow
+  // Keep the Immich list fresh while dreaming.
+  if (settings.dreamMode && settings.immich.albumId && hasImmichKey() && Date.now() - dreamImmichAt > IMMICH_TTL) {
+    void refreshImmich()
+  }
   if (active) {
     if (!dreamWindow || dreamWindow.isDestroyed()) { dreamWindow = createDreamWindow(); dreamShowing = false }
     const b = petWindow!.getBounds()
@@ -334,12 +373,12 @@ function dreamTick(): void {
       dreamWindow.showInactive()
       dreamShowing = true
       dreamLastSwap = now
-      const send = (): void => showDreamPhoto()
+      const send = (): void => { void showDreamPhoto() }
       if (dreamWindow.webContents.isLoading()) dreamWindow.webContents.once('did-finish-load', send)
       else send()
     } else if (now - dreamLastSwap > 9000) {
       dreamLastSwap = now
-      showDreamPhoto()
+      void showDreamPhoto()
     }
   } else if (dreamShowing && dreamWindow) {
     dreamWindow.hide()
@@ -349,6 +388,7 @@ function dreamTick(): void {
 
 function startDreamLoop(): void {
   refreshDreamPool()
+  void refreshImmich()
   if (!dreamTimer) dreamTimer = setInterval(dreamTick, 2000)
 }
 
@@ -499,6 +539,26 @@ function registerIpc(): void {
     settings.dreamMode = !!v
     saveSettings(settings)
     dreamTick() // reflect promptly (hide if just turned off)
+  })
+  ipcMain.handle('immich:status', () => immichStatus())
+  ipcMain.on('immich:set-config', (_e, cfg: Partial<ImmichConfig>) => {
+    if (typeof cfg.serverUrl === 'string') settings.immich.serverUrl = cfg.serverUrl.trim()
+    if (typeof cfg.albumId === 'string') settings.immich.albumId = cfg.albumId.trim()
+    saveSettings(settings)
+    void refreshImmich()
+  })
+  ipcMain.handle('immich:set-key', (_e, key: string) => {
+    saveImmichKey(typeof key === 'string' ? key.trim() : '')
+    void refreshImmich()
+    return immichStatus()
+  })
+  ipcMain.handle('immich:clear-key', () => {
+    clearImmichKey()
+    dreamImmichIds = []
+    return immichStatus()
+  })
+  ipcMain.handle('immich:test', async () => {
+    return testImmich(settings.immich.serverUrl, settings.immich.albumId, loadImmichKey() ?? '')
   })
   ipcMain.on('settings:set-trait', (_e, p: { petId: string; key: keyof Personality; value: number }) => {
     const ov = settings.overrides[p.petId] ?? (settings.overrides[p.petId] = {})
