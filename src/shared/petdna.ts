@@ -79,13 +79,26 @@ function darken(h: string, amt = 0.32): string {
   return '#' + ((d(r) << 16) | (d(g) << 8) | d(b)).toString(16).padStart(6, '0')
 }
 
+/**
+ * A natural whisker color for a coat. Real whiskers are white/pale (dark cats
+ * often black), never a saturated hue — so we derive it from the coat's
+ * lightness rather than letting the model pick: pale whiskers on a dark cat,
+ * a soft gray on a light cat so they stay visible without looking colored.
+ */
+export function naturalWhisker(primary: string): string {
+  const n = parseInt(primary.slice(1), 16)
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return lum < 0.5 ? '#e8e8ef' : '#b9b9c6'
+}
+
 /** Build the coat spec for a marking, filling required-but-missing colors. */
 function buildCoat(dna: PetDNA): CoatSpec {
   const c = dna.colors
   const coat: CoatSpec = { primary: c.primary, iris: c.iris }
   if (c.nose) coat.nose = c.nose
   if (c.innerEar) coat.innerEar = c.innerEar
-  if (c.whisk) coat.whisk = c.whisk
+  coat.whisk = naturalWhisker(c.primary) // never AI-chosen — real whiskers aren't colored
   const white = c.white ?? '#f4f4f7'
   switch (dna.marking) {
     case 'tabby':

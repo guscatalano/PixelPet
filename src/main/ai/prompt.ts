@@ -71,7 +71,7 @@ export const JSON_SYSTEM_PROMPT =
   `- build: one of ${list(BUILD_NAMES)}\n` +
   `- marking: one of ${list(MARKING_NAMES)} (points = pale body with a dark face/ears/legs like a siamese)\n` +
   `- eyeStyle: one of ${list(EYE_STYLES)}\n` +
-  `- colors: object with "primary" and "iris" as #RRGGBB hex (required); optional "secondary" (stripes/shading/point color), "white" (tuxedo/bicolor/calico areas), "tertiary" (third calico color), "nose", "innerEar", "whisk" (all hex)\n` +
+  `- colors: object with "primary" and "iris" as #RRGGBB hex (required); optional "secondary" (stripes/shading/point color), "white" (tuxedo/bicolor/calico areas), "tertiary" (third calico color), "nose", "innerEar" (all hex). Do NOT include whiskers.\n` +
   `- personality: object with ${list(TRAIT_KEYS)} — each a number from 0 to 1`
 
 export const JSON_USER_PROMPT = 'Here is my cat. Return the pixel-pet DNA JSON.'

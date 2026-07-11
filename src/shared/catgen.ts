@@ -348,14 +348,17 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
   put(overlay, nx, ny + 2, O.MOUTH)
   for (const dx of [-2, -1, 1, 2]) put(overlay, nx + dx, ny + 3, O.MOUTH)
 
-  // Whiskers: anchored to the fur edge (scan outward from the head centre on
-  // each row), so they stay attached to the cheek at any front-view scale.
+  // Whiskers: a short fan sprouting FROM the cheek. Scan outward per row to find
+  // the fur edge, then draw starting immediately adjacent to it (i from 1) so the
+  // whiskers attach to the face instead of floating as detached background lines.
+  // The middle whisker is longest, so the cluster reads as a whisker fan.
   for (const s of [-1, 1]) {
     for (let k = 0; k < 3; k++) {
       const y = Math.round(g.noseY - 1 + k + (k - 1) * 0.6)
       let edge = Math.round(g.headCx)
       for (let x = Math.round(g.headCx); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
-      for (let i = 2; i <= 5; i++) {
+      const len = k === 1 ? 4 : 3
+      for (let i = 1; i <= len; i++) {
         const x = edge + s * i
         if (inB(x, y) && overlay[idx(x, y)] === O.NONE && !fur[idx(x, y)]) put(overlay, x, y, O.WHISK)
       }

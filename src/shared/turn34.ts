@@ -210,15 +210,15 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
       earR - 0.5 - iwR, earBaseY - 0.5, earR - 0.5 + iwR, earBaseY - 0.5, earR - 0.3 + g.earLean * 0.3, earBaseY - earRH * 0.5)
   }
-  // Whiskers: anchored to the fur edge (near side full, far side shortened as
-  // the head turns away), so they stay attached at any front-view scale.
+  // Whiskers: a short fan sprouting FROM the cheek (i from 1 = attached, not
+  // floating); far side shortened as the head turns away.
   for (const s of [-1, 1]) {
     const len = s < 0 ? 4 : Math.max(1, Math.round(4 * (1 - 0.6 * t)))
     for (let k = 0; k < 3; k++) {
       const y = Math.round(noseY - 1 + k + (k - 1) * 0.6)
       let edge = Math.round(hx)
       for (let x = Math.round(hx); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
-      for (let i = 2; i < 2 + len; i++) {
+      for (let i = 1; i <= len; i++) {
         const x = edge + s * i
         if (inB(x, y) && overlay[idx(x, y)] === O.NONE && !fur[idx(x, y)]) put(overlay, x, y, O.WHISK)
       }

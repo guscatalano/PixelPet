@@ -10,7 +10,7 @@ import { TRAIT_KEYS, TOGGLEABLE_ANIMS } from '../shared/types'
 import { DEFAULT_SCALE, MIN_SCALE, MAX_SCALE } from '../shared/constants'
 import { DEFAULT_FRONT_SCALE } from '../shared/catgen'
 import { DEFAULT_PET, PETS, type AppPet } from '../shared/pets'
-import { MARKING_NAMES } from '../shared/petdna'
+import { MARKING_NAMES, naturalWhisker } from '../shared/petdna'
 import { DEFAULT_MODEL } from './ai/providers'
 
 function settingsPath(): string {
@@ -52,6 +52,8 @@ function sanitizeUserPet(raw: unknown): AppPet | null {
   const personality = {} as Personality
   for (const k of TRAIT_KEYS) personality[k] = clamp01(Number(per?.[k]))
   const marking = typeof r.marking === 'string' && (MARKING_NAMES as readonly string[]).includes(r.marking) ? r.marking : 'solid'
+  // Migrate: whiskers are never a colored/AI-chosen hue — re-derive from the coat.
+  ;(coat as Record<string, unknown>).whisk = naturalWhisker(coat.primary)
   return {
     id: r.id,
     name: typeof r.name === 'string' && r.name.trim() ? r.name.slice(0, 24) : 'Cat',

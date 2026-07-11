@@ -240,7 +240,7 @@ export function generate34Grid(preset, t, state = {}) {
       const y = Math.round(noseY - 1 + k + (k - 1) * 0.6)
       let edge = Math.round(hx)
       for (let x = Math.round(hx); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
-      for (let i = 2; i < 2 + len; i++) {
+      for (let i = 1; i <= len; i++) {
         const x = edge + s * i
         if (inB(x, y) && overlay[idx(x, y)] === O.NONE && !fur[idx(x, y)]) put(overlay, x, y, O.WHISK)
       }

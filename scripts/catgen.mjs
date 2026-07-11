@@ -351,13 +351,14 @@ function drawFace(overlay, fur, g, state) {
   put(overlay, nx, ny + 2, O.MOUTH)
   for (const dx of [-2, -1, 1, 2]) put(overlay, nx + dx, ny + 3, O.MOUTH)
 
-  // Whiskers: anchored to the fur edge so they stay attached at any front scale.
+  // Whiskers: a short fan sprouting FROM the cheek (i from 1 = attached, not floating).
   for (const s of [-1, 1]) {
     for (let k = 0; k < 3; k++) {
       const y = Math.round(g.noseY - 1 + k + (k - 1) * 0.6)
       let edge = Math.round(g.headCx)
       for (let x = Math.round(g.headCx); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
-      for (let i = 2; i <= 5; i++) {
+      const len = k === 1 ? 4 : 3
+      for (let i = 1; i <= len; i++) {
         const x = edge + s * i
         if (inB(x, y) && overlay[idx(x, y)] === O.NONE && !fur[idx(x, y)]) put(overlay, x, y, O.WHISK)
       }
