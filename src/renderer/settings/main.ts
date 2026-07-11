@@ -227,9 +227,25 @@ function thumbnail(petId: string): HTMLCanvasElement {
   return c
 }
 
+type GridFilter = 'all' | 'builtin' | 'user'
+let gridFilter: GridFilter = 'all'
+
+function buildGridFilter(): void {
+  const bar = $('gridfilter')
+  for (const b of Array.from(bar.querySelectorAll('button'))) {
+    b.addEventListener('click', () => {
+      gridFilter = (b as HTMLElement).dataset.f as GridFilter
+      for (const child of bar.children) child.classList.toggle('on', child === b)
+      buildGrid()
+    })
+  }
+}
+
 function buildGrid(): void {
   grid.innerHTML = ''
-  for (const pet of roster()) {
+  const list = roster().filter((p) => gridFilter === 'all' || (gridFilter === 'user' ? isUserPet(p.id) : !isUserPet(p.id)))
+  $('gridempty').style.display = list.length ? 'none' : 'block'
+  for (const pet of list) {
     const card = document.createElement('div')
     card.className = 'card' + (pet.id === state.activePetId ? ' active' : '')
     card.dataset.id = pet.id
@@ -480,6 +496,7 @@ function buildAi(): void {
 
 async function init(): Promise<void> {
   state = await window.settings.get()
+  buildGridFilter()
   buildGrid()
   buildPoses()
   buildSizes()

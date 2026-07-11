@@ -96,6 +96,8 @@
       .toggle:hover { border-color: var(--accent); }
       .toggle.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 
+      .gridempty { font-size: 13px; color: var(--faint); padding: 14px 4px; }
+
       /* Selected-pet identity line */
       .petid { margin-top: 13px; font-size: 13px; color: var(--dim); }
       .petid b { color: var(--accent); font-weight: 600; }
@@ -176,7 +178,13 @@
 
       <section>
         <div class="label">Your pet</div>
+        <div class="seg" id="gridfilter" style="margin-bottom: 10px">
+          <button data-f="all" class="on">All</button>
+          <button data-f="builtin">Built-in</button>
+          <button data-f="user">Yours</button>
+        </div>
         <div class="grid" id="grid"></div>
+        <div class="gridempty" id="gridempty" style="display: none">No generated cats yet — make one below.</div>
         <div class="petid" id="petid"></div>
       </section>
 
