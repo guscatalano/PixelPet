@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <title>PixelPet Item</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+      body { cursor: grab; }
+      body.drag { cursor: grabbing; }
+      canvas { image-rendering: pixelated; display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas id="i"></canvas>
+    <script type="module" src="./item/main.ts"></script>
+  </body>
+</html>

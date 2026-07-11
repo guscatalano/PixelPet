@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, Menu, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality, TriggerEvent } from '../shared/types'
 import { MIN_SCALE, MAX_SCALE, petWindowSize } from '../shared/constants'
@@ -182,6 +182,103 @@ function openSettings(): void {
   settingsWindow = createSettingsWindow()
 }
 
+// ---- right-click care menu + draggable care items --------------------------
+
+type ItemKind = 'food' | 'toy' | 'medicine'
+const ITEM_ACTION: Record<ItemKind, CareAction> = { food: 'feed', toy: 'play', medicine: 'heal' }
+let itemWindow: BrowserWindow | null = null
+let itemKind: ItemKind = 'food'
+let itemDragTimer: ReturnType<typeof setInterval> | null = null
+
+function createItemWindow(): BrowserWindow {
+  const size = 52
+  const win = new BrowserWindow({
+    width: size, height: size, transparent: true, frame: false, resizable: false,
+    skipTaskbar: true, hasShadow: false, alwaysOnTop: true, maximizable: false, fullscreenable: false,
+    webPreferences: { preload: join(__dirname, '../preload/item.js'), sandbox: false }
+  })
+  win.setAlwaysOnTop(true, 'screen-saver')
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/item.html`)
+  else win.loadFile(join(__dirname, '../renderer/item.html'))
+  win.on('closed', () => { itemWindow = null; stopItemDrag() })
+  return win
+}
+
+/** Summon a draggable care item next to the cat (right-click → Bring…). */
+function bringItem(kind: ItemKind): void {
+  if (!petWindow) return
+  itemKind = kind
+  if (!itemWindow || itemWindow.isDestroyed()) itemWindow = createItemWindow()
+  const win = itemWindow
+  const send = (): void => win.webContents.send('item:set', kind)
+  if (win.webContents.isLoading()) win.webContents.once('did-finish-load', send)
+  else send()
+  const b = petWindow.getBounds()
+  const s = win.getBounds()
+  win.setPosition(Math.round(b.x - s.width - 6), Math.round(b.y + b.height / 2 - s.height / 2))
+  win.show()
+}
+
+function startItemDrag(): void {
+  if (!itemWindow) return
+  const [wx, wy] = itemWindow.getPosition()
+  const c = screen.getCursorScreenPoint()
+  const ox = c.x - wx, oy = c.y - wy
+  stopItemDrag()
+  itemDragTimer = setInterval(() => {
+    if (!itemWindow) return
+    const p = screen.getCursorScreenPoint()
+    itemWindow.setPosition(p.x - ox, p.y - oy)
+  }, 16)
+}
+function stopItemDrag(): void {
+  if (itemDragTimer) { clearInterval(itemDragTimer); itemDragTimer = null }
+}
+
+const rectsOverlap = (a: Electron.Rectangle, b: Electron.Rectangle): boolean =>
+  a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+
+/** Item let go: if it's on the cat, use it (feed/play/heal); else leave it out. */
+function onItemDropped(): void {
+  stopItemDrag()
+  if (!itemWindow || !petWindow) return
+  if (rectsOverlap(itemWindow.getBounds(), petWindow.getBounds())) {
+    engine?.careAction(ITEM_ACTION[itemKind])
+    itemWindow.close()
+    itemWindow = null
+  }
+}
+
+function showPetMenu(): void {
+  const items: MenuItemConstructorOptions[] = []
+  if (settings.careMode && engine) {
+    const st = engine.getStatus()
+    items.push({ label: `${st.state.emoji}  ${st.state.label}`, enabled: false })
+    items.push({ type: 'separator' })
+    items.push({ label: 'Feed', click: () => engine?.careAction('feed') })
+    items.push({ label: 'Play', click: () => engine?.careAction('play') })
+    items.push({ label: 'Rest', click: () => engine?.careAction('rest') })
+    items.push({ label: 'Groom', click: () => engine?.careAction('groom') })
+    items.push({ label: 'Give medicine', click: () => engine?.careAction('heal') })
+    items.push({ type: 'separator' })
+    items.push({
+      label: 'Bring an item…',
+      submenu: [
+        { label: '🥣  Food bowl', click: () => bringItem('food') },
+        { label: '🪶  Feather toy', click: () => bringItem('toy') },
+        { label: '💊  Medicine', click: () => bringItem('medicine') }
+      ]
+    })
+  } else {
+    items.push({ label: 'Care Mode is off', enabled: false })
+    items.push({ label: 'Turn on Care Mode…', click: () => openSettings() })
+  }
+  items.push({ type: 'separator' })
+  items.push({ label: 'Settings…', click: () => openSettings() })
+  Menu.buildFromTemplate(items).popup()
+}
+
 // ---- applying settings changes ---------------------------------------------
 
 /** Swap the active pet: redraw in the renderer + retune the behavior engine. */
@@ -321,6 +418,9 @@ function registerIpc(): void {
   })
   ipcMain.handle('care:get', () => engine?.getStatus() ?? null)
   ipcMain.on('care:action', (_e, action: CareAction) => engine?.careAction(action))
+  ipcMain.on('pet:context-menu', () => showPetMenu())
+  ipcMain.on('item:drag-start', () => startItemDrag())
+  ipcMain.on('item:drag-end', () => onItemDropped())
   ipcMain.on('settings:set-trait', (_e, p: { petId: string; key: keyof Personality; value: number }) => {
     const ov = settings.overrides[p.petId] ?? (settings.overrides[p.petId] = {})
     ov[p.key] = Math.max(0, Math.min(1, p.value))
@@ -418,6 +518,8 @@ if (!gotLock) {
 
   app.on('before-quit', () => {
     stopDrag()
+    stopItemDrag()
+    itemWindow?.destroy()
     engine?.dispose()
     tray?.destroy()
   })

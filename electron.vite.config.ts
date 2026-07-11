@@ -19,7 +19,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/preload/index.ts'),
-          settings: resolve(__dirname, 'src/preload/settings.ts')
+          settings: resolve(__dirname, 'src/preload/settings.ts'),
+          item: resolve(__dirname, 'src/preload/item.ts')
         }
       }
     }
@@ -30,7 +31,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           pet: resolve(__dirname, 'src/renderer/pet.html'),
-          settings: resolve(__dirname, 'src/renderer/settings.html')
+          settings: resolve(__dirname, 'src/renderer/settings.html'),
+          item: resolve(__dirname, 'src/renderer/item.html')
         }
       }
     }

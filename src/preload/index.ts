@@ -15,6 +15,8 @@ const api = {
   sendTrigger: (ev: TriggerEvent): void => ipcRenderer.send('pet:trigger', ev),
   /** Notify main that a one-shot clip finished playing. */
   clipEnded: (clip: string): void => ipcRenderer.send('pet:clip-ended', clip),
+  /** Ask main to pop the right-click care menu at the cursor. */
+  contextMenu: (): void => ipcRenderer.send('pet:context-menu'),
   /** Notify main the renderer's animation graph has arrived at the requested clip. */
   stateReached: (clip: string): void => ipcRenderer.send('pet:state-reached', clip),
   /** Subscribe to animation-state commands from the behavior engine. */

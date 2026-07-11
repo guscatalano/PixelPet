@@ -12,6 +12,7 @@ interface PetApi {
   dragEnd: () => void
   sendTrigger: (ev: TriggerEvent) => void
   clipEnded: (clip: string) => void
+  contextMenu: () => void
   stateReached: (clip: string) => void
   onPlay: (handler: (cmd: PlayCommand) => void) => void
   onWalkStep: (handler: (step: number) => void) => void
@@ -665,6 +666,11 @@ window.addEventListener('mousemove', (e) => {
     return
   }
   updateHover(e.clientX, e.clientY)
+})
+
+window.addEventListener('contextmenu', (e) => {
+  e.preventDefault()
+  if (isOverCat(e.clientX, e.clientY)) window.pet.contextMenu()
 })
 
 window.addEventListener('mousedown', (e) => {
