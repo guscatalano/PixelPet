@@ -63,7 +63,9 @@ const api = {
   /** Generate a pet from photo data URLs; on success it's added + made active. */
   generateFromPhotos: (dataUrls: string[]): Promise<GenResult> => ipcRenderer.invoke('ai:generate', dataUrls),
   /** Delete a user-generated pet. */
-  deleteUserPet: (petId: string): void => ipcRenderer.send('pets:delete-user', petId)
+  deleteUserPet: (petId: string): void => ipcRenderer.send('pets:delete-user', petId),
+  /** Rename any cat (empty name clears the override back to its default). */
+  renamePet: (petId: string, name: string): void => ipcRenderer.send('pets:rename', { petId, name })
 }
 
 contextBridge.exposeInMainWorld('settings', api)

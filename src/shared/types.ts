@@ -77,6 +77,8 @@ export interface AppSettings {
   ai: AiConfig
   /** Pets the user generated from photos (M4). Merged with the built-in PETS roster. */
   userPets: AppPet[]
+  /** User-chosen display names, keyed by pet id (overrides the built-in/generated name). */
+  nameOverrides: Record<string, string>
   overrides: Record<string, Partial<Personality>>
 }
 

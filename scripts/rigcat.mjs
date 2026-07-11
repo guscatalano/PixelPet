@@ -186,9 +186,9 @@ export const POSES = {
     tail: { root: [7, 33], ctrl: [7, 42], tip: [22, 42] }, eye: 1,
     legs: [
       { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false }, // hind folded
-      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: false }, // front straight
+      { hip: [25, 33], mid: [25, 38], foot: [25, GROUND], near: false }, // front straight
       { hip: [16, 34], mid: [12, 39], foot: [21, 42], near: true },
-      { hip: [29, 33], mid: [29, 38], foot: [29, GROUND], near: true }
+      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: true }
     ]
   },
   curl: {
@@ -264,7 +264,7 @@ export const POSES = {
     tail: { root: [7, 33], ctrl: [7, 42], tip: [22, 42] }, eye: 0,
     legs: [
       { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false },
-      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: false }, // far paw planted
+      { hip: [25, 33], mid: [25, 38], foot: [25, GROUND], near: false }, // far paw planted
       { hip: [16, 34], mid: [12, 39], foot: [21, 42], near: true },
       { hip: [29, 33], mid: [32.5, 30.5], foot: [31.5, 28.5], near: true } // near paw up at the mouth
     ]
@@ -274,7 +274,7 @@ export const POSES = {
     tail: { root: [7, 33], ctrl: [7, 42], tip: [23, 41.5] }, eye: 0,
     legs: [
       { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false },
-      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: false },
+      { hip: [25, 33], mid: [25, 38], foot: [25, GROUND], near: false },
       { hip: [16, 34], mid: [12, 39], foot: [21, 42], near: true },
       { hip: [29, 33], mid: [32.5, 31], foot: [31.5, 29.2], near: true } // paw meets the dip
     ]
@@ -330,9 +330,9 @@ export const POSES = {
     tail: { root: [10, 28], ctrl: [4, 18], tip: [12, 9] }, tailR: 4.4, eye: 1,
     legs: [
       { hip: [14, 33], mid: [13.5, 38], foot: [14, GROUND], near: false }, // straight, on tiptoe
-      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: false },
+      { hip: [25, 33], mid: [25, 38], foot: [25, GROUND], near: false },
       { hip: [16, 33], mid: [15.5, 38], foot: [16, GROUND], near: true },
-      { hip: [29, 33], mid: [29, 38], foot: [29, GROUND], near: true }
+      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: true }
     ]
   },
   // Teetering at a ledge edge (the edge is to the RIGHT): weight rocked back on

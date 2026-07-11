@@ -618,6 +618,13 @@ function registerIpc(): void {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
+  ipcMain.on('pets:rename', (_e, p: { petId: string; name: string }) => {
+    const name = typeof p?.name === 'string' ? p.name.trim().slice(0, 24) : ''
+    if (!p?.petId) return
+    if (name) settings.nameOverrides[p.petId] = name
+    else delete settings.nameOverrides[p.petId]
+    saveSettings(settings)
+  })
   ipcMain.on('pets:delete-user', (_e, petId: string) => {
     const i = settings.userPets.findIndex((p) => p.id === petId)
     if (i < 0) return

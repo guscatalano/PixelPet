@@ -32,6 +32,7 @@ interface SettingsApi {
   testAi: () => Promise<{ ok: boolean; message: string }>
   generateFromPhotos: (dataUrls: string[]) => Promise<GenResult>
   deleteUserPet: (petId: string) => void
+  renamePet: (petId: string, name: string) => void
   immichStatus: () => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
   setImmichConfig: (cfg: { serverUrl?: string; albumId?: string }) => void
   setImmichKey: (key: string) => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
@@ -50,8 +51,9 @@ const posesEl = $('poses'), poseWho = $('poseWho'), petid = $('petid'), mod = $(
 
 let state: AppSettings
 
-/** The full roster shown in the picker: built-in presets plus user-generated pets. */
-const roster = (): AppPet[] => [...PETS, ...(state.userPets ?? [])]
+/** The full roster shown in the picker: built-in presets + user pets, with renames applied. */
+const roster = (): AppPet[] =>
+  [...PETS, ...(state.userPets ?? [])].map((p) => (state.nameOverrides?.[p.id] ? { ...p, name: state.nameOverrides[p.id] } : p))
 const findPet = (id: string): AppPet => roster().find((p) => p.id === id) ?? PETS[0]
 const isUserPet = (id: string): boolean => (state.userPets ?? []).some((p) => p.id === id)
 
@@ -62,10 +64,43 @@ function isCustomized(petId: string): boolean {
 }
 
 /** Reflect the active pet's identity + whether its traits are customized. */
+function startRename(pet: AppPet): void {
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.value = pet.name
+  input.maxLength = 24
+  input.className = 'renameinput'
+  petid.replaceChildren(input)
+  input.focus()
+  input.select()
+  let done = false
+  const commit = (save: boolean): void => {
+    if (done) return
+    done = true
+    if (save) {
+      const name = input.value.trim()
+      state.nameOverrides = state.nameOverrides ?? {}
+      if (name) state.nameOverrides[pet.id] = name
+      else delete state.nameOverrides[pet.id]
+      window.settings.renamePet(pet.id, name)
+      buildGrid()
+    }
+    refreshMeta()
+  }
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(true) }
+    else if (e.key === 'Escape') { e.preventDefault(); commit(false) }
+  })
+  input.addEventListener('blur', () => commit(true))
+}
+
 function refreshMeta(): void {
   const pet = findPet(state.activePetId)
-  petid.replaceChildren(Object.assign(document.createElement('b'), { textContent: pet.name }),
-    document.createTextNode(` — ${pet.blurb}`))
+  const name = Object.assign(document.createElement('b'), { textContent: pet.name })
+  name.className = 'rename'
+  name.title = 'Click to rename'
+  name.addEventListener('click', () => startRename(pet))
+  petid.replaceChildren(name, document.createTextNode(` — ${pet.blurb}`))
   poseWho.textContent = pet.name
   const custom = isCustomized(pet.id)
   mod.textContent = custom ? '· customized' : ''

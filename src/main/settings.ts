@@ -36,7 +36,7 @@ function defaults(): AppSettings {
     activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS,
     stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, careMode: false, difficulty: 'normal', dreamMode: false,
     immich: { serverUrl: '', albumId: '' }, disabledAnims: [],
-    ai: defaultAi(), userPets: [], overrides: {}
+    ai: defaultAi(), userPets: [], nameOverrides: {}, overrides: {}
   }
 }
 
@@ -117,6 +117,11 @@ function sanitize(raw: unknown): AppSettings {
       (a): a is AppSettings['disabledAnims'][number] => typeof a === 'string' && (TOGGLEABLE_ANIMS as string[]).includes(a)
     )
   }
+  if (r.nameOverrides && typeof r.nameOverrides === 'object') {
+    for (const [petId, name] of Object.entries(r.nameOverrides as Record<string, unknown>)) {
+      if (known(petId) && typeof name === 'string' && name.trim()) s.nameOverrides[petId] = name.trim().slice(0, 24)
+    }
+  }
   if (r.overrides && typeof r.overrides === 'object') {
     for (const [petId, ov] of Object.entries(r.overrides as Record<string, unknown>)) {
       if (!known(petId) || !ov || typeof ov !== 'object') continue
@@ -147,9 +152,9 @@ export function saveSettings(s: AppSettings): void {
   }
 }
 
-/** The full roster the app offers: built-in presets plus user-generated pets. */
+/** The full roster the app offers: built-in presets + user pets, with any renames applied. */
 export function allPets(s: AppSettings): AppPet[] {
-  return [...PETS, ...s.userPets]
+  return [...PETS, ...s.userPets].map((p) => (s.nameOverrides[p.id] ? { ...p, name: s.nameOverrides[p.id] } : p))
 }
 
 /** Resolve a pet id against the full roster (built-in + user), falling back to Ash. */

@@ -238,9 +238,9 @@ export const POSES: Record<string, RigPose> = {
     tail: { root: [7, 33], ctrl: [7, 42], tip: [22, 42] }, eye: 1,
     legs: [
       { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false }, // hind folded
-      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: false }, // front straight
+      { hip: [25, 33], mid: [25, 38], foot: [25, GROUND], near: false }, // front straight (tucked back under the chest)
       { hip: [16, 34], mid: [12, 39], foot: [21, 42], near: true },
-      { hip: [29, 33], mid: [29, 38], foot: [29, GROUND], near: true }
+      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: true }
     ]
   },
   curl: {
