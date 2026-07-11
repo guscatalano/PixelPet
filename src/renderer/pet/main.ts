@@ -238,7 +238,11 @@ function pawFrames(): Frame[] {
     const f = (paw: number, pat: number, ms: number): Frame => ({
       img: rgbaToCanvas(renderPet(generate34Grid(activePet, 0, { paw, pawX: pat }), activePet.coat)), ms
     })
-    return [f(0.5, 0, 110), f(1, 0, 160), f(1, 1, 90), f(1, 0.25, 120), f(1, 1, 90), f(1, 0.25, 120), f(1, 0, 150), f(0.5, 0, 110)]
+    return [
+      f(0.25, 0, 85), f(0.55, 0, 85), f(0.8, 0, 85), f(1, 0, 170), // the leg lifts off the ground and rises
+      f(1, 1, 90), f(1, 0.25, 120), f(1, 1, 90), f(1, 0.25, 120),  // pat-pat
+      f(1, 0, 140), f(0.75, 0, 85), f(0.45, 0, 85), f(0.2, 0, 85)  // and back down
+    ]
   })
 }
 const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = { yawn: 'front', stretch: 'stand', react: 'front', paw: 'front' }

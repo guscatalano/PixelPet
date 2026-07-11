@@ -51,14 +51,17 @@ export function generate34Grid(preset, t, state = {}) {
     for (let k = 0; k <= 1.001; k += 0.05) { const it = 1 - k
       ellipse(set, it * it * p0[0] + 2 * it * k * p1[0] + k * k * p2[0], it * it * p0[1] + 2 * it * k * p1[1] + k * k * p2[1], (3.0 - k * 1.2) * Math.min(1, ta + 0.4), (3.0 - k * 1.2) * Math.min(1, ta + 0.4)) }
   }
-  // Pawing at you (ref: a cat reaching a foreleg toward the camera): the leg is
-  // FORESHORTENED — a short forearm ending in a BIG pad facing the viewer,
-  // toe beans out. Reaching = the pad growing toward you.
+  // Pawing at you: the lift is a real journey — the paw starts AT its planted
+  // spot on the ground and travels up as the leg raises (forearm visible), the
+  // pad rotating toward the viewer as it arrives (grows, toe beans out).
   const pawAmt = state.paw || 0, pawX = state.pawX || 0
   const pawMask = new Uint8Array(W * H)
   const pawReach = 0.55 + 0.45 * pawAmt
-  const pawPx = bx + 4.5 + 1.8 * pawAmt
-  const pawPy = g.bodyCy + g.bodyRy * 0.32 - 4.5 * pawAmt + pawX * 1.6
+  const plantedX = bxBase + 0.9 * t + g.bodyRx * 0.3
+  const groundPawY = g.bodyCy + g.bodyRy * 0.98
+  const pawPx = plantedX + (bx + 6.2 - plantedX) * pawAmt
+  const pawPy = groundPawY + (g.bodyCy + g.bodyRy * 0.32 - 4.5 - groundPawY) * pawAmt + pawX * 1.6
+  const pawRx = 2.6 + 0.9 * pawAmt, pawRy = 2.1 + 1.0 * pawAmt
   { // front legs, shifted with the chest
     const legDX = g.bodyRx * 0.3
     const legTop = g.bodyCy + g.bodyRy * 0.32, pawY = g.bodyCy + g.bodyRy * 0.98
@@ -66,8 +69,9 @@ export function generate34Grid(preset, t, state = {}) {
       const lx = bxBase + 0.9 * t + s * legDX // planted — the body leans over them
       if (s === 1 && pawAmt > 0.05) {
         const setPaw = (x, y) => { set(x, y); if (inB(x, y)) pawMask[idx(x, y)] = 1 }
-        for (let k = 0; k <= 1.001; k += 0.25) ellipse(setPaw, bx + 3 + (pawPx - 0.4 - (bx + 3)) * k, legTop + 1.5 + (pawPy + 2 - (legTop + 1.5)) * k, 1.8, 1.6)
-        ellipse(setPaw, pawPx, pawPy, 3.4 * pawReach, 3.1 * pawReach) // the pad, toward you
+        // the lifting foreleg, pivoting up from where the foot stood
+        for (let k = 0; k <= 1.001; k += 0.2) ellipse(setPaw, lx + (pawPx - 0.3 - lx) * k, legTop + 1.5 + (pawPy + 1.8 - (legTop + 1.5)) * k, 1.9 - k * 0.3, 1.7 - k * 0.2)
+        ellipse(setPaw, pawPx, pawPy, pawRx, pawRy) // the pad
         continue
       }
       for (let y = legTop; y <= pawY; y += 0.5) ellipse(set, lx, y, 2.3, 1.6)
