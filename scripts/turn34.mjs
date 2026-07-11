@@ -26,12 +26,13 @@ export function generate34Grid(preset, t, state = {}) {
   const fur = new Uint8Array(W * H)
   const set = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
 
-  // --- paw-driven weight shift: body leans away from the raised paw, head
+  // --- paw-driven weight shift: body leans away from the raised paw(s), head
   // tips back to watch you, each pat rocks the cat. Feet stay planted. ---
   const pawAmtW = state.paw || 0, pawXW = state.pawX || 0
-  const leanX = -(1.1 * pawAmtW) + 0.35 * pawXW
-  const headUp = 0.9 * pawAmtW - 0.6 * pawXW
-  if (pawAmtW > 0.01) { g.headCy -= headUp; g.eyeY -= headUp; g.noseY -= headUp }
+  const paw2W = state.paw2 || 0, paw2XW = state.paw2X || 0
+  const leanX = -(1.1 * (pawAmtW - 0.85 * paw2W)) + 0.35 * (pawXW - 0.85 * paw2XW)
+  const headUp = 0.9 * Math.max(pawAmtW, paw2W) - 0.6 * Math.max(pawXW, paw2XW)
+  if (pawAmtW > 0.01 || paw2W > 0.01) { g.headCy -= headUp; g.eyeY -= headUp; g.noseY -= headUp }
 
   // --- asymmetric geometry (face angled toward viewer-right) ---
   const hx = g.headCx + 1.3 * t + leanX * 1.2
@@ -54,24 +55,37 @@ export function generate34Grid(preset, t, state = {}) {
   // Pawing at you: the lift is a real journey — the paw starts AT its planted
   // spot on the ground and travels up as the leg raises (forearm visible), the
   // pad rotating toward the viewer as it arrives (grows, toe beans out).
-  const pawAmt = state.paw || 0, pawX = state.pawX || 0
+  // Per-side params: side +1 uses paw/pawX, side -1 uses paw2/paw2X. pawH
+  // scales the reach height; pawLx adds lateral motion (waving).
   const pawMask = new Uint8Array(W * H)
-  const pawReach = 0.55 + 0.45 * pawAmt
-  const plantedX = bxBase + 0.9 * t + g.bodyRx * 0.3
   const groundPawY = g.bodyCy + g.bodyRy * 0.98
-  const pawPx = plantedX + (bx + 6.2 - plantedX) * pawAmt
-  const pawPy = groundPawY + (g.bodyCy + g.bodyRy * 0.32 - 4.5 - groundPawY) * pawAmt + pawX * 1.6
-  const pawRx = 2.6 + 0.9 * pawAmt, pawRy = 2.1 + 1.0 * pawAmt
+  const pawH = state.pawH ?? 1, pawLx = state.pawLx || 0
+  const pawSide = (s) => {
+    const amt = (s === 1 ? state.paw : state.paw2) || 0
+    const stroke = (s === 1 ? state.pawX : state.paw2X) || 0
+    const plantedX = bxBase + 0.9 * t + s * g.bodyRx * 0.3
+    const targetY = g.bodyCy + g.bodyRy * 0.32 - 4.5 - 6 * (pawH - 1)
+    return {
+      amt, stroke,
+      px: plantedX + (bx + s * 6.2 + s * pawLx - plantedX) * amt,
+      py: groundPawY + (targetY - groundPawY) * amt + stroke * 1.6,
+      rx: 2.6 + 0.9 * amt, ry: 2.1 + 1.0 * amt
+    }
+  }
+  const pawR = pawSide(1)
+  const pawAmt = pawR.amt, pawX = pawR.stroke
+  const pawPx = pawR.px, pawPy = pawR.py, pawRx = pawR.rx, pawRy = pawR.ry
   { // front legs, shifted with the chest
     const legDX = g.bodyRx * 0.3
     const legTop = g.bodyCy + g.bodyRy * 0.32, pawY = g.bodyCy + g.bodyRy * 0.98
     for (const s of [-1, 1]) {
       const lx = bxBase + 0.9 * t + s * legDX // planted — the body leans over them
-      if (s === 1 && pawAmt > 0.05) {
+      const ps = pawSide(s)
+      if (ps.amt > 0.05) {
         const setPaw = (x, y) => { set(x, y); if (inB(x, y)) pawMask[idx(x, y)] = 1 }
         // the lifting foreleg, pivoting up from where the foot stood
-        for (let k = 0; k <= 1.001; k += 0.2) ellipse(setPaw, lx + (pawPx - 0.3 - lx) * k, legTop + 1.5 + (pawPy + 1.8 - (legTop + 1.5)) * k, 1.9 - k * 0.3, 1.7 - k * 0.2)
-        ellipse(setPaw, pawPx, pawPy, pawRx, pawRy) // the pad
+        for (let k = 0; k <= 1.001; k += 0.2) ellipse(setPaw, lx + (ps.px - s * 0.3 - lx) * k, legTop + 1.5 + (ps.py + 1.8 - (legTop + 1.5)) * k, 1.9 - k * 0.3, 1.7 - k * 0.2)
+        ellipse(setPaw, ps.px, ps.py, ps.rx, ps.ry) // the pad
         continue
       }
       for (let y = legTop; y <= pawY; y += 0.5) ellipse(set, lx, y, 2.3, 1.6)
@@ -113,12 +127,12 @@ export function generate34Grid(preset, t, state = {}) {
     for (let y = legTop; y <= pawY; y++) {
       if (inB(cxp, y) && fur[idx(cxp, y)]) shade[idx(cxp, y)] = DEEP
       if (inB(cxp - 1, y) && fur[idx(cxp - 1, y)] && shade[idx(cxp - 1, y)] < SHADOW) shade[idx(cxp - 1, y)] = SHADOW }
-    for (const s of [-1, 1]) { if (s === 1 && pawAmt > 0.05) continue
+    for (const s of [-1, 1]) { if (pawSide(s).amt > 0.05) continue
       const px = Math.round(bxBase + 0.9 * t + s * legDX)
       if (inB(px, pawY) && fur[idx(px, pawY)]) shade[idx(px, pawY)] = DEEP }
   }
-  if (pawAmt > 0.05) {
-    // A dark ring around the raised limb where it overlaps the body.
+  if (pawAmt > 0.05 || pawSide(-1).amt > 0.05) {
+    // A dark ring around the raised limb(s) where they overlap the body.
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       if (!pawMask[idx(x, y)]) continue
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
@@ -127,17 +141,20 @@ export function generate34Grid(preset, t, state = {}) {
         put(overlay, nx2, ny2, O.OUTLINE)
       }
     }
-    // Toe beans — the "paw at the glass" signature.
-    if (pawAmt > 0.6) {
-      const bean = (x, y) => {
-        const rx2 = Math.round(x), ry2 = Math.round(y)
-        if (inB(rx2, ry2) && pawMask[idx(rx2, ry2)] && overlay[idx(rx2, ry2)] === O.NONE) put(overlay, rx2, ry2, O.NOSE)
-      }
-      bean(pawPx - 1.8 * pawReach, pawPy - 1.2 * pawReach)
-      bean(pawPx, pawPy - 1.8 * pawReach)
-      bean(pawPx + 1.8 * pawReach, pawPy - 1.2 * pawReach)
+    // Toe beans — the "paw at the glass" signature — per raised pad.
+    const bean = (x, y) => {
+      const rx2 = Math.round(x), ry2 = Math.round(y)
+      if (inB(rx2, ry2) && pawMask[idx(rx2, ry2)] && overlay[idx(rx2, ry2)] === O.NONE) put(overlay, rx2, ry2, O.NOSE)
+    }
+    for (const s of [-1, 1]) {
+      const ps = pawSide(s)
+      if (ps.amt <= 0.6) continue
+      const reach = 0.55 + 0.45 * ps.amt
+      bean(ps.px - 1.8 * reach, ps.py - 1.2 * reach)
+      bean(ps.px, ps.py - 1.8 * reach)
+      bean(ps.px + 1.8 * reach, ps.py - 1.2 * reach)
       ellipse((x, y) => { if (pawMask[idx(x, y)] && overlay[idx(x, y)] === O.NONE) put(overlay, x, y, O.NOSE) },
-        pawPx, pawPy + 1.1 * pawReach, 1.3 * pawReach, 0.9 * pawReach)
+        ps.px, ps.py + 1.1 * reach, 1.3 * reach, 0.9 * reach)
     }
   }
 
