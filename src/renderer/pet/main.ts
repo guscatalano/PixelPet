@@ -200,6 +200,9 @@ function computeAnim(now: number): Anim {
   switch (clip) {
     case 'walk':
       return { frame: getWalkFrame(walkStep), overlay: 'none' }
+    case 'fall':
+      // Legs scrabbling fast in the air (the window is dropping underneath it).
+      return { frame: getWalkFrame((now / 90) % 1), overlay: 'none' }
     case 'sleep':
       return { frame: getCurlFrame((now / 1800) % (Math.PI * 2)), overlay: 'zzz' }
     case 'react': {

@@ -1,7 +1,7 @@
 // Types shared across main, preload, and renderer.
 
 /** Animation clips the renderer knows how to play. */
-export type ClipName = 'idle' | 'sit' | 'walk' | 'sleep' | 'react'
+export type ClipName = 'idle' | 'sit' | 'walk' | 'sleep' | 'react' | 'fall'
 
 /** Which way the pet faces (affects horizontal flip). */
 export type Facing = 'left' | 'right'

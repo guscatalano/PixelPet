@@ -5,6 +5,7 @@ import { MIN_SCALE, MAX_SCALE, petWindowSize } from '../shared/constants'
 import { createTray } from './tray'
 import { PetEngine } from './behavior/engine'
 import { loadSettings, saveSettings, effectivePersonality } from './settings'
+import { setSelfWindow } from './desktop/windows'
 
 let petWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
@@ -40,6 +41,12 @@ function createPetWindow(): BrowserWindow {
 
   // Start click-through; the renderer disables it (per-pixel) over the cat.
   win.setIgnoreMouseEvents(true, { forward: true })
+
+  // Tell the window-enumerator to skip our own overlay (so the pet never tries
+  // to stand on itself).
+  if (process.platform === 'win32') {
+    try { setSelfWindow(win.getNativeWindowHandle()) } catch (e) { console.error('[desktop] setSelfWindow failed', e) }
+  }
 
   const [px, py] = defaultPetPosition()
   win.setPosition(px, py)
