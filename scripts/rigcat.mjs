@@ -53,6 +53,7 @@ export function generateRigGrid(_pet, pose) {
   pose.legs.filter((l) => !l.near).forEach(drawLeg) // far legs behind
 
   ellipse(set, bcx, bcy, brx, bry) // body
+  if (pose.body2) ellipse(set, pose.body2[0], pose.body2[1], pose.body2[2], pose.body2[3]) // optional 2nd mass (e.g. raised rear in a stretch)
   ellipse(set, pose.neck[0], pose.neck[1], pose.neck[2], pose.neck[3]) // neck
   ellipse(set, hcx, hcy, hr * 1.02, hr * 0.98) // round head (our cat's head)
   triangle(set, hcx - 4, hcy - hr + 2, hcx, hcy - hr + 2, hcx - 4.5, hcy - hr - 4) // back ear
@@ -71,6 +72,8 @@ export function generateRigGrid(_pet, pose) {
   }
   const inHead = (x, y) => ((x - hcx) / (hr + 0.5)) ** 2 + ((y - hcy) / (hr + 0.5)) ** 2 <= 1.05
   const inBody = (x, y) => ((x - bcx) / (brx + 0.5)) ** 2 + ((y - bcy) / (bry + 0.5)) ** 2 <= 1.05
+  const b2 = pose.body2
+  const inBody2 = (x, y) => b2 && ((x - b2[0]) / (b2[2] + 0.5)) ** 2 + ((y - b2[1]) / (b2[3] + 0.5)) ** 2 <= 1.05
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!fur[idx(x, y)]) continue
     const tag = legTag[idx(x, y)]
@@ -78,6 +81,7 @@ export function generateRigGrid(_pet, pose) {
     else if (tag === 1) shade[idx(x, y)] = BASE
     else if (inHead(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, hcx, hcy, hr, hr))
     else if (inBody(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, bcx, bcy, brx, bry))
+    else if (inBody2(x, y)) shade[idx(x, y)] = shadeLevel(sphereBright(x, y, b2[0], b2[1], b2[2], b2[3]))
     else shade[idx(x, y)] = BASE
   }
   // Face (matches the walk pose exactly).
@@ -127,6 +131,18 @@ export const POSES = {
       { hip: [26, 39], mid: [27, 41], foot: [25, 42], near: false },
       { hip: [18, 38], mid: [16, 41], foot: [21, 42], near: true },
       { hip: [28, 39], mid: [29, 41], foot: [27, 42], near: true }
+    ]
+  },
+  // The classic wake-up stretch: chest low, butt up, front legs extended flat
+  // forward, tail high. Eyes closed (cats squeeze them shut mid-stretch).
+  stretch: {
+    body: [25, 35, 8, 5.5], body2: [13, 28, 8.5, 7.5], head: [35, 30, 7], neck: [30, 32, 5.5, 4.5],
+    tail: { root: [7, 27], ctrl: [3, 18], tip: [8, 11] }, eye: 0,
+    legs: [
+      { hip: [12, 32], mid: [11, 38], foot: [12, GROUND], near: false }, // hind far (under the raised rear)
+      { hip: [29, 37], mid: [34, 41], foot: [39, GROUND], near: false }, // front far, stretched forward
+      { hip: [15, 32], mid: [14, 38], foot: [15, GROUND], near: true },  // hind near
+      { hip: [31, 37], mid: [36, 41], foot: [41, GROUND], near: true }   // front near, stretched forward
     ]
   }
 }

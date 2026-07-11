@@ -91,7 +91,8 @@ export function generate34Grid(preset, t, state = {}) {
   }
 
   // --- face: near (left) eye full, far (right) eye narrowed & closer to nose ---
-  const eyeOpen = state.eyeOpen !== false
+  const yawn = state.yawn || 0
+  const eyeOpen = state.eyeOpen !== false && yawn < 0.05 // eyes squeeze shut in a yawn
   const eyeY = g.eyeY + 0.3 * t
   const eyes = [
     { ex: noseX - g.eyeDX * (1 + 0.10 * t), rx: g.eyeRx, ry: g.eyeRy },                       // near (left)
@@ -105,8 +106,16 @@ export function generate34Grid(preset, t, state = {}) {
     put(overlay, Math.round(e.ex + look - e.rx * 0.35), Math.round(eyeY - e.ry * 0.4), O.GLINT)
   }
   triangle((x, y) => put(overlay, x, y, O.NOSE), noseX - 1.6, noseY - 1, noseX + 1.6, noseY - 1, noseX, noseY + 1.2)
-  put(overlay, Math.round(noseX), Math.round(noseY) + 2, O.MOUTH)
-  for (const dx of [-2, -1, 1, 2]) put(overlay, Math.round(noseX) + dx, Math.round(noseY) + 3, O.MOUTH)
+  if (yawn > 0.05) {
+    // Open mouth: a dark oval growing with the yawn, pink tongue at its base.
+    const mrx = 0.7 + 1.7 * yawn, mry = 0.6 + 2.4 * yawn
+    const mcy = noseY + 2.4 + mry * 0.55
+    ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.MOUTH) }, noseX, mcy, mrx, mry)
+    if (yawn > 0.4) ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, noseX, mcy + mry * 0.45, mrx * 0.55, Math.max(0.7, mry * 0.3))
+  } else {
+    put(overlay, Math.round(noseX), Math.round(noseY) + 2, O.MOUTH)
+    for (const dx of [-2, -1, 1, 2]) put(overlay, Math.round(noseX) + dx, Math.round(noseY) + 3, O.MOUTH)
+  }
   { // inner ears (white-rimmed, like the front pose)
     const iw = g.earW * 0.26
     triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },

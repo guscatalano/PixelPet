@@ -16,6 +16,8 @@ const uri = (rgba) => 'data:image/png;base64,' + Buffer.from(encodePNG(W, H, rgb
 const lerp = (a, b, k) => a + (b - a) * k, lerpA = (a, b, k) => a.map((v, i) => lerp(v, b[i], k))
 const lerpLeg = (a, b, k) => ({ hip: lerpA(a.hip, b.hip, k), mid: lerpA(a.mid, b.mid, k), foot: lerpA(a.foot, b.foot, k), near: a.near })
 const lerpPose = (A, B, k) => ({ body: lerpA(A.body, B.body, k), head: lerpA(A.head, B.head, k), neck: lerpA(A.neck, B.neck, k),
+  // body2 (e.g. the stretch's raised rear) grows out of / melts into the main body when only one side has it
+  body2: (A.body2 || B.body2) ? lerpA(A.body2 || A.body, B.body2 || B.body, k) : undefined,
   tail: { root: lerpA(A.tail.root, B.tail.root, k), ctrl: lerpA(A.tail.ctrl, B.tail.ctrl, k), tip: lerpA(A.tail.tip, B.tail.tip, k) },
   eye: lerp(A.eye, B.eye, k), legs: A.legs.map((l, i) => lerpLeg(l, B.legs[i], k)) })
 const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2)
@@ -35,7 +37,21 @@ const turn = TURN.map((k) => ({ u: uri(render(generate34Grid(ash, k.t, { eyeOpen
 // front idle (tail sway + occasional blink)
 const front = Array.from({ length: 10 }, (_, i) =>
   uri(render(generateGrid(ash, { eyeOpen: i !== 6, tailPhase: Math.sin((i / 10) * Math.PI * 2) * 0.9 }), ash.coat)))
-const data = JSON.stringify({ w: W, h: H, walk, sitdown, turn, front })
+// yawn (front-facing): mouth opens wide, eyes squeezed, then closes
+const yawnKs = [0.3, 0.65, 1, 1, 1, 0.6, 0.25]
+const yawn = yawnKs.map((k) => uri(render(generate34Grid(ash, 0, { yawn: k }), ash.coat)))
+// lie down: side sit -> curl (articulated)
+const lie = Array.from({ length: 7 }, (_, i) => uri(render(generateRigGrid(ash, lerpPose(POSES.sit, POSES.curl, ease(i / 6))), ash.coat)))
+// sleeping: the curl breathing (body swells gently)
+const sleep = Array.from({ length: 6 }, (_, i) => {
+  const br = Math.sin((i / 6) * Math.PI * 2)
+  const p = lerpPose(POSES.curl, POSES.curl, 0)
+  p.body = [p.body[0], p.body[1] - br * 0.25, p.body[2], p.body[3] + br * 0.5]
+  return uri(render(generateRigGrid(ash, p), ash.coat))
+})
+// the wake-up stretch: stand -> stretch (chest sinks, butt up, front legs slide out)
+const stretch = Array.from({ length: 6 }, (_, i) => uri(render(generateRigGrid(ash, lerpPose(POSES.stand, POSES.stretch, ease(i / 5))), ash.coat)))
+const data = JSON.stringify({ w: W, h: H, walk, sitdown, turn, front, yawn, lie, sleep, stretch })
 
 const html = `<title>Ash · walk → sit → face you</title>
 <style>
@@ -58,8 +74,8 @@ const html = `<title>Ash · walk → sit → face you</title>
   input[type=range]{accent-color:var(--accent)}
 </style>
 <div class="card">
-  <header><h1>Meet <b>Ash</b> — walk → sit → face you</h1>
-  <div class="sub">Articulated sit-down, then a fast keyframe ¾ turn. The cat <b>blinks through the turn</b> (an animator's mask) and opens its eyes facing you.</div>
+  <header><h1>Meet <b>Ash</b> — a full day in the life</h1>
+  <div class="sub">walk → sit → turn to you → rest → <b>yawn</b> → turn away → lie down → sleep → wake → <b>stretch</b> → walk. All articulated / keyframed, our cat's art throughout.</div>
   <div class="now" id="now">walking</div></header>
   <div class="stage"><div class="floor"></div><canvas id="c"></canvas></div>
   <div class="controls"><button id="play">Pause</button><span class="spacer"></span><span class="hint">turn speed <span id="v">80</span>ms/frame</span><input type="range" id="s" min="50" max="220" step="10" value="80"></div>
@@ -69,6 +85,7 @@ const D=${data}, S=7; const cv=document.getElementById('c'); cv.width=D.w*S; cv.
 const ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
 const mk=a=>a.map(u=>{const i=new Image();i.src=(typeof u==='string')?u:u.u;return i});
 const WALK=mk(D.walk), SIT=mk(D.sitdown), TURN=mk(D.turn), FRONT=mk(D.front);
+const YAWN=mk(D.yawn), LIE=mk(D.lie), SLEEP=mk(D.sleep), STRETCH=mk(D.stretch);
 const TOFF=D.turn.map(t=>({ox:t.ox,oy:t.oy}));
 function draw(img, ox=0, oy=0){ if(!img||!img.complete) return; ctx.clearRect(0,0,cv.width,cv.height);
   ctx.drawImage(img,0,0,D.w,D.h, ox*S, (2+oy)*S, D.w*S, D.h*S); }
@@ -80,8 +97,13 @@ function phases(){ return [
   { n:'sitting down',   frames: SIT.map(f=>({img:f})), ms:95 },
   { n:'turning to you', frames: TURN.map((f,i)=>({img:f,ox:TOFF[i].ox,oy:TOFF[i].oy})), ms:turnMs },
   { n:'resting',        frames: FRONT.map(f=>({img:f})), ms:280, loop: 2 },
+  { n:'yawning',        frames: YAWN.map(f=>({img:f})), ms:130 },
   { n:'turning away',   frames: [...TURN].reverse().map((f)=>{const i=TURN.indexOf(f);return {img:f,ox:TOFF[i].ox,oy:TOFF[i].oy}}), ms:turnMs },
-  { n:'getting up',     frames: [...SIT].reverse().map(f=>({img:f})), ms:95 }
+  { n:'lying down',     frames: LIE.map(f=>({img:f})), ms:105 },
+  { n:'sleeping',       frames: SLEEP.map(f=>({img:f})), ms:300, loop: 3 },
+  { n:'waking up',      frames: [...LIE].reverse().map(f=>({img:f})), ms:105 },
+  { n:'standing up',    frames: [...SIT].reverse().map(f=>({img:f})), ms:95 },
+  { n:'stretching',     frames: [...STRETCH.map(f=>({img:f})), {img:STRETCH[5]}, {img:STRETCH[5]}, {img:STRETCH[5]}, ...[...STRETCH].reverse().map(f=>({img:f}))], ms:110 }
 ]}
 let ph=0, fi=0, li=0, acc=0, last=0
 function loop(now){ requestAnimationFrame(loop); if(!last)last=now; const dt=now-last; last=now; if(!playing)return;
