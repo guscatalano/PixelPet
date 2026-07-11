@@ -81,6 +81,13 @@ function sitPose(t: number): ReturnType<typeof lerpPose> {
   p.eye = t % 4200 > 160 ? 1 : 0
   return p
 }
+function sphinxPose(t: number): ReturnType<typeof lerpPose> {
+  const br = Math.sin(t / 1000)
+  const p = lerpPose(RIG.sphinx, RIG.sphinx, 0)
+  p.body = [p.body[0], p.body[1] - br * 0.2, p.body[2], p.body[3] + br * 0.35]
+  p.eye = t % 4200 > 160 ? 1 : 0
+  return p
+}
 function stretchPose(t: number): ReturnType<typeof lerpPose> {
   const ph = t % 3000
   if (ph < 700) return lerpPose(RIG.stand, RIG.stretch, easeIn(ph / 700))
@@ -116,6 +123,7 @@ const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) 
   { key: 'walk', label: 'Walk', rgba: (pet, t) => renderPet(generateWalkGrid(pet, (t / 900) % 1), pet.coat) },
   { key: 'sit', label: 'Sit', rgba: (pet, t) => renderPet(generateRigGrid(pet, sitPose(t)), pet.coat) },
   { key: 'loaf', label: 'Loaf', rgba: (pet, t) => renderPet(generateRigGrid(pet, loafPose(t)), pet.coat) },
+  { key: 'sphinx', label: 'Sphinx', rgba: (pet, t) => renderPet(generateRigGrid(pet, sphinxPose(t)), pet.coat) },
   { key: 'sleep', label: 'Sleep', rgba: (pet, t) => renderPet(generateRigGrid(pet, sleepPose(t)), pet.coat) },
   { key: 'groom', label: 'Groom', rgba: (pet, t) => renderPet(generateRigGrid(pet, lerpPose(RIG.groom, RIG.groomLick, 0.5 + 0.5 * Math.sin(t / 140))), pet.coat) },
   { key: 'stretch', label: 'Stretch', rgba: (pet, t) => renderPet(generateRigGrid(pet, stretchPose(t)), pet.coat) },

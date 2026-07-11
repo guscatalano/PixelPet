@@ -374,11 +374,12 @@ export class PetEngine {
     }
     const p = this.personality
     const wasAsleep = this.clip === 'sleep'
-    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger'>([
+    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger'>([
       // In stay-put mode the cat holds its spot: no wandering, no pounce leaps.
       { item: 'wander', weight: this.stayPut ? 0 : 0.3 + p.energy * 0.8 + p.curiosity * 0.3 },
       { item: 'sleep', weight: 0.12 + p.sleepiness * 0.9 - p.energy * 0.2 },
-      { item: 'loaf', weight: 0.18 + p.sleepiness * 0.4 + (1 - p.energy) * 0.3 },
+      { item: 'loaf', weight: 0.14 + p.sleepiness * 0.35 + (1 - p.energy) * 0.25 },
+      { item: 'sphinx', weight: 0.14 + p.sleepiness * 0.25 + (1 - p.energy) * 0.25 },
       { item: 'groom', weight: 0.15 + p.independence * 0.2 },
       { item: 'pounce', weight: this.stayPut ? 0 : 0.06 + p.energy * 0.35 + p.mischief * 0.35 },
       { item: 'paw', weight: 0.05 + p.affection * 0.22 },
@@ -396,6 +397,10 @@ export class PetEngine {
           break
         case 'loaf':
           this.setClip('loaf')
+          this.scheduleAmbient(8000 + Math.random() * 9000)
+          break
+        case 'sphinx':
+          this.setClip('sphinx')
           this.scheduleAmbient(8000 + Math.random() * 9000)
           break
         case 'groom':

@@ -89,7 +89,7 @@ function getRigFrame(key: string, make: () => RigPose): HTMLCanvasElement {
 // (real motion: the cat turns, sits, tucks, coils). The engine requests a clip;
 // the renderer walks the graph to it and reports arrival via stateReached.
 type Node =
-  | 'front' | 'sit' | 'stand' | 'walk' | 'loaf' | 'sleep' | 'groom'
+  | 'front' | 'sit' | 'stand' | 'walk' | 'loaf' | 'sphinx' | 'sleep' | 'groom'
   | 'teeter' | 'crouch' | 'air' | 'fall' | 'poof'
 
 interface Frame { img: HTMLCanvasElement; ms: number; ox?: number; oy?: number }
@@ -148,6 +148,10 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
     case 'stand>sit': return seqFrames(key, () => rigLerpFrames(POSES.stand, POSES.sit, 5, 95))
     case 'sit>loaf': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.loaf, 6, 105))
     case 'loaf>sit': return seqFrames(key, () => rigLerpFrames(POSES.loaf, POSES.sit, 6, 105))
+    case 'sit>sphinx': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.sphinx, 6, 105)) // paws slide forward as it settles
+    case 'sphinx>sit': return seqFrames(key, () => rigLerpFrames(POSES.sphinx, POSES.sit, 6, 105))
+    case 'loaf>sphinx': return seqFrames(key, () => rigLerpFrames(POSES.loaf, POSES.sphinx, 5, 110)) // paws slide out of the bread
+    case 'sphinx>loaf': return seqFrames(key, () => rigLerpFrames(POSES.sphinx, POSES.loaf, 5, 110))
     case 'sit>sleep': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.curl, 7, 105))
     case 'sleep>sit': return seqFrames(key, () => rigLerpFrames(POSES.curl, POSES.sit, 7, 105))
     case 'sit>groom': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.groom, 4, 110))
@@ -174,10 +178,11 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
 // Graph adjacency for pathfinding (BFS over a dozen nodes).
 const EDGES: Record<Node, Node[]> = {
   front: ['sit'],
-  sit: ['front', 'stand', 'loaf', 'sleep', 'groom'],
+  sit: ['front', 'stand', 'loaf', 'sphinx', 'sleep', 'groom'],
   stand: ['sit', 'walk', 'teeter', 'poof', 'crouch'],
   walk: ['stand'],
-  loaf: ['sit'],
+  loaf: ['sit', 'sphinx'],
+  sphinx: ['sit', 'loaf'],
   sleep: ['sit'],
   groom: ['sit'],
   teeter: ['stand'],
@@ -250,7 +255,7 @@ const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = { yawn: yawnFr
 
 // ---- Graph runtime state ------------------------------------------------------
 const NODE_OF: Partial<Record<ClipName, Node>> = {
-  idle: 'front', sit: 'sit', walk: 'walk', sleep: 'sleep', loaf: 'loaf',
+  idle: 'front', sit: 'sit', walk: 'walk', sleep: 'sleep', loaf: 'loaf', sphinx: 'sphinx',
   groom: 'groom', teeter: 'teeter', fall: 'fall', poof: 'poof'
 }
 const CROUCH_WIGGLE_MS = 1150 // butt-wiggle time before the leap
@@ -418,6 +423,26 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
         pose.eye = open ? 1 : 0
         pose.headFace = f / 2
         pose.earPerk = f * 0.25 // it noticed you
+        return pose
+      }) }
+    }
+    case 'sphinx': {
+      // Same hover response as the loaf: the head turns to look at you.
+      const dt = Math.min(100, now - headLast)
+      headLast = now
+      const speed = dt / 200
+      const target = hovering ? 1 : 0
+      headCur = target > headCur ? Math.min(target, headCur + speed) : Math.max(target, headCur - speed)
+      const f = Math.round(headCur * 2)
+      const b = Math.round(((Math.sin(now / 1000) + 1) / 2) * 5)
+      const open = restBlink(now)
+      return { img: getRigFrame(`sphinx|${b}|${open ? 1 : 0}|${f}`, () => {
+        const pose = lerpPose(POSES.sphinx, POSES.sphinx, 0)
+        const br = (b / 5) * 2 - 1
+        pose.body = [pose.body[0], pose.body[1] - br * 0.2, pose.body[2], pose.body[3] + br * 0.35]
+        pose.eye = open ? 1 : 0
+        pose.headFace = f / 2
+        pose.earPerk = f * 0.25
         return pose
       }) }
     }

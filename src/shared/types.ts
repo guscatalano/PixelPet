@@ -8,7 +8,7 @@
  */
 export type ClipName =
   | 'idle' | 'sit' | 'walk' | 'sleep' | 'react' | 'fall'
-  | 'loaf' | 'groom' | 'teeter' | 'poof' | 'pounce' | 'yawn' | 'stretch' | 'paw'
+  | 'loaf' | 'sphinx' | 'groom' | 'teeter' | 'poof' | 'pounce' | 'yawn' | 'stretch' | 'paw'
 
 /** Which way the pet faces (affects horizontal flip). */
 export type Facing = 'left' | 'right'

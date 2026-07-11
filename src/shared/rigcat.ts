@@ -232,6 +232,18 @@ export const POSES: Record<string, RigPose> = {
       { hip: [30, 37], mid: [30, 40], foot: [29, 41], near: true }
     ]
   },
+  // The sphinx: belly down like a loaf, but the front legs stretch forward
+  // along the ground (paws poking out ahead of the chest), head upright.
+  sphinx: {
+    body: [20, 36, 13, 7], head: [32, 26.5, 7], neck: [29, 31.5, 6.5, 5.5],
+    tail: { root: [8, 38], ctrl: [9, 44], tip: [25, 42.5] }, eye: 1,
+    legs: [
+      { hip: [15, 38], mid: [13, 40], foot: [16, 41], near: false },       // hind tucked in the mound
+      { hip: [27, 38.5], mid: [32, 40.8], foot: [36.5, 41.8], near: false }, // foreleg stretched forward
+      { hip: [17, 38], mid: [15, 40], foot: [18, 41], near: true },
+      { hip: [29, 38.5], mid: [34, 40.8], foot: [38.5, 41.8], near: true }   // foreleg stretched forward
+    ]
+  },
   // Washing up: sitting, one front paw raised to the mouth, head dipped toward
   // it, eyes squeezed in concentration. Lerp groom <-> groomLick for the licks.
   groom: {
