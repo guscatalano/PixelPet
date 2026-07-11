@@ -24,6 +24,8 @@ const api = {
   setPupilsByTime: (v: boolean): void => ipcRenderer.send('settings:set-pupils', v),
   /** Toggle dream bubbles while the cat sleeps. */
   setDreamMode: (v: boolean): void => ipcRenderer.send('settings:set-dreammode', v),
+  /** Set the chance (0..1) that a nap shows a dream. */
+  setDreamChance: (v: number): void => ipcRenderer.send('settings:set-dreamchance', v),
 
   // ---- Immich dream album ----
   immichStatus: (): Promise<ImmichStatus> => ipcRenderer.invoke('immich:status'),

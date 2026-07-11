@@ -18,6 +18,7 @@ interface SettingsApi {
   setFrontScale: (k: number) => void
   setPupilsByTime: (v: boolean) => void
   setDreamMode: (v: boolean) => void
+  setDreamChance: (v: number) => void
   setCareMode: (v: boolean) => void
   setDifficulty: (d: Difficulty) => void
   careStatus: () => Promise<CareStatus | null>
@@ -450,6 +451,15 @@ function buildAnimation(): void {
     state.dreamMode = !state.dreamMode
     paintDream(state.dreamMode)
     window.settings.setDreamMode(state.dreamMode)
+  })
+
+  const dc = $<HTMLInputElement>('dreamchance'), dcLabel = $('dreamchancev')
+  const showDc = (): void => { dcLabel.textContent = `${dc.value}%` }
+  dc.value = String(Math.round((state.dreamChance ?? 0.55) * 100))
+  showDc()
+  dc.addEventListener('input', () => {
+    showDc()
+    window.settings.setDreamChance(Number(dc.value) / 100)
   })
 }
 

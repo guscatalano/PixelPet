@@ -301,7 +301,6 @@ let dreamWasSleeping = false // edge-detect sleep sessions
 let dreamThisSession = false // did this nap roll a dream?
 
 const IMMICH_TTL = 30 * 60_000 // re-fetch the album list every 30 min
-const DREAM_CHANCE = 0.55 // not every nap dreams
 
 /** Refresh the Immich asset-id list if configured (fire-and-forget). */
 async function refreshImmich(): Promise<void> {
@@ -361,7 +360,7 @@ async function showDreamPhoto(): Promise<void> {
 function dreamTick(): void {
   const sleeping = !!engine?.isSleeping()
   // Each time the cat drops off to sleep, roll whether this nap dreams at all.
-  if (sleeping && !dreamWasSleeping) dreamThisSession = Math.random() < DREAM_CHANCE
+  if (sleeping && !dreamWasSleeping) dreamThisSession = Math.random() < settings.dreamChance
   dreamWasSleeping = sleeping
   const hasPhotos = dreamPool.length + dreamImmichIds.length > 0
   const active = settings.dreamMode && sleeping && dreamThisSession && hasPhotos && !!petWindow
@@ -547,6 +546,10 @@ function registerIpc(): void {
     settings.dreamMode = !!v
     saveSettings(settings)
     dreamTick() // reflect promptly (hide if just turned off)
+  })
+  ipcMain.on('settings:set-dreamchance', (_e, v: number) => {
+    settings.dreamChance = Math.max(0, Math.min(1, v))
+    saveSettings(settings)
   })
   ipcMain.handle('immich:status', () => immichStatus())
   ipcMain.on('immich:set-config', (_e, cfg: Partial<ImmichConfig>) => {
