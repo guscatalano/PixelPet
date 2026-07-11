@@ -462,6 +462,25 @@ export class PetEngine {
 
   // ---- personality-weighted ambient loop ---------------------------------------
 
+  /**
+   * How long the cat holds a resting state before the next ambient decision.
+   * Restful states dwell much longer than fidgety ones — a nap is minutes-ish,
+   * not seconds — and personality stretches them (a sleepy cat sleeps far
+   * longer). These are floors-with-jitter, so sleep is never a 2-second blip.
+   */
+  private dwellFor(state: 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'sit' | 'idle'): number {
+    const p = this.personality
+    const r = (min: number, max: number): number => min + Math.random() * (max - min)
+    switch (state) {
+      case 'sleep': return r(15000, 26000) * (0.75 + p.sleepiness * 0.9) // ~12s floor, much longer for sleepy cats
+      case 'loaf': return r(11000, 19000) * (0.8 + p.sleepiness * 0.45)
+      case 'sphinx': return r(11000, 19000) * (0.8 + p.sleepiness * 0.45)
+      case 'groom': return r(5000, 9000)
+      case 'sit': return r(4500, 9000) * (0.85 + (1 - p.energy) * 0.4)
+      default: return r(3000, 6500) // idle / linger — brief, restless
+    }
+  }
+
   private scheduleAmbient(delayMs?: number): void {
     if (this.ambientTimer) clearTimeout(this.ambientTimer)
     const delay = delayMs ?? 3000 + Math.random() * 5000
@@ -503,19 +522,19 @@ export class PetEngine {
           break
         case 'sleep':
           this.setClip('sleep')
-          this.scheduleAmbient(9000 + Math.random() * 10000)
+          this.scheduleAmbient(this.dwellFor('sleep'))
           break
         case 'loaf':
           this.setClip('loaf')
-          this.scheduleAmbient(8000 + Math.random() * 9000)
+          this.scheduleAmbient(this.dwellFor('loaf'))
           break
         case 'sphinx':
           this.setClip('sphinx')
-          this.scheduleAmbient(8000 + Math.random() * 9000)
+          this.scheduleAmbient(this.dwellFor('sphinx'))
           break
         case 'groom':
           this.setClip('groom')
-          this.scheduleAmbient(4000 + Math.random() * 4000)
+          this.scheduleAmbient(this.dwellFor('groom'))
           break
         case 'pounce':
           this.startPounce()
@@ -525,11 +544,11 @@ export class PetEngine {
           break
         case 'sit':
           this.setClip('sit')
-          this.scheduleAmbient()
+          this.scheduleAmbient(this.dwellFor('sit'))
           break
         default:
           this.setClip('idle')
-          this.scheduleAmbient()
+          this.scheduleAmbient(this.dwellFor('idle'))
           break
       }
     }
