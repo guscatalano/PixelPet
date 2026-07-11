@@ -3,7 +3,7 @@ import { generateGrid, generateWalkGrid, render as renderPet, type AnimState, ty
 import { generateRigGrid, lerpPose, POSES, type RigPose } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
 import { DEFAULT_PET, PETS } from '../../shared/pets'
-import type { ClipName, Facing, PlayCommand, TriggerEvent } from '../../shared/types'
+import type { ClipName, Facing, PetConfig, PlayCommand, TriggerEvent } from '../../shared/types'
 
 // ---- Bridge typing (exposed by preload) ------------------------------------
 interface PetApi {
@@ -16,6 +16,7 @@ interface PetApi {
   onPlay: (handler: (cmd: PlayCommand) => void) => void
   onWalkStep: (handler: (step: number) => void) => void
   onSetPet: (handler: (petId: string) => void) => void
+  onConfig: (handler: (cfg: PetConfig) => void) => void
 }
 declare global {
   interface Window {
@@ -92,7 +93,6 @@ type Node =
   | 'teeter' | 'crouch' | 'air' | 'fall' | 'poof'
 
 interface Frame { img: HTMLCanvasElement; ms: number; ox?: number; oy?: number }
-interface Seq { frames: Frame[]; end: Node; onDone?: () => void }
 
 const easeK = (k: number): number => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2)
 
@@ -111,7 +111,9 @@ const rigLerpFrames = (A: RigPose, B: RigPose, n: number, ms: number): Frame[] =
 
 // The ¾ turn keyframes (side sit -> facing you). Eyes closed through the turn
 // (the blink masks the 1-eye -> 2-eye pop); ox tracks the head from its side
-// position to centre. Reverse for turning away.
+// position to centre. Reverse for turning away. turnMs is a user setting
+// (Settings → Animation), pushed live over pet:set-config.
+let turnMs = 80
 const TURN_KEYS = [
   { t: 1.0, blink: true, ox: 8, oy: 2 },
   { t: 0.62, blink: true, ox: 4, oy: 1 },
@@ -119,8 +121,15 @@ const TURN_KEYS = [
 ]
 const turnFrames = (): Frame[] => TURN_KEYS.map((k) => ({
   img: rgbaToCanvas(renderPet(generate34Grid(activePet, k.t, { eyeOpen: !k.blink }), activePet.coat)),
-  ms: 80, ox: k.ox, oy: k.oy
+  ms: turnMs, ox: k.ox, oy: k.oy
 }))
+window.pet.onConfig((cfg) => {
+  if (typeof cfg.turnMs === 'number' && cfg.turnMs !== turnMs) {
+    turnMs = cfg.turnMs
+    seqCache.delete('sit>front') // rebuilt with the new timing on next use
+    seqCache.delete('front>sit')
+  }
+})
 
 /** The transition sequence for one graph edge (from -> to must be adjacent). */
 function edgeSeq(from: Node, to: Node): Frame[] | null {

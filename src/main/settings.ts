@@ -14,8 +14,12 @@ function settingsPath(): string {
   return join(app.getPath('userData'), 'settings.json')
 }
 
+export const DEFAULT_TURN_MS = 80
+export const MIN_TURN_MS = 50
+export const MAX_TURN_MS = 220
+
 function defaults(): AppSettings {
-  return { activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, overrides: {} }
+  return { activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS, overrides: {} }
 }
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n))
@@ -28,6 +32,9 @@ function sanitize(raw: unknown): AppSettings {
   if (typeof r.activePetId === 'string' && PETS.some((p) => p.id === r.activePetId)) s.activePetId = r.activePetId
   if (typeof r.scale === 'number' && Number.isFinite(r.scale)) {
     s.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.round(r.scale)))
+  }
+  if (typeof r.turnMs === 'number' && Number.isFinite(r.turnMs)) {
+    s.turnMs = Math.max(MIN_TURN_MS, Math.min(MAX_TURN_MS, Math.round(r.turnMs)))
   }
   if (r.overrides && typeof r.overrides === 'object') {
     for (const [petId, ov] of Object.entries(r.overrides as Record<string, unknown>)) {

@@ -9,6 +9,7 @@ interface SettingsApi {
   get: () => Promise<AppSettings>
   setPet: (petId: string) => void
   setScale: (scale: number) => void
+  setTurnMs: (ms: number) => void
   setTrait: (petId: string, key: keyof Personality, value: number) => void
   resetTraits: (petId: string) => void
 }
@@ -216,11 +217,23 @@ resetBtn.addEventListener('click', () => {
   refreshMeta()
 })
 
+function buildAnimation(): void {
+  const slider = $<HTMLInputElement>('turnms'), label = $('turnmsv')
+  const show = (): void => { label.textContent = `${slider.value}ms` }
+  slider.value = String(state.turnMs ?? 80)
+  show()
+  slider.addEventListener('input', () => {
+    show()
+    window.settings.setTurnMs(Number(slider.value))
+  })
+}
+
 async function init(): Promise<void> {
   state = await window.settings.get()
   buildGrid()
   buildPoses()
   buildSizes()
+  buildAnimation()
   buildTraits()
   refreshMeta()
   // Make sure the current cat is visible even if it's far down the grid.

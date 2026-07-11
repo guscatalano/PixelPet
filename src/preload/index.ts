@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { PlayCommand, TriggerEvent } from '../shared/types'
+import type { PetConfig, PlayCommand, TriggerEvent } from '../shared/types'
 
 // Typed bridge exposed to the pet renderer as `window.pet`.
 const api = {
@@ -27,6 +27,10 @@ const api = {
   /** Switch the active pet at runtime; handler receives the new pet's id. */
   onSetPet: (handler: (petId: string) => void): void => {
     ipcRenderer.on('pet:set-pet', (_e, petId: string) => handler(petId))
+  },
+  /** Live-tunable animation config (e.g. turn speed) pushed from settings. */
+  onConfig: (handler: (cfg: PetConfig) => void): void => {
+    ipcRenderer.on('pet:set-config', (_e, cfg: PetConfig) => handler(cfg))
   }
 }
 

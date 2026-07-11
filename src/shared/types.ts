@@ -52,5 +52,12 @@ export const TRAIT_KEYS: Array<keyof Personality> = [
 export interface AppSettings {
   activePetId: string
   scale: number
+  /** ¾-turn keyframe duration, ms per frame (lower = snappier turn). */
+  turnMs: number
   overrides: Record<string, Partial<Personality>>
+}
+
+/** Live-tunable renderer config pushed over pet:set-config. */
+export interface PetConfig {
+  turnMs?: number
 }
