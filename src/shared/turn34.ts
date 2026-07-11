@@ -28,11 +28,20 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
   const fur = new Uint8Array(W * H)
   const set = (x: number, y: number): void => { if (inB(x, y)) fur[idx(x, y)] = 1 }
 
+  // --- paw-driven weight shift (a reaching cat is not a statue): the body
+  // leans away from the raised paw, the head tips back to watch you, and each
+  // pat rocks the whole cat subtly. Feet stay planted (legs use bxBase). ---
+  const pawAmtW = state.paw || 0, pawXW = state.pawX || 0
+  const leanX = -(1.1 * pawAmtW) + 0.35 * pawXW
+  const headUp = 0.9 * pawAmtW - 0.6 * pawXW
+  if (pawAmtW > 0.01) { g.headCy -= headUp; g.eyeY -= headUp; g.noseY -= headUp }
+
   // --- asymmetric geometry (face angled toward viewer-right) ---
-  const hx = g.headCx + 1.3 * t            // head mass eases right
-  const bx = g.bodyCx - 0.7 * t            // rear hints left
-  const noseX = hx + 2.2 * t               // nose travels toward the facing side
-  const noseY = g.noseY + 0.4 * t          // ...and a touch down (muzzle turning)
+  const hx = g.headCx + 1.3 * t + leanX * 1.2 // head mass eases right (+ lean)
+  const bxBase = g.bodyCx - 0.7 * t          // where the planted feet stay
+  const bx = bxBase + leanX                   // the body mass leans off-side
+  const noseX = hx + 2.2 * t                  // nose travels toward the facing side
+  const noseY = g.noseY + 0.4 * t             // ...and a touch down (muzzle turning)
 
   // --- silhouette: body, tail (near side), legs, neck, head, cheeks, ears ---
   ellipse(set, bx, g.bodyCy, g.bodyRx, g.bodyRy)
@@ -59,7 +68,7 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     const legDX = g.bodyRx * 0.3
     const legTop = g.bodyCy + g.bodyRy * 0.32, pawY = g.bodyCy + g.bodyRy * 0.98
     for (const s of [-1, 1]) {
-      const lx = bx + 0.9 * t + s * legDX
+      const lx = bxBase + 0.9 * t + s * legDX // planted — the body leans over them
       if (s === 1 && pawAmt > 0.05) {
         const setPaw = (x: number, y: number): void => { set(x, y); if (inB(x, y)) pawMask[idx(x, y)] = 1 }
         // short foreshortened forearm, mostly hidden behind the pad
@@ -116,8 +125,8 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
       const dx = (x - bx) / 5.5, dy = (y - (g.bodyCy + 2)) / 7.5
       if (dx * dx + dy * dy <= 1 && shade[idx(x, y)] > HI) shade[idx(x, y)] -= 1
     }
-  { // front-leg crease + toes, shifted with the chest
-    const legDX = g.bodyRx * 0.3, cxp = Math.round(bx + 0.9 * t)
+  { // front-leg crease + toes, anchored to the planted legs
+    const legDX = g.bodyRx * 0.3, cxp = Math.round(bxBase + 0.9 * t)
     const legTop = Math.round(g.bodyCy + g.bodyRy * 0.42), pawY = Math.round(g.bodyCy + g.bodyRy * 0.98)
     for (let y = legTop; y <= pawY; y++) {
       if (inB(cxp, y) && fur[idx(cxp, y)]) shade[idx(cxp, y)] = DEEP
@@ -125,7 +134,7 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     }
     for (const s of [-1, 1]) {
       if (s === 1 && pawAmt > 0.05) continue // that leg is up in the air
-      const px = Math.round(bx + 0.9 * t + s * legDX)
+      const px = Math.round(bxBase + 0.9 * t + s * legDX)
       if (inB(px, pawY) && fur[idx(px, pawY)]) shade[idx(px, pawY)] = DEEP
     }
   }

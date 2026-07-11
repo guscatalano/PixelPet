@@ -26,11 +26,19 @@ export function generate34Grid(preset, t, state = {}) {
   const fur = new Uint8Array(W * H)
   const set = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
 
+  // --- paw-driven weight shift: body leans away from the raised paw, head
+  // tips back to watch you, each pat rocks the cat. Feet stay planted. ---
+  const pawAmtW = state.paw || 0, pawXW = state.pawX || 0
+  const leanX = -(1.1 * pawAmtW) + 0.35 * pawXW
+  const headUp = 0.9 * pawAmtW - 0.6 * pawXW
+  if (pawAmtW > 0.01) { g.headCy -= headUp; g.eyeY -= headUp; g.noseY -= headUp }
+
   // --- asymmetric geometry (face angled toward viewer-right) ---
-  const hx = g.headCx + 1.3 * t            // head mass eases right
-  const bx = g.bodyCx - 0.7 * t            // rear hints left
-  const noseX = hx + 2.2 * t               // nose travels toward the facing side
-  const noseY = g.noseY + 0.4 * t          // ...and a touch down (muzzle turning)
+  const hx = g.headCx + 1.3 * t + leanX * 1.2
+  const bxBase = g.bodyCx - 0.7 * t        // where the planted feet stay
+  const bx = bxBase + leanX                 // the body mass leans off-side
+  const noseX = hx + 2.2 * t
+  const noseY = g.noseY + 0.4 * t
 
   // --- silhouette: body, tail (near side), legs, neck, head, cheeks, ears ---
   ellipse(set, bx, g.bodyCy, g.bodyRx, g.bodyRy)
@@ -55,7 +63,7 @@ export function generate34Grid(preset, t, state = {}) {
     const legDX = g.bodyRx * 0.3
     const legTop = g.bodyCy + g.bodyRy * 0.32, pawY = g.bodyCy + g.bodyRy * 0.98
     for (const s of [-1, 1]) {
-      const lx = bx + 0.9 * t + s * legDX
+      const lx = bxBase + 0.9 * t + s * legDX // planted — the body leans over them
       if (s === 1 && pawAmt > 0.05) {
         const setPaw = (x, y) => { set(x, y); if (inB(x, y)) pawMask[idx(x, y)] = 1 }
         for (let k = 0; k <= 1.001; k += 0.25) ellipse(setPaw, bx + 3 + (pawPx - 0.4 - (bx + 3)) * k, legTop + 1.5 + (pawPy + 2 - (legTop + 1.5)) * k, 1.8, 1.6)
@@ -96,13 +104,13 @@ export function generate34Grid(preset, t, state = {}) {
     const dx = (x - bx) / 5.5, dy = (y - (g.bodyCy + 2)) / 7.5
     if (dx * dx + dy * dy <= 1 && shade[idx(x, y)] > HI) shade[idx(x, y)] -= 1 }
   { // front-leg crease + toes, shifted with the chest
-    const legDX = g.bodyRx * 0.3, cxp = Math.round(bx + 0.9 * t)
+    const legDX = g.bodyRx * 0.3, cxp = Math.round(bxBase + 0.9 * t)
     const legTop = Math.round(g.bodyCy + g.bodyRy * 0.42), pawY = Math.round(g.bodyCy + g.bodyRy * 0.98)
     for (let y = legTop; y <= pawY; y++) {
       if (inB(cxp, y) && fur[idx(cxp, y)]) shade[idx(cxp, y)] = DEEP
       if (inB(cxp - 1, y) && fur[idx(cxp - 1, y)] && shade[idx(cxp - 1, y)] < SHADOW) shade[idx(cxp - 1, y)] = SHADOW }
     for (const s of [-1, 1]) { if (s === 1 && pawAmt > 0.05) continue
-      const px = Math.round(bx + 0.9 * t + s * legDX)
+      const px = Math.round(bxBase + 0.9 * t + s * legDX)
       if (inB(px, pawY) && fur[idx(px, pawY)]) shade[idx(px, pawY)] = DEEP }
   }
   if (pawAmt > 0.05) {
