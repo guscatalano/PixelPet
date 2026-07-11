@@ -119,6 +119,56 @@
       .pose.off canvas { opacity: 0.3; filter: grayscale(1); }
       .pose.off .pl { text-decoration: line-through; }
       .pose.off .pl::after { content: ' · off'; text-decoration: none; color: var(--accent); }
+
+      /* Delete affordance on user-generated pet cards */
+      .card { position: relative; }
+      .card .del {
+        position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; line-height: 16px;
+        border-radius: 50%; border: 1px solid var(--hair); background: var(--panel-2); color: var(--dim);
+        font-size: 12px; cursor: pointer; display: none; padding: 0;
+      }
+      .card:hover .del { display: block; }
+      .card .del:hover { color: #ff7a7a; border-color: #ff7a7a; }
+
+      /* AI / create-from-photo */
+      .ai { background: var(--panel); border: 1px solid var(--hair); border-radius: 12px; padding: 16px 18px; }
+      .field { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 12px; padding: 5px 0; }
+      .field > label { font-size: 13px; color: var(--dim); }
+      .ai input[type='text'], .ai input[type='password'], .ai select {
+        font-family: var(--sans); font-size: 13px; color: var(--ink); background: var(--panel-2);
+        border: 1px solid var(--hair); border-radius: 8px; padding: 7px 10px; outline: none; width: 100%;
+      }
+      .ai input:focus, .ai select:focus { border-color: var(--accent); }
+      .keyrow { display: flex; gap: 8px; }
+      .keyrow input { flex: 1; }
+      .btn {
+        font-family: var(--sans); font-size: 13px; border-radius: 8px; padding: 7px 14px; cursor: pointer;
+        border: 1px solid var(--hair); background: var(--panel-2); color: var(--ink); white-space: nowrap;
+      }
+      .btn:hover:not(:disabled) { border-color: var(--accent); }
+      .btn.primary { background: var(--accent); color: #23252f; border-color: var(--accent); font-weight: 600; }
+      .btn.primary:hover:not(:disabled) { filter: brightness(1.06); }
+      .btn:disabled { opacity: 0.45; cursor: default; }
+      .drop {
+        margin-top: 10px; border: 1.5px dashed var(--hair); border-radius: 10px; padding: 16px;
+        display: flex; align-items: center; gap: 14px; cursor: pointer; transition: border-color 0.12s;
+      }
+      .drop:hover { border-color: var(--accent); }
+      .drop.has { border-style: solid; }
+      .drop .thumb {
+        width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: var(--panel-2);
+        flex: 0 0 auto; display: none;
+      }
+      .drop.has .thumb { display: block; }
+      .drop .dtext { font-size: 13px; color: var(--dim); }
+      .genrow { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+      .status { font-size: 12.5px; color: var(--dim); min-height: 18px; }
+      .status.ok { color: #8fd08a; }
+      .status.err { color: #ff8a8a; }
+      .status.busy { color: var(--accent); }
+      .keystate { font-size: 12px; font-family: var(--mono); color: var(--faint); margin-top: 4px; }
+      .keystate.saved { color: #8fd08a; }
+      .hint { font-size: 11.5px; color: var(--faint); margin-top: 10px; line-height: 1.45; }
     </style>
   </head>
   <body>
@@ -130,6 +180,52 @@
         <div class="label">Your pet</div>
         <div class="grid" id="grid"></div>
         <div class="petid" id="petid"></div>
+      </section>
+
+      <section>
+        <div class="label">Create from a photo</div>
+        <div class="ai">
+          <div class="field">
+            <label for="aiprovider">Provider</label>
+            <select id="aiprovider">
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="aimodel">Model</label>
+            <input type="text" id="aimodel" spellcheck="false" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="aiendpoint">Endpoint</label>
+            <input type="text" id="aiendpoint" spellcheck="false" autocomplete="off" placeholder="(default)" />
+          </div>
+          <div class="field">
+            <label for="aikey">API key</label>
+            <div class="keyrow">
+              <input type="password" id="aikey" spellcheck="false" autocomplete="off" placeholder="sk-…" />
+              <button class="btn" id="aisavekey">Save</button>
+              <button class="btn" id="aitest">Test</button>
+            </div>
+          </div>
+          <div class="keystate" id="aikeystate"></div>
+
+          <div class="drop" id="aidrop">
+            <img class="thumb" id="aithumb" alt="" />
+            <div class="dtext" id="aidroptext">Click to choose a photo of a cat…</div>
+          </div>
+          <input type="file" id="aifile" accept="image/png,image/jpeg,image/webp" hidden />
+
+          <div class="genrow">
+            <button class="btn primary" id="aigen" disabled>Generate cat</button>
+            <div class="status" id="aistatus"></div>
+          </div>
+          <div class="hint">
+            Your photo is sent to the provider you chose to describe the cat's colors, build, and vibe — then
+            drawn as a pixel pet here. The key is stored encrypted on this PC and never leaves it except to call
+            that provider.
+          </div>
+        </div>
       </section>
 
       <section>

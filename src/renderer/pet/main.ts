@@ -2,7 +2,7 @@ import { SPRITE_H, SPRITE_TOP, SPRITE_W } from '../../shared/constants'
 import { generateGrid, generateWalkGrid, render as renderPet, setFrontScale, type AnimState, type Pet } from '../../shared/catgen'
 import { generateRigGrid, lerpPose, POSES, type RigPose } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
-import { DEFAULT_PET, PETS } from '../../shared/pets'
+import { DEFAULT_PET } from '../../shared/pets'
 import type { ClipName, Facing, PetConfig, PlayCommand, TriggerEvent } from '../../shared/types'
 
 // ---- Bridge typing (exposed by preload) ------------------------------------
@@ -15,7 +15,7 @@ interface PetApi {
   stateReached: (clip: string) => void
   onPlay: (handler: (cmd: PlayCommand) => void) => void
   onWalkStep: (handler: (step: number) => void) => void
-  onSetPet: (handler: (petId: string) => void) => void
+  onSetPet: (handler: (pet: Pet) => void) => void
   onConfig: (handler: (cfg: PetConfig) => void) => void
 }
 declare global {
@@ -527,9 +527,9 @@ applyScale()
 window.addEventListener('resize', applyScale)
 
 // Swap the active pet at runtime: regenerate all frames + the hit mask.
-window.pet.onSetPet((petId: string) => {
-  const next = PETS.find((p) => p.id === petId)
-  if (!next || next === activePet) return
+window.pet.onSetPet((next: Pet) => {
+  // Main sends the full spec (built-in or user-generated), so no roster lookup.
+  if (!next || next.id === activePet.id) return
   activePet = next
   frontCache.clear()
   walkCache.clear()

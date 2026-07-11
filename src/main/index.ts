@@ -1,11 +1,17 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'node:path'
-import type { AppSettings, ClipName, Personality, TriggerEvent } from '../shared/types'
+import type { AppSettings, AiConfig, AiStatus, ClipName, Personality, TriggerEvent } from '../shared/types'
 import { MIN_SCALE, MAX_SCALE, petWindowSize } from '../shared/constants'
 import { createTray } from './tray'
 import { PetEngine } from './behavior/engine'
-import { loadSettings, saveSettings, effectivePersonality, MIN_TURN_MS, MAX_TURN_MS, MIN_FRONT_SCALE, MAX_FRONT_SCALE } from './settings'
+import {
+  loadSettings, saveSettings, effectivePersonality, findPet, AI_PROVIDERS,
+  MIN_TURN_MS, MAX_TURN_MS, MIN_FRONT_SCALE, MAX_FRONT_SCALE
+} from './settings'
 import { setSelfWindow } from './desktop/windows'
+import { testConnection, DEFAULT_MODEL, DEFAULT_ENDPOINT, type VisionConfig } from './ai/providers'
+import { generatePetFromPhotos, dataUrlToImage } from './ai/petGenerator'
+import { saveApiKey, loadApiKey, hasApiKey, clearApiKey, encryptionAvailable } from './ai/secrets'
 
 let petWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
@@ -73,9 +79,10 @@ function createPetWindow(): BrowserWindow {
     engine.setStayPut(settings.stayPut)
     engine.setDisabled(settings.disabledAnims)
     engine.start()
-    // Tell the renderer which pet to draw (it boots on the default cat) and
+    // Tell the renderer which pet to draw (the full spec, so user-generated pets
+    // — absent from the built-in PETS the renderer imports — render too) and
     // push the live-tunable animation config.
-    win.webContents.send('pet:set-pet', settings.activePetId)
+    win.webContents.send('pet:set-pet', findPet(settings, settings.activePetId))
     win.webContents.send('pet:set-config', { turnMs: settings.turnMs, frontScale: settings.frontScale })
   })
 
@@ -176,8 +183,26 @@ function openSettings(): void {
 
 /** Swap the active pet: redraw in the renderer + retune the behavior engine. */
 function applyActivePet(): void {
-  petWindow?.webContents.send('pet:set-pet', settings.activePetId)
+  petWindow?.webContents.send('pet:set-pet', findPet(settings, settings.activePetId))
   if (engine) engine.personality = effectivePersonality(settings, settings.activePetId)
+}
+
+/** Non-secret AI status for the settings UI. */
+function aiStatus(): AiStatus {
+  return {
+    provider: settings.ai.provider,
+    model: settings.ai.model,
+    endpoint: settings.ai.endpoint ?? DEFAULT_ENDPOINT[settings.ai.provider],
+    hasKey: hasApiKey(),
+    encryptionAvailable: encryptionAvailable()
+  }
+}
+
+/** Assemble the vision config from settings + the stored key; null if no key. */
+function visionConfig(): VisionConfig | null {
+  const key = loadApiKey()
+  if (!key) return null
+  return { provider: settings.ai.provider, apiKey: key, model: settings.ai.model, endpoint: settings.ai.endpoint }
 }
 
 /** Resize the pet window to a new scale, keeping the pet's feet anchored. */
@@ -263,6 +288,53 @@ function registerIpc(): void {
     delete settings.overrides[petId]
     saveSettings(settings)
     applyPersonality(petId)
+  })
+
+  // ---- AI / generate-from-photo channels ----
+  ipcMain.handle('ai:status', () => aiStatus())
+  ipcMain.on('ai:set-config', (_e, cfg: Partial<AiConfig>) => {
+    if (cfg.provider && (AI_PROVIDERS as string[]).includes(cfg.provider)) settings.ai.provider = cfg.provider
+    if (typeof cfg.model === 'string') settings.ai.model = cfg.model.trim() || DEFAULT_MODEL[settings.ai.provider]
+    settings.ai.endpoint = typeof cfg.endpoint === 'string' && cfg.endpoint.trim() ? cfg.endpoint.trim() : undefined
+    saveSettings(settings)
+  })
+  ipcMain.handle('ai:set-key', (_e, key: string) => {
+    saveApiKey(typeof key === 'string' ? key.trim() : '')
+    return aiStatus()
+  })
+  ipcMain.handle('ai:clear-key', () => {
+    clearApiKey()
+    return aiStatus()
+  })
+  ipcMain.handle('ai:test', async () => {
+    const cfg = visionConfig()
+    if (!cfg) return { ok: false, message: 'No API key saved.' }
+    return testConnection(cfg)
+  })
+  ipcMain.handle('ai:generate', async (_e, dataUrls: string[]) => {
+    const cfg = visionConfig()
+    if (!cfg) return { ok: false, error: 'No API key saved. Add one above first.' }
+    if (!Array.isArray(dataUrls) || !dataUrls.length) return { ok: false, error: 'No photo provided.' }
+    try {
+      const images = dataUrls.slice(0, 3).map(dataUrlToImage)
+      const pet = await generatePetFromPhotos(images, cfg)
+      settings.userPets.push(pet)
+      settings.activePetId = pet.id
+      saveSettings(settings)
+      applyActivePet()
+      return { ok: true, pet }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  ipcMain.on('pets:delete-user', (_e, petId: string) => {
+    const i = settings.userPets.findIndex((p) => p.id === petId)
+    if (i < 0) return
+    settings.userPets.splice(i, 1)
+    delete settings.overrides[petId]
+    if (settings.activePetId === petId) settings.activePetId = 'ash'
+    saveSettings(settings)
+    applyActivePet()
   })
 }
 

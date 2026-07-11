@@ -3,7 +3,9 @@ import { generateRigGrid, lerpPose, POSES as RIG } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
 import { PETS, type AppPet } from '../../shared/pets'
 import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
-import { TRAIT_KEYS, TOGGLEABLE_ANIMS, type AppSettings, type ClipName, type Personality } from '../../shared/types'
+import { TRAIT_KEYS, TOGGLEABLE_ANIMS, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Personality } from '../../shared/types'
+
+type GenResult = { ok: true; pet: AppPet } | { ok: false; error: string }
 
 // ---- Bridge typing (exposed by preload/settings.ts) ------------------------
 interface SettingsApi {
@@ -16,6 +18,13 @@ interface SettingsApi {
   setDisabledAnims: (disabled: ClipName[]) => void
   setTrait: (petId: string, key: keyof Personality, value: number) => void
   resetTraits: (petId: string) => void
+  aiStatus: () => Promise<AiStatus>
+  setAiConfig: (cfg: Partial<AiConfig>) => void
+  setAiKey: (key: string) => Promise<AiStatus>
+  clearAiKey: () => Promise<AiStatus>
+  testAi: () => Promise<{ ok: boolean; message: string }>
+  generateFromPhotos: (dataUrls: string[]) => Promise<GenResult>
+  deleteUserPet: (petId: string) => void
 }
 declare global {
   interface Window { settings: SettingsApi }
@@ -29,6 +38,11 @@ const posesEl = $('poses'), poseWho = $('poseWho'), petid = $('petid'), mod = $(
 
 let state: AppSettings
 
+/** The full roster shown in the picker: built-in presets plus user-generated pets. */
+const roster = (): AppPet[] => [...PETS, ...(state.userPets ?? [])]
+const findPet = (id: string): AppPet => roster().find((p) => p.id === id) ?? PETS[0]
+const isUserPet = (id: string): boolean => (state.userPets ?? []).some((p) => p.id === id)
+
 /** True if the active pet has any user-customized traits. */
 function isCustomized(petId: string): boolean {
   const ov = state.overrides[petId]
@@ -37,7 +51,7 @@ function isCustomized(petId: string): boolean {
 
 /** Reflect the active pet's identity + whether its traits are customized. */
 function refreshMeta(): void {
-  const pet = PETS.find((p) => p.id === state.activePetId)!
+  const pet = findPet(state.activePetId)
   petid.replaceChildren(Object.assign(document.createElement('b'), { textContent: pet.name }),
     document.createTextNode(` — ${pet.blurb}`))
   poseWho.textContent = pet.name
@@ -181,8 +195,8 @@ function animatePoses(t: number): void {
   requestAnimationFrame(animatePoses)
   if (t - poseLast < 66) return // ~15fps is plenty for these gentle loops
   poseLast = t
-  const pet = PETS.find((p) => p.id === state?.activePetId)
-  if (!pet) return
+  if (!state) return
+  const pet = findPet(state.activePetId)
   POSES.forEach((pose, i) => {
     const cx = poseCanvases[i]
     if (!cx) return
@@ -195,13 +209,13 @@ function animatePoses(t: number): void {
 
 /** A pet's effective traits: preset defaults merged with the user's overrides. */
 function effective(petId: string): Personality {
-  const pet = PETS.find((p) => p.id === petId)!
+  const pet = findPet(petId)
   return { ...pet.personality, ...(state.overrides[petId] ?? {}) }
 }
 
 /** Render a pet's idle frame into a small canvas thumbnail. */
 function thumbnail(petId: string): HTMLCanvasElement {
-  const pet = PETS.find((p) => p.id === petId)!
+  const pet = findPet(petId)
   const rgba = renderPet(generateGrid(pet, { eyeOpen: true, tailPhase: 0.3 }), pet.coat)
   const c = document.createElement('canvas')
   c.width = SPRITE_W
@@ -215,7 +229,7 @@ function thumbnail(petId: string): HTMLCanvasElement {
 
 function buildGrid(): void {
   grid.innerHTML = ''
-  for (const pet of PETS) {
+  for (const pet of roster()) {
     const card = document.createElement('div')
     card.className = 'card' + (pet.id === state.activePetId ? ' active' : '')
     card.dataset.id = pet.id
@@ -232,6 +246,22 @@ function buildGrid(): void {
     card.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPet(pet.id) }
     })
+    if (isUserPet(pet.id)) {
+      const del = document.createElement('button')
+      del.className = 'del'
+      del.textContent = '×' // ×
+      del.title = `Delete ${pet.name}`
+      del.addEventListener('click', (e) => {
+        e.stopPropagation()
+        window.settings.deleteUserPet(pet.id)
+        state.userPets = (state.userPets ?? []).filter((p) => p.id !== pet.id)
+        if (state.activePetId === pet.id) state.activePetId = 'ash'
+        buildGrid()
+        buildTraits()
+        refreshMeta()
+      })
+      card.append(del)
+    }
     grid.append(card)
   }
 }
@@ -252,7 +282,7 @@ function buildSizes(): void {
 }
 
 function buildTraits(): void {
-  const pet = PETS.find((p) => p.id === state.activePetId)!
+  const pet = findPet(state.activePetId)
   who.textContent = pet.name
   const eff = effective(pet.id)
   rows.innerHTML = ''
@@ -334,12 +364,107 @@ function buildAnimation(): void {
   })
 }
 
+const DEFAULT_MODELS: Record<AiProviderId, string> = { openai: 'gpt-4o', anthropic: 'claude-sonnet-5' }
+
+function buildAi(): void {
+  const provider = $<HTMLSelectElement>('aiprovider')
+  const model = $<HTMLInputElement>('aimodel')
+  const endpoint = $<HTMLInputElement>('aiendpoint')
+  const key = $<HTMLInputElement>('aikey')
+  const saveKey = $<HTMLButtonElement>('aisavekey')
+  const test = $<HTMLButtonElement>('aitest')
+  const keystate = $('aikeystate')
+  const drop = $('aidrop'), thumb = $<HTMLImageElement>('aithumb'), droptext = $('aidroptext')
+  const file = $<HTMLInputElement>('aifile'), gen = $<HTMLButtonElement>('aigen'), status = $('aistatus')
+
+  let chosen: string | null = null // data URL of the selected photo
+  const setStatus = (msg: string, cls = ''): void => { status.textContent = msg; status.className = 'status' + (cls ? ' ' + cls : '') }
+  const paintKeyState = (st: AiStatus): void => {
+    keystate.textContent = st.hasKey
+      ? '✓ key saved' + (st.encryptionAvailable ? ' (encrypted on this PC)' : ' (stored plaintext — OS encryption unavailable)')
+      : 'No key saved yet.'
+    keystate.className = 'keystate' + (st.hasKey ? ' saved' : '')
+  }
+  const pushConfig = (): void => window.settings.setAiConfig({
+    provider: provider.value as AiProviderId, model: model.value, endpoint: endpoint.value
+  })
+  // If a key was typed but not explicitly saved, persist it before a call.
+  const flushKey = async (): Promise<void> => {
+    if (!key.value.trim()) return
+    const st = await window.settings.setAiKey(key.value.trim())
+    key.value = ''
+    paintKeyState(st)
+  }
+
+  window.settings.aiStatus().then((st) => {
+    provider.value = st.provider
+    model.value = st.model
+    endpoint.value = /api\.(openai|anthropic)\.com/.test(st.endpoint) ? '' : st.endpoint
+    paintKeyState(st)
+  })
+
+  provider.addEventListener('change', () => {
+    const other = provider.value === 'openai' ? DEFAULT_MODELS.anthropic : DEFAULT_MODELS.openai
+    if (!model.value.trim() || model.value.trim() === other) model.value = DEFAULT_MODELS[provider.value as AiProviderId]
+    pushConfig()
+  })
+  model.addEventListener('change', pushConfig)
+  endpoint.addEventListener('change', pushConfig)
+
+  saveKey.addEventListener('click', async () => {
+    if (!key.value.trim()) { setStatus('Enter a key first.', 'err'); return }
+    pushConfig()
+    await flushKey()
+    setStatus('Key saved.', 'ok')
+  })
+  test.addEventListener('click', async () => {
+    pushConfig()
+    await flushKey()
+    setStatus('Testing…', 'busy')
+    const r = await window.settings.testAi()
+    setStatus(r.message, r.ok ? 'ok' : 'err')
+  })
+
+  drop.addEventListener('click', () => file.click())
+  file.addEventListener('change', () => {
+    const f = file.files?.[0]
+    if (!f) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      chosen = String(reader.result)
+      thumb.src = chosen
+      drop.classList.add('has')
+      droptext.textContent = f.name
+      gen.disabled = false
+    }
+    reader.readAsDataURL(f)
+  })
+
+  gen.addEventListener('click', async () => {
+    if (!chosen) return
+    pushConfig()
+    await flushKey()
+    gen.disabled = true
+    setStatus('Generating… this can take a few seconds.', 'busy')
+    const r = await window.settings.generateFromPhotos([chosen])
+    gen.disabled = false
+    if (!r.ok) { setStatus(r.error, 'err'); return }
+    setStatus(`Created ${r.pet.name} — added to your pets and made active.`, 'ok')
+    state = await window.settings.get() // main added the pet + made it active
+    buildGrid()
+    buildTraits()
+    refreshMeta()
+    grid.querySelector('.card.active')?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
 async function init(): Promise<void> {
   state = await window.settings.get()
   buildGrid()
   buildPoses()
   buildSizes()
   buildAnimation()
+  buildAi()
   buildTraits()
   refreshMeta()
   // Make sure the current cat is visible even if it's far down the grid.

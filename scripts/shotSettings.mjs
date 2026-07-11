@@ -10,8 +10,14 @@ const root = resolve(__dirname, '..')
 const outPath = resolve(process.argv[2] || resolve(root, '.settings.png'))
 
 app.whenReady().then(async () => {
-  ipcMain.handle('settings:get', () => ({ activePetId: 'tiger', scale: 5, turnMs: 80, stayPut: false, frontScale: 0.8, disabledAnims: [], overrides: {} }))
-  for (const ch of ['settings:set-pet', 'settings:set-scale', 'settings:set-trait', 'settings:reset-traits']) {
+  const userPets = process.env.WITHUSERPET ? [{ id: 'user-demo', name: 'Mittens', blurb: 'Your photo cat.', geom: { bodyRx: 15, bodyRy: 12.5 }, marking: 'tuxedo', coat: { primary: '#2b2b32', white: '#f4f4f7', iris: '#e7b24e' }, personality: { energy: 0.6, sleepiness: 0.4, affection: 0.8, mischief: 0.4, curiosity: 0.6, independence: 0.4 } }] : []
+  ipcMain.handle('settings:get', () => ({ activePetId: 'tiger', scale: 5, turnMs: 80, stayPut: false, frontScale: 0.8, disabledAnims: [], ai: { provider: 'openai', model: 'gpt-4o' }, userPets, overrides: {} }))
+  ipcMain.handle('ai:status', () => ({ provider: 'openai', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1', hasKey: !!process.env.WITHKEY, encryptionAvailable: true }))
+  ipcMain.handle('ai:set-key', () => ({ provider: 'openai', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1', hasKey: true, encryptionAvailable: true }))
+  ipcMain.handle('ai:clear-key', () => ({ provider: 'openai', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1', hasKey: false, encryptionAvailable: true }))
+  ipcMain.handle('ai:test', () => ({ ok: true, message: 'Connected to OpenAI (gpt-4o).' }))
+  ipcMain.handle('ai:generate', () => ({ ok: false, error: 'stub' }))
+  for (const ch of ['settings:set-pet', 'settings:set-scale', 'settings:set-trait', 'settings:reset-traits', 'ai:set-config', 'pets:delete-user']) {
     ipcMain.on(ch, (_e, arg) => console.log(`[ipc] ${ch}`, JSON.stringify(arg)))
   }
 

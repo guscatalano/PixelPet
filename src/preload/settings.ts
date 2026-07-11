@@ -1,5 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppSettings, ClipName, Personality } from '../shared/types'
+import type { AppSettings, AiConfig, AiStatus, ClipName, Personality } from '../shared/types'
+import type { AppPet } from '../shared/pets'
+
+type GenResult = { ok: true; pet: AppPet } | { ok: false; error: string }
 
 // Typed bridge exposed to the settings window as `window.settings`.
 const api = {
@@ -21,7 +24,23 @@ const api = {
   setTrait: (petId: string, key: keyof Personality, value: number): void =>
     ipcRenderer.send('settings:set-trait', { petId, key, value }),
   /** Reset a pet's personality back to its preset defaults. */
-  resetTraits: (petId: string): void => ipcRenderer.send('settings:reset-traits', petId)
+  resetTraits: (petId: string): void => ipcRenderer.send('settings:reset-traits', petId),
+
+  // ---- AI / generate-from-photo ----
+  /** Current AI status (provider/model/endpoint/hasKey/encryption); never the key. */
+  aiStatus: (): Promise<AiStatus> => ipcRenderer.invoke('ai:status'),
+  /** Persist non-secret AI config (provider/model/endpoint). */
+  setAiConfig: (cfg: Partial<AiConfig>): void => ipcRenderer.send('ai:set-config', cfg),
+  /** Save (encrypt) the API key; returns refreshed status. */
+  setAiKey: (key: string): Promise<AiStatus> => ipcRenderer.invoke('ai:set-key', key),
+  /** Forget the stored API key; returns refreshed status. */
+  clearAiKey: (): Promise<AiStatus> => ipcRenderer.invoke('ai:clear-key'),
+  /** Cheap credentials/model check. */
+  testAi: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('ai:test'),
+  /** Generate a pet from photo data URLs; on success it's added + made active. */
+  generateFromPhotos: (dataUrls: string[]): Promise<GenResult> => ipcRenderer.invoke('ai:generate', dataUrls),
+  /** Delete a user-generated pet. */
+  deleteUserPet: (petId: string): void => ipcRenderer.send('pets:delete-user', petId)
 }
 
 contextBridge.exposeInMainWorld('settings', api)
