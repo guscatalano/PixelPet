@@ -37,6 +37,22 @@
       h1 { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; }
       .sub { color: var(--dim); font-size: 12.5px; margin-top: 2px; }
       section { margin-top: 26px; }
+
+      /* Tab bar + search */
+      .navbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+      .tabs { display: inline-flex; gap: 2px; background: var(--panel); border: 1px solid var(--hair); border-radius: 11px; padding: 3px; }
+      .tabs button {
+        font-family: var(--sans); font-size: 13px; color: var(--dim); background: transparent;
+        border: 0; border-radius: 8px; padding: 6px 14px; cursor: pointer; transition: background 0.12s, color 0.12s;
+      }
+      .tabs button:hover { color: var(--ink); }
+      .tabs button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+      #search {
+        font-family: var(--sans); font-size: 13px; color: var(--ink); background: var(--panel);
+        border: 1px solid var(--hair); border-radius: 9px; padding: 7px 12px; outline: none; width: 180px; flex: 0 1 auto;
+      }
+      #search:focus { border-color: var(--accent); }
+      .noresults { color: var(--faint); font-size: 13px; padding: 20px 4px; }
       .label {
         font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
         text-transform: uppercase; color: var(--faint); margin-bottom: 12px;
@@ -220,7 +236,18 @@
       <h1>PixelPet Settings</h1>
       <div class="sub">Pick your desktop cat, size it, and tune how it behaves.</div>
 
-      <details class="sec" open>
+      <div class="navbar">
+        <div class="tabs" id="tabs">
+          <button data-tab="pet" class="on">Pet</button>
+          <button data-tab="anim">Animations</button>
+          <button data-tab="care">Care</button>
+          <button data-tab="dreams">Dreams</button>
+        </div>
+        <input type="search" id="search" placeholder="Search settings…" spellcheck="false" autocomplete="off" />
+      </div>
+      <div class="noresults" id="noresults" style="display: none">No settings match that search.</div>
+
+      <details class="sec" open data-tab="pet">
         <summary class="label">Your pet</summary>
         <div class="seg" id="gridfilter" style="margin-bottom: 10px">
           <button data-f="all" class="on">All</button>
@@ -232,7 +259,7 @@
         <div class="petid" id="petid"></div>
       </details>
 
-      <details class="sec">
+      <details class="sec" data-tab="pet">
         <summary class="label">Create from a photo</summary>
         <div class="ai">
           <div class="field">
@@ -278,17 +305,17 @@
         </div>
       </details>
 
-      <details class="sec" open>
+      <details class="sec" open data-tab="anim">
         <summary class="label">Animations &middot; <span id="poseWho">Ash</span> &middot; <span style="text-transform: none; letter-spacing: 0">click a tile to play it on your cat &middot; corner dot turns it on/off</span></summary>
         <div class="poses" id="poses"></div>
       </details>
 
-      <details class="sec" open>
+      <details class="sec" open data-tab="pet">
         <summary class="label">Size</summary>
         <div class="seg" id="sizes"></div>
       </details>
 
-      <details class="sec" open>
+      <details class="sec" open data-tab="anim">
         <summary class="label">Animation &amp; behavior</summary>
         <div class="traits">
           <div class="trow">
@@ -324,7 +351,7 @@
         </div>
       </details>
 
-      <details class="sec">
+      <details class="sec" data-tab="care">
         <summary class="label">Care mode</summary>
         <div class="care">
           <div class="carehead">
@@ -350,7 +377,7 @@
         </div>
       </details>
 
-      <details class="sec">
+      <details class="sec" data-tab="dreams">
         <summary class="label">Dream photos &middot; Immich album</summary>
         <div class="ai">
           <div class="field">
@@ -378,7 +405,7 @@
         </div>
       </details>
 
-      <details class="sec">
+      <details class="sec" data-tab="pet">
         <summary class="label">Personality</summary>
         <div class="traits">
           <div class="traits-head">

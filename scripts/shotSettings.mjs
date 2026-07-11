@@ -18,6 +18,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('ai:clear-key', () => ({ provider: 'openai', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1', hasKey: false, encryptionAvailable: true }))
   ipcMain.handle('ai:test', () => ({ ok: true, message: 'Connected to OpenAI (gpt-4o).' }))
   ipcMain.handle('ai:generate', () => ({ ok: false, error: 'stub' }))
+  ipcMain.handle('immich:status', () => ({ serverUrl: '', albumId: '', hasKey: false }))
   for (const ch of ['settings:set-pet', 'settings:set-scale', 'settings:set-trait', 'settings:reset-traits', 'ai:set-config', 'pets:delete-user', 'settings:set-pupils', 'settings:set-caremode', 'settings:set-difficulty', 'care:action', 'settings:set-dreammode']) {
     ipcMain.on(ch, (_e, arg) => console.log(`[ipc] ${ch}`, JSON.stringify(arg)))
   }

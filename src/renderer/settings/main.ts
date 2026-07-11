@@ -296,6 +296,40 @@ function thumbnail(petId: string): HTMLCanvasElement {
   return c
 }
 
+// Tab navigation + search across the settings sections.
+function buildNav(): void {
+  const tabsBar = $('tabs')
+  const search = $<HTMLInputElement>('search')
+  const secs = Array.from(document.querySelectorAll<HTMLDetailsElement>('details.sec'))
+  let activeTab = 'pet'
+  const showTab = (): void => {
+    $('noresults').style.display = 'none'
+    for (const s of secs) s.style.display = s.dataset.tab === activeTab ? '' : 'none'
+  }
+  for (const b of Array.from(tabsBar.querySelectorAll('button'))) {
+    b.addEventListener('click', () => {
+      activeTab = (b as HTMLElement).dataset.tab as string
+      for (const c of tabsBar.children) c.classList.toggle('on', c === b)
+      showTab()
+    })
+  }
+  const runSearch = (): void => {
+    const q = search.value.trim().toLowerCase()
+    if (!q) { tabsBar.style.display = ''; showTab(); return }
+    tabsBar.style.display = 'none'
+    let any = false
+    for (const s of secs) {
+      const match = (s.textContent ?? '').toLowerCase().includes(q)
+      s.style.display = match ? '' : 'none'
+      if (match) { s.open = true; any = true }
+    }
+    $('noresults').style.display = any ? 'none' : 'block'
+  }
+  search.addEventListener('input', runSearch)
+  search.addEventListener('search', runSearch)
+  showTab()
+}
+
 type GridFilter = 'all' | 'builtin' | 'user'
 let gridFilter: GridFilter = 'all'
 
@@ -703,6 +737,7 @@ function buildImmich(): void {
 
 async function init(): Promise<void> {
   state = await window.settings.get()
+  buildNav()
   buildGridFilter()
   buildGrid()
   buildPoses()
