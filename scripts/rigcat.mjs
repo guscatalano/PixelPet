@@ -56,11 +56,13 @@ export function generateRigGrid(_pet, pose) {
   if (pose.body2) ellipse(set, pose.body2[0], pose.body2[1], pose.body2[2], pose.body2[3]) // optional 2nd mass (e.g. raised rear in a stretch)
   ellipse(set, pose.neck[0], pose.neck[1], pose.neck[2], pose.neck[3]) // neck
   ellipse(set, hcx, hcy, hr * 1.02, hr * 0.98) // round head (our cat's head)
-  triangle(set, hcx - 4, hcy - hr + 2, hcx, hcy - hr + 2, hcx - 4.5, hcy - hr - 4) // back ear
-  triangle(set, hcx + 1, hcy - hr + 2, hcx + 5, hcy - hr + 2, hcx + 4, hcy - hr - 4) // front ear
+  const perk = pose.earPerk ?? 0 // 0 = normal; 1 = ears fully perked (taller, more upright)
+  triangle(set, hcx - 4, hcy - hr + 2, hcx, hcy - hr + 2, hcx - 4.5 + perk * 0.8, hcy - hr - 4 - perk * 3)
+  triangle(set, hcx + 1, hcy - hr + 2, hcx + 5, hcy - hr + 2, hcx + 4 - perk * 0.8, hcy - hr - 4 - perk * 3)
   { const p0 = pose.tail.root, p1 = pose.tail.ctrl, p2 = pose.tail.tip
+    const tr = pose.tailR ?? 2.6 // base tail radius; crank it up for the scared poof
     for (let t = 0; t <= 1.0001; t += 0.05) { const it = 1 - t
-      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], 2.6 - t * 1.1, 2.6 - t * 1.1) } }
+      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], tr - t * 1.1, tr - t * 1.1) } }
   pose.legs.filter((l) => l.near).forEach(drawLeg) // near legs on top
 
   const shade = new Uint8Array(W * H), region = new Uint8Array(W * H), overlay = new Uint8Array(W * H)
@@ -133,17 +135,96 @@ export const POSES = {
       { hip: [28, 39], mid: [29, 41], foot: [27, 42], near: true }
     ]
   },
-  // The bread loaf: a smooth mound with all four paws tucked underneath
-  // (the legs are posed fully inside the body silhouette, so they vanish),
-  // head up and content, tail wrapped along the base.
+  // The bread loaf: a smooth rounded mound with all four paws tucked underneath
+  // (the legs are posed fully inside the body silhouette, so they vanish). The
+  // head sits LOW with the chin resting on the mound — proper brioche, not a
+  // craned neck — tail wrapped along the base.
   loaf: {
-    body: [21, 36, 13.5, 6.8], head: [33, 26, 7], neck: [29, 31, 6, 5],
-    tail: { root: [8, 38], ctrl: [9, 44], tip: [25, 42.5] }, eye: 1,
+    body: [21, 35.5, 13.5, 7.2], head: [32, 27, 7], neck: [29, 31.5, 6.5, 5.5],
+    tail: { root: [8, 38], ctrl: [9, 44], tip: [26, 42.5] }, eye: 1,
     legs: [
-      { hip: [15, 37], mid: [13, 40], foot: [16, 41.5], near: false }, // all tucked under —
-      { hip: [28, 37], mid: [28, 40], foot: [27, 41.5], near: false }, // inside the mound
-      { hip: [17, 37], mid: [15, 40], foot: [18, 41.5], near: true },
-      { hip: [30, 37], mid: [30, 40], foot: [29, 41.5], near: true }
+      { hip: [15, 37], mid: [13, 40], foot: [16, 41], near: false }, // all tucked under —
+      { hip: [28, 37], mid: [28, 40], foot: [27, 41], near: false }, // inside the mound
+      { hip: [17, 37], mid: [15, 40], foot: [18, 41], near: true },
+      { hip: [30, 37], mid: [30, 40], foot: [29, 41], near: true }
+    ]
+  },
+  // Washing up: sitting, one front paw raised to the mouth, head dipped toward
+  // it, eyes squeezed in concentration. Lerp groom <-> groomLick for the licks.
+  groom: {
+    body: [17, 31, 11, 8], head: [31, 24, 7], neck: [26, 28, 6, 5.5],
+    tail: { root: [7, 33], ctrl: [7, 42], tip: [22, 42] }, eye: 0,
+    legs: [
+      { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false },
+      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: false }, // far paw planted
+      { hip: [16, 34], mid: [12, 39], foot: [21, 42], near: true },
+      { hip: [29, 33], mid: [32.5, 30.5], foot: [31.5, 28.5], near: true } // near paw up at the mouth
+    ]
+  },
+  groomLick: {
+    body: [17, 31, 11, 8], head: [31, 25.2, 7], neck: [26, 28.5, 6, 5.5],
+    tail: { root: [7, 33], ctrl: [7, 42], tip: [23, 41.5] }, eye: 0,
+    legs: [
+      { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false },
+      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: false },
+      { hip: [16, 34], mid: [12, 39], foot: [21, 42], near: true },
+      { hip: [29, 33], mid: [32.5, 31], foot: [31.5, 29.2], near: true } // paw meets the dip
+    ]
+  },
+  // Pre-pounce crouch: body flat and low, head locked forward, tail low.
+  // Lerp crouch <-> crouchWiggle for the butt-wiggle.
+  crouch: {
+    body: [19, 35, 11.5, 5.8], head: [32, 30, 7], neck: [27, 32, 5.5, 4.5],
+    tail: { root: [8, 34], ctrl: [3, 30], tip: [4, 22] }, eye: 1,
+    legs: [
+      { hip: [15, 37], mid: [11, 40], foot: [15, GROUND], near: false },
+      { hip: [27, 37], mid: [27, 40], foot: [27, GROUND], near: false },
+      { hip: [17, 37], mid: [13, 40], foot: [17, GROUND], near: true },
+      { hip: [29, 37], mid: [29, 40], foot: [29, GROUND], near: true }
+    ]
+  },
+  crouchWiggle: {
+    body: [19, 34, 11.5, 6.2], head: [32, 30.2, 7], neck: [27, 32, 5.5, 4.5],
+    tail: { root: [8, 33], ctrl: [3, 28], tip: [6, 20] }, eye: 1,
+    legs: [
+      { hip: [15, 36], mid: [11, 40], foot: [15, GROUND], near: false },
+      { hip: [27, 37], mid: [27, 40], foot: [27, GROUND], near: false },
+      { hip: [17, 36], mid: [13, 40], foot: [17, GROUND], near: true },
+      { hip: [29, 37], mid: [29, 40], foot: [29, GROUND], near: true }
+    ]
+  },
+  // Airborne mid-pounce: body extended, front paws reaching, hind legs trailing.
+  pounce: {
+    body: [22, 30, 11, 6], head: [35, 25, 7], neck: [29, 28, 5.5, 5],
+    tail: { root: [11, 29], ctrl: [5, 26], tip: [2, 18] }, eye: 1,
+    legs: [
+      { hip: [13, 32], mid: [9, 36], foot: [6, 39], near: false },  // hind trailing
+      { hip: [30, 32], mid: [35, 34], foot: [39, 37], near: false }, // front reaching
+      { hip: [15, 32], mid: [11, 36], foot: [8, 39], near: true },
+      { hip: [32, 32], mid: [37, 34], foot: [41, 37], near: true }
+    ]
+  },
+  // Landing: compressed onto bent front legs.
+  land: {
+    body: [22, 34.5, 10.5, 6], head: [34, 29.5, 7], neck: [29, 32, 5.5, 4.5],
+    tail: { root: [10, 32], ctrl: [4, 28], tip: [5, 20] }, eye: 1,
+    legs: [
+      { hip: [16, 36], mid: [12, 40], foot: [14, GROUND], near: false },
+      { hip: [29, 36], mid: [31, 40], foot: [32, GROUND], near: false },
+      { hip: [18, 36], mid: [14, 40], foot: [16, GROUND], near: true },
+      { hip: [31, 36], mid: [33, 40], foot: [34, GROUND], near: true }
+    ]
+  },
+  // The Halloween-cat scare: up on straight legs, back arched (body2 bump),
+  // head dipped, and the tail POOFED (tailR way up) in a fat upright curve.
+  poof: {
+    body: [21, 30, 11, 6.5], body2: [20, 27.5, 7, 5], head: [33, 25, 7], neck: [28, 27.5, 5.5, 5],
+    tail: { root: [10, 28], ctrl: [4, 18], tip: [12, 9] }, tailR: 4.4, eye: 1,
+    legs: [
+      { hip: [14, 33], mid: [13.5, 38], foot: [14, GROUND], near: false }, // straight, on tiptoe
+      { hip: [27, 33], mid: [27, 38], foot: [27, GROUND], near: false },
+      { hip: [16, 33], mid: [15.5, 38], foot: [16, GROUND], near: true },
+      { hip: [29, 33], mid: [29, 38], foot: [29, GROUND], near: true }
     ]
   },
   // Teetering at a ledge edge (the edge is to the RIGHT): weight rocked back on

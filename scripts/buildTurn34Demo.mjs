@@ -19,6 +19,7 @@ const lerpPose = (A, B, k) => ({ body: lerpA(A.body, B.body, k), head: lerpA(A.h
   // body2 (e.g. the stretch's raised rear) grows out of / melts into the main body when only one side has it
   body2: (A.body2 || B.body2) ? lerpA(A.body2 || A.body, B.body2 || B.body, k) : undefined,
   tail: { root: lerpA(A.tail.root, B.tail.root, k), ctrl: lerpA(A.tail.ctrl, B.tail.ctrl, k), tip: lerpA(A.tail.tip, B.tail.tip, k) },
+  tailR: lerp(A.tailR ?? 2.6, B.tailR ?? 2.6, k), earPerk: lerp(A.earPerk ?? 0, B.earPerk ?? 0, k),
   eye: lerp(A.eye, B.eye, k), legs: A.legs.map((l, i) => lerpLeg(l, B.legs[i], k)) })
 const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2)
 
@@ -66,7 +67,32 @@ const loaf = Array.from({ length: 8 }, (_, i) => {
   if (i === 5) p.eye = 0 // a slow content blink
   return uri(render(generateRigGrid(ash, p), ash.coat))
 })
-const data = JSON.stringify({ w: W, h: H, walk, sitdown, turn, front, yawn, lie, sleep, stretch, teeterIn, wobble, loafdown, loaf })
+// spooked: from stand into the arched poof-tail scare (tail inflates on the way)
+const spook = Array.from({ length: 4 }, (_, i) => uri(render(generateRigGrid(ash, lerpPose(POSES.stand, POSES.poof, ease((i + 1) / 4))), ash.coat)))
+// washing up: sit -> paw up, then lick bobs (groom <-> groomLick)
+const groomIn = Array.from({ length: 4 }, (_, i) => uri(render(generateRigGrid(ash, lerpPose(POSES.sit, POSES.groom, ease((i + 1) / 4))), ash.coat)))
+const lick = Array.from({ length: 4 }, (_, i) => uri(render(generateRigGrid(ash, lerpPose(POSES.groom, POSES.groomLick, 0.5 + 0.5 * Math.sin((i / 4) * Math.PI * 2))), ash.coat)))
+// ears perking mid-sleep (hover): perk up, hold (head lifts a hair), relax
+const perkKs = [0.45, 1, 1, 1, 0.5, 0]
+const perk = perkKs.map((k, i) => {
+  const p = lerpPose(POSES.curl, POSES.curl, 0)
+  p.earPerk = k
+  if (k === 1) p.head = [p.head[0], p.head[1] - 1, p.head[2]] // listening…
+  return uri(render(generateRigGrid(ash, p), ash.coat))
+})
+// the pounce: crouch -> leap (airborne, oy up) -> land -> recover to stand
+const crouchIn = Array.from({ length: 4 }, (_, i) => uri(render(generateRigGrid(ash, lerpPose(POSES.stand, POSES.crouch, ease((i + 1) / 4))), ash.coat)))
+const wiggleB = Array.from({ length: 4 }, (_, i) => uri(render(generateRigGrid(ash, lerpPose(POSES.crouch, POSES.crouchWiggle, 0.5 + 0.5 * Math.sin((i / 4) * Math.PI * 2))), ash.coat)))
+const leap = [
+  { u: uri(render(generateRigGrid(ash, lerpPose(POSES.crouch, POSES.pounce, 0.5)), ash.coat)), ox: 1, oy: -3 },
+  { u: uri(render(generateRigGrid(ash, POSES.pounce), ash.coat)), ox: 3, oy: -6 },
+  { u: uri(render(generateRigGrid(ash, POSES.pounce), ash.coat)), ox: 5, oy: -4 },
+  { u: uri(render(generateRigGrid(ash, lerpPose(POSES.pounce, POSES.land, 0.6)), ash.coat)), ox: 6, oy: -1 },
+  { u: uri(render(generateRigGrid(ash, POSES.land), ash.coat)), ox: 7, oy: 0 },
+  { u: uri(render(generateRigGrid(ash, lerpPose(POSES.land, POSES.stand, 0.5)), ash.coat)), ox: 4, oy: 0 },
+  { u: uri(render(generateRigGrid(ash, POSES.stand), ash.coat)), ox: 0, oy: 0 }
+]
+const data = JSON.stringify({ w: W, h: H, walk, sitdown, turn, front, yawn, lie, sleep, stretch, teeterIn, wobble, loafdown, loaf, spook, groomIn, lick, perk, leap, crouchIn, wiggleB })
 
 const html = `<title>Ash · walk → sit → face you</title>
 <style>
@@ -90,7 +116,7 @@ const html = `<title>Ash · walk → sit → face you</title>
 </style>
 <div class="card">
   <header><h1>Meet <b>Ash</b> — a full day in the life</h1>
-  <div class="sub">walk → sit → turn to you → rest → <b>yawn</b> → turn away → lie down → sleep → wake → <b>stretch</b> → walk. All articulated / keyframed, our cat's art throughout.</div>
+  <div class="sub">walk → teeter at an edge → <b>poof!</b> → loaf → <b>wash a paw</b> → turn to you → rest → yawn → sleep → <b>ears perk</b> → stretch → butt-wiggle → <b>POUNCE</b>. All articulated / keyframed, our cat's art throughout.</div>
   <div class="now" id="now">walking</div></header>
   <div class="stage"><div class="floor"></div><canvas id="c"></canvas></div>
   <div class="controls"><button id="play">Pause</button><span class="spacer"></span><span class="hint">turn speed <span id="v">80</span>ms/frame</span><input type="range" id="s" min="50" max="220" step="10" value="80"></div>
@@ -102,6 +128,8 @@ const mk=a=>a.map(u=>{const i=new Image();i.src=(typeof u==='string')?u:u.u;retu
 const WALK=mk(D.walk), SIT=mk(D.sitdown), TURN=mk(D.turn), FRONT=mk(D.front);
 const YAWN=mk(D.yawn), LIE=mk(D.lie), SLEEP=mk(D.sleep), STRETCH=mk(D.stretch);
 const TEETIN=mk(D.teeterIn), WOBBLE=mk(D.wobble), LOAFDOWN=mk(D.loafdown), LOAF=mk(D.loaf);
+const SPOOK=mk(D.spook), GROOMIN=mk(D.groomIn), LICK=mk(D.lick), PERK=mk(D.perk), CROUCHIN=mk(D.crouchIn), WIGGLEB=mk(D.wiggleB);
+const LEAP=mk(D.leap), LOFF=D.leap.map(t=>({ox:t.ox,oy:t.oy}));
 const TOFF=D.turn.map(t=>({ox:t.ox,oy:t.oy}));
 function draw(img, ox=0, oy=0){ if(!img||!img.complete) return; ctx.clearRect(0,0,cv.width,cv.height);
   ctx.drawImage(img,0,0,D.w,D.h, ox*S, (2+oy)*S, D.w*S, D.h*S); }
@@ -113,19 +141,28 @@ function phases(){ return [
   { n:'ooh, an edge…',  frames: TEETIN.map(f=>({img:f})), ms:100 },
   { n:'teetering!',     frames: WOBBLE.map(f=>({img:f})), ms:90, loop: 2 },
   { n:'nope — backing up', frames: [...TEETIN].reverse().map(f=>({img:f})), ms:100 },
+  { n:'SPOOKED — poof!!', frames: [...SPOOK.map(f=>({img:f})), {img:SPOOK[3]}, {img:SPOOK[3]}, {img:SPOOK[3]}, {img:SPOOK[3]}], ms:90 },
+  { n:'…phew',          frames: [...SPOOK].reverse().map(f=>({img:f})), ms:130 },
   { n:'sitting down',   frames: SIT.map(f=>({img:f})), ms:95 },
   { n:'bread mode',     frames: LOAFDOWN.map(f=>({img:f})), ms:105 },
   { n:'loafing',        frames: LOAF.map(f=>({img:f})), ms:260, loop: 2 },
   { n:'un-loafing',     frames: [...LOAFDOWN].reverse().map(f=>({img:f})), ms:105 },
+  { n:'washing up',     frames: GROOMIN.map(f=>({img:f})), ms:110 },
+  { n:'lick… lick…',    frames: LICK.map(f=>({img:f})), ms:140, loop: 3 },
+  { n:'done washing',   frames: [...GROOMIN].reverse().map(f=>({img:f})), ms:110 },
   { n:'turning to you', frames: TURN.map((f,i)=>({img:f,ox:TOFF[i].ox,oy:TOFF[i].oy})), ms:turnMs },
   { n:'resting',        frames: FRONT.map(f=>({img:f})), ms:280, loop: 2 },
   { n:'yawning',        frames: YAWN.map(f=>({img:f})), ms:130 },
   { n:'turning away',   frames: [...TURN].reverse().map((f)=>{const i=TURN.indexOf(f);return {img:f,ox:TOFF[i].ox,oy:TOFF[i].oy}}), ms:turnMs },
   { n:'lying down',     frames: LIE.map(f=>({img:f})), ms:105 },
-  { n:'sleeping',       frames: SLEEP.map(f=>({img:f})), ms:300, loop: 3 },
+  { n:'sleeping',       frames: SLEEP.map(f=>({img:f})), ms:300, loop: 2 },
+  { n:'…did you hear something?', frames: PERK.map(f=>({img:f})), ms:170 },
+  { n:'sleeping',       frames: SLEEP.map(f=>({img:f})), ms:300, loop: 1 },
   { n:'waking up',      frames: [...LIE].reverse().map(f=>({img:f})), ms:105 },
   { n:'standing up',    frames: [...SIT].reverse().map(f=>({img:f})), ms:95 },
-  { n:'stretching',     frames: [...STRETCH.map(f=>({img:f})), {img:STRETCH[5]}, {img:STRETCH[5]}, {img:STRETCH[5]}, ...[...STRETCH].reverse().map(f=>({img:f}))], ms:110 }
+  { n:'stretching',     frames: [...STRETCH.map(f=>({img:f})), {img:STRETCH[5]}, {img:STRETCH[5]}, {img:STRETCH[5]}, ...[...STRETCH].reverse().map(f=>({img:f}))], ms:110 },
+  { n:'butt wiggle…',   frames: [...CROUCHIN.map(f=>({img:f})), ...WIGGLEB.map(f=>({img:f})), ...WIGGLEB.map(f=>({img:f})), ...WIGGLEB.map(f=>({img:f}))], ms:100 },
+  { n:'POUNCE!',        frames: LEAP.map((f,i)=>({img:f,ox:LOFF[i].ox,oy:LOFF[i].oy})), ms:85 }
 ]}
 let ph=0, fi=0, li=0, acc=0, last=0
 function loop(now){ requestAnimationFrame(loop); if(!last)last=now; const dt=now-last; last=now; if(!playing)return;
