@@ -104,12 +104,14 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
     ellipse(set, hcx - hr * 0.72, hcy + hr * 0.42, g.cheekFluff * 0.45, g.cheekFluff * 0.35)
   }
   const perk = pose.earPerk ?? 0
-  const earTipL = hcy - hr - (4 + perk * 3) * eH
+  // A perked/alert ear rises only modestly — a small lift, not antennae. (Was
+  // perk*3, which made tall/tufted ears shoot up when hovering the sleeper.)
+  const earTipL = hcy - hr - (3.4 + perk * 1.2) * eH
   triangle(set, hcx - 4 * eW, hcy - hr + 2, hcx, hcy - hr + 2, hcx + (-4.5 + perk * 0.8) * eW, earTipL)
   triangle(set, hcx + 1 * eW, hcy - hr + 2, hcx + 5 * eW, hcy - hr + 2, hcx + (4 - perk * 0.8) * eW, earTipL)
-  if (g.earStyle === 'tufted') { // lynx tufts sprouting from the ear tips
-    triangle(set, hcx - 5 * eW, earTipL + 1.5, hcx - 3.5 * eW, earTipL + 1.5, hcx - 5 * eW, earTipL - 2.6)
-    triangle(set, hcx + 3.3 * eW, earTipL + 1.5, hcx + 4.8 * eW, earTipL + 1.5, hcx + 4.6 * eW, earTipL - 2.6)
+  if (g.earStyle === 'tufted') { // short lynx tufts at the ear tips
+    triangle(set, hcx - 5 * eW, earTipL + 1.5, hcx - 3.5 * eW, earTipL + 1.5, hcx - 5 * eW, earTipL - 1.5)
+    triangle(set, hcx + 3.3 * eW, earTipL + 1.5, hcx + 4.8 * eW, earTipL + 1.5, hcx + 4.6 * eW, earTipL - 1.5)
   }
   {
     const p0 = pose.tail.root, p1 = pose.tail.ctrl, p2 = pose.tail.tip
