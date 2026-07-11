@@ -3,7 +3,7 @@
 // override-able per the locked AI design. Both providers force a tool/function
 // call against DNA_SCHEMA so the model returns structured DNA, not prose.
 
-import { DNA_SCHEMA, SYSTEM_PROMPT, USER_PROMPT, TOOL_NAME } from './prompt'
+import { DNA_SCHEMA, SYSTEM_PROMPT, USER_PROMPT, TOOL_NAME, JSON_SYSTEM_PROMPT, JSON_USER_PROMPT } from './prompt'
 import type { AiProviderId } from '../../shared/types'
 
 export type ProviderId = AiProviderId
@@ -26,6 +26,10 @@ export const PROVIDER_LABEL: Record<ProviderId, string> = {
 const TOOL_DESC = 'Describe the photographed cat as pixel-pet DNA.'
 const base = (cfg: VisionConfig): string => (cfg.endpoint?.trim() || DEFAULT_ENDPOINT[cfg.provider]).replace(/\/$/, '')
 
+/** Auth header — omitted when there's no key (local endpoints like Ollama ignore it). */
+const authHeader = (cfg: VisionConfig): Record<string, string> =>
+  cfg.apiKey ? { authorization: `Bearer ${cfg.apiKey}` } : {}
+
 /** Pull a human-readable message out of a provider error body. */
 function errText(status: number, body: string): string {
   try {
@@ -36,41 +40,53 @@ function errText(status: number, body: string): string {
   return body.slice(0, 300) || `HTTP ${status}`
 }
 
-// ---- OpenAI (Chat Completions + function calling) ---------------------------
+/** Extract a JSON object from a model reply that may wrap it in ```fences``` or prose. */
+function extractJson(text: string): unknown {
+  if (typeof text !== 'string' || !text.trim()) throw new Error('The model returned an empty reply.')
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text)
+  const body = fence ? fence[1] : text
+  const start = body.indexOf('{')
+  const end = body.lastIndexOf('}')
+  if (start < 0 || end <= start) throw new Error('The model did not return a JSON object.')
+  return JSON.parse(body.slice(start, end + 1))
+}
+
+// ---- OpenAI-compatible (Chat Completions, JSON mode) ------------------------
+// We ask for the JSON object directly rather than forcing a function call, so
+// this also works with local vision models (Ollama etc.) that don't support
+// tool-calling. Cloud gpt-4o follows the JSON instruction just as reliably.
 async function openaiDescribe(images: VisionImage[], cfg: VisionConfig): Promise<unknown> {
   const res = await fetch(`${base(cfg)}/chat/completions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.apiKey}` },
+    headers: { 'content-type': 'application/json', ...authHeader(cfg) },
     body: JSON.stringify({
       model: cfg.model,
-      max_tokens: 700,
+      stream: false,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: JSON_SYSTEM_PROMPT },
         {
           role: 'user',
           content: [
-            { type: 'text', text: USER_PROMPT },
+            { type: 'text', text: JSON_USER_PROMPT },
             ...images.map((im) => ({ type: 'image_url', image_url: { url: `data:${im.mediaType};base64,${im.data}` } }))
           ]
         }
-      ],
-      tools: [{ type: 'function', function: { name: TOOL_NAME, description: TOOL_DESC, parameters: DNA_SCHEMA } }],
-      tool_choice: { type: 'function', function: { name: TOOL_NAME } }
+      ]
     })
   })
   const text = await res.text()
   if (!res.ok) throw new Error(errText(res.status, text))
   const j = JSON.parse(text)
-  const args = j?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments
-  if (typeof args !== 'string') throw new Error('OpenAI returned no structured description.')
-  return JSON.parse(args)
+  const content = j?.choices?.[0]?.message?.content
+  if (typeof content !== 'string') throw new Error('The model returned no description.')
+  return extractJson(content)
 }
 
 async function openaiPing(cfg: VisionConfig): Promise<void> {
   const res = await fetch(`${base(cfg)}/chat/completions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.apiKey}` },
-    body: JSON.stringify({ model: cfg.model, max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] })
+    headers: { 'content-type': 'application/json', ...authHeader(cfg) },
+    body: JSON.stringify({ model: cfg.model, stream: false, messages: [{ role: 'user', content: 'Reply with OK.' }] })
   })
   if (!res.ok) throw new Error(errText(res.status, await res.text()))
 }

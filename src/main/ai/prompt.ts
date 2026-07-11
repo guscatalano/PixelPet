@@ -54,3 +54,23 @@ export const SYSTEM_PROMPT =
 
 export const USER_PROMPT =
   'Here is my cat. Please describe it as pixel-pet DNA using the describe_cat tool.'
+
+// JSON-mode variant for OpenAI-compatible endpoints. Local vision models (Ollama
+// et al.) generally can't do tool-calling, so instead of forcing a function call
+// we ask for the JSON object directly and parse it from the reply. Cloud gpt-4o
+// follows this just as well.
+const list = (a: readonly string[]): string => a.join(' | ')
+export const JSON_SYSTEM_PROMPT =
+  'You are a pet-portrait analyst for a cute 8-bit pixel-art desktop-pet generator. Given a photo ' +
+  'of a real cat, sample real hex colors from the fur, eyes, and nose, pick the closest build and ' +
+  'marking, and infer a playful personality from breed cues, pose, expression, and setting. ' +
+  'Return ONLY a JSON object — no prose, no markdown code fences — with exactly these fields:\n' +
+  `- name: string (short, fitting)\n` +
+  `- blurb: string (one charming sentence, max ~10 words)\n` +
+  `- build: one of ${list(BUILD_NAMES)}\n` +
+  `- marking: one of ${list(MARKING_NAMES)} (points = pale body with a dark face/ears/legs like a siamese)\n` +
+  `- eyeStyle: one of ${list(EYE_STYLES)}\n` +
+  `- colors: object with "primary" and "iris" as #RRGGBB hex (required); optional "secondary" (stripes/shading/point color), "white" (tuxedo/bicolor/calico areas), "tertiary" (third calico color), "nose", "innerEar", "whisk" (all hex)\n` +
+  `- personality: object with ${list(TRAIT_KEYS)} — each a number from 0 to 1`
+
+export const JSON_USER_PROMPT = 'Here is my cat. Return the pixel-pet DNA JSON.'

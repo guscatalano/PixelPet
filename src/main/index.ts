@@ -198,10 +198,15 @@ function aiStatus(): AiStatus {
   }
 }
 
-/** Assemble the vision config from settings + the stored key; null if no key. */
+/**
+ * Assemble the vision config from settings + the stored key. A custom endpoint
+ * (e.g. a local Ollama server) may need no key, so we only require one for the
+ * default cloud endpoints. Returns null when a key is genuinely required but absent.
+ */
 function visionConfig(): VisionConfig | null {
-  const key = loadApiKey()
-  if (!key) return null
+  const key = loadApiKey() ?? ''
+  const custom = !!settings.ai.endpoint?.trim()
+  if (!key && !custom) return null
   return { provider: settings.ai.provider, apiKey: key, model: settings.ai.model, endpoint: settings.ai.endpoint }
 }
 
@@ -308,12 +313,12 @@ function registerIpc(): void {
   })
   ipcMain.handle('ai:test', async () => {
     const cfg = visionConfig()
-    if (!cfg) return { ok: false, message: 'No API key saved.' }
+    if (!cfg) return { ok: false, message: 'Add an API key (or set a local endpoint that needs none).' }
     return testConnection(cfg)
   })
   ipcMain.handle('ai:generate', async (_e, dataUrls: string[]) => {
     const cfg = visionConfig()
-    if (!cfg) return { ok: false, error: 'No API key saved. Add one above first.' }
+    if (!cfg) return { ok: false, error: 'Add an API key first (or set a local endpoint that needs none).' }
     if (!Array.isArray(dataUrls) || !dataUrls.length) return { ok: false, error: 'No photo provided.' }
     try {
       const images = dataUrls.slice(0, 3).map(dataUrlToImage)
