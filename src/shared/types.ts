@@ -1,5 +1,7 @@
 // Types shared across main, preload, and renderer.
 
+import type { AppPet } from './pets'
+
 /**
  * Animation clips the renderer knows how to play. Most are stable states the
  * renderer transitions to through the animation graph (real motion — turning,
@@ -60,7 +62,30 @@ export interface AppSettings {
   frontScale: number
   /** Animations the user turned off (subset of TOGGLEABLE_ANIMS). */
   disabledAnims: ClipName[]
+  /** Non-secret AI config (provider/model/endpoint). The API key lives elsewhere (safeStorage). */
+  ai: AiConfig
+  /** Pets the user generated from photos (M4). Merged with the built-in PETS roster. */
+  userPets: AppPet[]
   overrides: Record<string, Partial<Personality>>
+}
+
+/** Which vision provider backs "generate a pet from a photo". */
+export type AiProviderId = 'openai' | 'anthropic'
+
+/** Non-secret AI settings persisted in settings.json (the key is stored separately). */
+export interface AiConfig {
+  provider: AiProviderId
+  model: string
+  endpoint?: string
+}
+
+/** AI status surfaced to the settings UI (never carries the key itself). */
+export interface AiStatus {
+  provider: AiProviderId
+  model: string
+  endpoint: string
+  hasKey: boolean
+  encryptionAvailable: boolean
 }
 
 /** Behaviors the user may turn off in settings (core locomotion is not toggleable). */
