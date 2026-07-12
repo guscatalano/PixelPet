@@ -274,7 +274,7 @@ function showPetMenu(): void {
       label: 'Bring an item…',
       submenu: [
         { label: '🥣  Food bowl', click: () => bringItem('food') },
-        { label: '🪶  Feather toy', click: () => bringItem('toy') },
+        { label: '🧶  Yarn ball', click: () => bringItem('toy') },
         { label: '💊  Medicine', click: () => bringItem('medicine') }
       ]
     })

@@ -1,4 +1,4 @@
-// A draggable care item (food bowl / feather toy / medicine capsule). The whole
+// A draggable care item (food bowl / yarn ball / medicine capsule). The whole
 // window is the item; press and drag it onto the cat to use it (main handles the
 // cursor-follow move + drop-on-cat detection).
 
