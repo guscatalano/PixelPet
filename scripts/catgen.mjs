@@ -533,7 +533,10 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
   const region = new Uint8Array(W * H)
   const overlay = new Uint8Array(W * H)
 
-  sideMarking(region, fur, { hcx: headCx, hcy: headCy, hr: headR, bcx: bodyCx, bcy: bodyCy, brx: bodyRx, bry: bodyRy, groundY, faceSign: 1 }, preset.marking || 'solid')
+  // Anchor markings to the REST body position (bob removed) so the coat stays
+  // put on screen while the barrel bobs through the gait — otherwise the whole
+  // pattern visibly bounces with every step.
+  sideMarking(region, fur, { hcx: headCx, hcy: headCy - bob, hr: headR, bcx: bodyCx, bcy: bodyCy - bob, brx: bodyRx, bry: bodyRy, groundY, faceSign: 1 }, preset.marking || 'solid')
 
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
