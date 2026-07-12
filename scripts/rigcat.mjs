@@ -4,7 +4,7 @@
 // them for articulated get-up / lie-down transitions.
 //
 // Preview:  node scripts/rigcat.mjs [out.png]
-import { W, H, render } from './catgen.mjs'
+import { W, H, render, sideMarking } from './catgen.mjs'
 
 // ---- helpers copied from catgen.mjs (module-private there) ------------------
 const HI = 1, BASE = 2, SHADOW = 3, DEEP = 4
@@ -107,6 +107,8 @@ export function generateRigGrid(pet, pose) {
   pose.legs.filter((l) => l.near).forEach(drawLeg) // near legs on top
 
   const shade = new Uint8Array(W * H), region = new Uint8Array(W * H), overlay = new Uint8Array(W * H)
+  const groundY = Math.max(...pose.legs.map((l) => l.foot[1]))
+  sideMarking(region, fur, { hcx, hcy, hr, bcx, bcy, brx, bry, groundY, faceSign: hcx >= bcx ? 1 : -1 }, pet.marking || 'solid')
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (fur[idx(x, y)]) continue
     let near = false

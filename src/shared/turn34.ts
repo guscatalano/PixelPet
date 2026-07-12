@@ -9,7 +9,7 @@
 // Also carries the yawn (state34.yawn 0..1): eyes squeeze shut, a dark mouth
 // oval opens with the yawn amount, pink tongue at its base.
 
-import { W, H, internals, defaultGeom, frontScaled, type Pet, type Parts } from './catgen'
+import { W, H, internals, applyMarking, defaultGeom, frontScaled, type Pet, type Parts } from './catgen'
 
 const { ellipse, triangle, idx, inB, put, sphereBright, shadeLevel, O, HI, BASE, SHADOW, DEEP } = internals
 
@@ -102,6 +102,8 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
 
   // --- outline, shading (same treatment as the front pose) ---
   const shade = new Uint8Array(W * H), region = new Uint8Array(W * H), overlay = new Uint8Array(W * H)
+  // Coat markings, in front geometry so t=0 matches the front idle seamlessly.
+  applyMarking(region, fur, g, preset.marking || 'solid')
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (fur[idx(x, y)]) continue

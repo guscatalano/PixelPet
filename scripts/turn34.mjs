@@ -7,7 +7,7 @@
 // t = 1   -> strongest ¾ (cat's face angled toward viewer-right)
 //
 //   node scripts/turn34.mjs [out.png]   (renders a strip of t values)
-import { W, H, render, frontScaled } from './catgen.mjs'
+import { W, H, render, frontScaled, applyMarking } from './catgen.mjs'
 
 const HI = 1, BASE = 2, SHADOW = 3, DEEP = 4
 const O = { NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8 }
@@ -121,6 +121,7 @@ export function generate34Grid(preset, t, state = {}) {
 
   // --- outline, shading (same treatment as the front pose) ---
   const shade = new Uint8Array(W * H), region = new Uint8Array(W * H), overlay = new Uint8Array(W * H)
+  applyMarking(region, fur, g, preset.marking || 'solid')
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (fur[idx(x, y)]) continue; let near = false
     for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if (inB(x + dx, y + dy) && fur[idx(x + dx, y + dy)]) { near = true; break }
     if (near) overlay[idx(x, y)] = O.OUTLINE }

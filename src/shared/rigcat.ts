@@ -7,7 +7,7 @@
 // interpolate the joints (lerpPose) — the cat physically gets up, sits down,
 // lies down, loafs, teeters, pounces.
 
-import { W, H, internals, type Pet, type Parts, defaultGeom } from './catgen'
+import { W, H, internals, sideMarking, type Pet, type Parts, defaultGeom } from './catgen'
 
 const { ellipse, triangle, idx, inB, put, sphereBright, shadeLevel, O, BASE, SHADOW } = internals
 
@@ -131,6 +131,8 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
   pose.legs.filter((l) => l.near).forEach(drawLeg) // near legs on top
 
   const shade = new Uint8Array(W * H), region = new Uint8Array(W * H), overlay = new Uint8Array(W * H)
+  const groundY = Math.max(...pose.legs.map((l) => l.foot[1]))
+  sideMarking(region, fur, { hcx, hcy, hr, bcx, bcy, brx, bry, groundY, faceSign: hcx >= bcx ? 1 : -1 }, pet.marking || 'solid')
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (fur[idx(x, y)]) continue

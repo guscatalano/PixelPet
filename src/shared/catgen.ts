@@ -153,7 +153,7 @@ function shadeLevel(b: number): number {
   return DEEP
 }
 
-function applyMarking(region: Uint8Array, fur: Uint8Array, g: Geom, kind: string): void {
+export function applyMarking(region: Uint8Array, fur: Uint8Array, g: Geom, kind: string): void {
   const forEachFur = (fn: SetFn): void => {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (fur[idx(x, y)]) fn(x, y)
   }
@@ -214,6 +214,91 @@ function applyMarking(region: Uint8Array, fur: Uint8Array, g: Geom, kind: string
         if (inEllipse(x, y, g.bodyCx, g.bodyCy + 3, 7, 9)) region[idx(x, y)] = WHITE
         if (inEllipse(x, y, g.headCx, g.noseY + 2, 5, 4)) region[idx(x, y)] = WHITE
         if (y > g.bodyCy + g.bodyRy * 0.55) region[idx(x, y)] = WHITE
+      })
+      break
+    default:
+      break
+  }
+}
+
+/** Silhouette geometry a side-view pose exposes for marking placement. */
+export interface SideGeom {
+  hcx: number; hcy: number; hr: number // head centre + radius
+  bcx: number; bcy: number; brx: number; bry: number // body ellipse
+  groundY: number // where the paws land
+  faceSign: number // +1 head is to the right of the body, -1 to the left
+}
+
+/**
+ * Paint coat markings onto the `region` layer of a SIDE-VIEW pose (rig / walk /
+ * turn) so calico, tabby, tuxedo, points, etc. survive every animation — not
+ * just the front idle (see applyMarking for the front-view equivalent). Works
+ * off the pose silhouette rather than fixed front geometry, so it adapts to any
+ * pose. Colours: S = secondary, T = tertiary, WHITE = white belly/socks.
+ */
+export function sideMarking(region: Uint8Array, fur: Uint8Array, s: SideGeom, kind: string): void {
+  const forEachFur = (fn: SetFn): void => {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (fur[idx(x, y)]) fn(x, y)
+  }
+  const inEllipse = (x: number, y: number, cx: number, cy: number, rx: number, ry: number): boolean => {
+    const dx = (x - cx) / rx, dy = (y - cy) / ry
+    return dx * dx + dy * dy <= 1
+  }
+  const inHead = (x: number, y: number): boolean => inEllipse(x, y, s.hcx, s.hcy, s.hr + 1, s.hr + 1)
+  const inBody = (x: number, y: number): boolean => inEllipse(x, y, s.bcx, s.bcy, s.brx + 1, s.bry + 1)
+  const fx = s.faceSign // front direction
+  switch (kind) {
+    case 'tabby': {
+      // Mackerel stripes: vertical bands running down the spine, wrapping legs
+      // and tail. A sine warp keeps them from looking like a picket fence.
+      forEachFur((x, y) => {
+        const v = (x - s.bcx) + Math.sin((y - s.bcy) * 0.5) * 2.6
+        if (((Math.round(v) % 5) + 5) % 5 === 0) region[idx(x, y)] = S
+      })
+      // Forehead "M" hint: a couple of short bars between the ears.
+      forEachFur((x, y) => {
+        if (y < s.hcy - 1 && inHead(x, y) && (((Math.round(x - s.hcx) % 2) + 2) % 2 === 0)) region[idx(x, y)] = S
+      })
+      break
+    }
+    case 'points':
+      // Dark extremities (face, ears, legs, tail); the barrel stays light.
+      forEachFur((x, y) => {
+        if (inHead(x, y)) { region[idx(x, y)] = S; return }
+        if (!inBody(x, y)) region[idx(x, y)] = S // legs + tail + neck reach past the body
+        else if (y > s.groundY - 6) region[idx(x, y)] = S // lower legs
+      })
+      break
+    case 'tuxedo':
+      // Black suit, white shirt: dark back/head dominate; white only on the
+      // lower-front chest bib, belly underside, paws and chin.
+      forEachFur((x, y) => {
+        if (y > s.bcy + s.bry * 0.35 && inBody(x, y)) region[idx(x, y)] = WHITE // belly underside
+        if (inEllipse(x, y, s.bcx + fx * s.brx * 0.55, s.bcy + s.bry * 0.5, s.brx * 0.42, s.bry * 0.7)) region[idx(x, y)] = WHITE // chest bib
+        if (y > s.groundY - 4) region[idx(x, y)] = WHITE // socks
+        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.5, s.hcy + s.hr * 0.55, s.hr * 0.5, s.hr * 0.42)) region[idx(x, y)] = WHITE // chin blaze
+      })
+      break
+    case 'bicolor':
+      forEachFur((x, y) => {
+        if (y > s.bcy - s.bry * 0.35 && inBody(x, y)) region[idx(x, y)] = WHITE // most of the body white
+        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.35, s.hcy + s.hr * 0.35, s.hr * 0.75, s.hr * 0.7)) region[idx(x, y)] = WHITE // white face/muzzle
+        if (y > s.groundY - 6) region[idx(x, y)] = WHITE
+      })
+      break
+    case 'socks':
+      forEachFur((x, y) => {
+        if (y > s.groundY - 5 || (y > s.bcy + s.bry * 0.6 && !inBody(x, y))) region[idx(x, y)] = WHITE
+      })
+      break
+    case 'calico':
+      // Irregular tortoiseshell patches of secondary (dark) + tertiary (ginger)
+      // over the white base.
+      forEachFur((x, y) => {
+        if (inEllipse(x, y, s.bcx - s.brx * 0.35, s.bcy - s.bry * 0.15, s.brx * 0.5, s.bry * 0.8)) region[idx(x, y)] = S
+        if (inEllipse(x, y, s.bcx + s.brx * 0.4, s.bcy + s.bry * 0.1, s.brx * 0.5, s.bry * 0.7)) region[idx(x, y)] = T
+        if (inEllipse(x, y, s.hcx - fx * s.hr * 0.3, s.hcy - s.hr * 0.15, s.hr * 0.75, s.hr * 0.8)) region[idx(x, y)] = S
+        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.45, s.hcy + s.hr * 0.2, s.hr * 0.55, s.hr * 0.55)) region[idx(x, y)] = T
       })
       break
     default:
@@ -467,6 +552,8 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1): Parts {
   const shade = new Uint8Array(W * H)
   const region = new Uint8Array(W * H)
   const overlay = new Uint8Array(W * H)
+
+  sideMarking(region, fur, { hcx: headCx, hcy: headCy, hr: headR, bcx: bodyCx, bcy: bodyCy, brx: bodyRx, bry: bodyRy, groundY, faceSign: 1 }, preset.marking || 'solid')
 
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {

@@ -148,7 +148,7 @@ function shadeLevel(b) {
 }
 
 // ---- markings --------------------------------------------------------------
-function applyMarking(region, fur, g, kind) {
+export function applyMarking(region, fur, g, kind) {
   const forEachFur = (fn) => {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (fur[idx(x, y)]) fn(x, y)
   }
@@ -221,6 +221,73 @@ function applyMarking(region, fur, g, kind) {
       break
     default:
       break // solid
+  }
+}
+
+// Side-view marking (rig / walk / turn) — mirrors catgen.ts sideMarking. Paints
+// the `region` layer from the pose silhouette so multi-colour coats survive
+// every animation, not just the front idle. S=secondary, T=tertiary, WHITE=white.
+export function sideMarking(region, fur, s, kind) {
+  const forEachFur = (fn) => {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (fur[idx(x, y)]) fn(x, y)
+  }
+  const inEllipse = (x, y, cx, cy, rx, ry) => {
+    const dx = (x - cx) / rx, dy = (y - cy) / ry
+    return dx * dx + dy * dy <= 1
+  }
+  const inHead = (x, y) => inEllipse(x, y, s.hcx, s.hcy, s.hr + 1, s.hr + 1)
+  const inBody = (x, y) => inEllipse(x, y, s.bcx, s.bcy, s.brx + 1, s.bry + 1)
+  const fx = s.faceSign
+  switch (kind) {
+    case 'tabby': {
+      forEachFur((x, y) => {
+        const v = (x - s.bcx) + Math.sin((y - s.bcy) * 0.5) * 2.6
+        if (((Math.round(v) % 5) + 5) % 5 === 0) region[idx(x, y)] = S
+      })
+      forEachFur((x, y) => {
+        if (y < s.hcy - 1 && inHead(x, y) && (((Math.round(x - s.hcx) % 2) + 2) % 2 === 0)) region[idx(x, y)] = S
+      })
+      break
+    }
+    case 'points':
+      forEachFur((x, y) => {
+        if (inHead(x, y)) { region[idx(x, y)] = S; return }
+        if (!inBody(x, y)) region[idx(x, y)] = S
+        else if (y > s.groundY - 6) region[idx(x, y)] = S
+      })
+      break
+    case 'tuxedo':
+      // Black suit, white shirt: dark back/head dominate; white only on the
+      // lower-front chest bib, belly underside, paws and chin.
+      forEachFur((x, y) => {
+        if (y > s.bcy + s.bry * 0.35 && inBody(x, y)) region[idx(x, y)] = WHITE
+        if (inEllipse(x, y, s.bcx + fx * s.brx * 0.55, s.bcy + s.bry * 0.5, s.brx * 0.42, s.bry * 0.7)) region[idx(x, y)] = WHITE
+        if (y > s.groundY - 4) region[idx(x, y)] = WHITE
+        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.5, s.hcy + s.hr * 0.55, s.hr * 0.5, s.hr * 0.42)) region[idx(x, y)] = WHITE
+      })
+      break
+    case 'bicolor':
+      forEachFur((x, y) => {
+        if (y > s.bcy - s.bry * 0.35 && inBody(x, y)) region[idx(x, y)] = WHITE
+        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.35, s.hcy + s.hr * 0.35, s.hr * 0.75, s.hr * 0.7)) region[idx(x, y)] = WHITE
+        if (y > s.groundY - 6) region[idx(x, y)] = WHITE
+      })
+      break
+    case 'socks':
+      forEachFur((x, y) => {
+        if (y > s.groundY - 5 || (y > s.bcy + s.bry * 0.6 && !inBody(x, y))) region[idx(x, y)] = WHITE
+      })
+      break
+    case 'calico':
+      forEachFur((x, y) => {
+        if (inEllipse(x, y, s.bcx - s.brx * 0.35, s.bcy - s.bry * 0.15, s.brx * 0.5, s.bry * 0.8)) region[idx(x, y)] = S
+        if (inEllipse(x, y, s.bcx + s.brx * 0.4, s.bcy + s.bry * 0.1, s.brx * 0.5, s.bry * 0.7)) region[idx(x, y)] = T
+        if (inEllipse(x, y, s.hcx - fx * s.hr * 0.3, s.hcy - s.hr * 0.15, s.hr * 0.75, s.hr * 0.8)) region[idx(x, y)] = S
+        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.45, s.hcy + s.hr * 0.2, s.hr * 0.55, s.hr * 0.55)) region[idx(x, y)] = T
+      })
+      break
+    default:
+      break
   }
 }
 
@@ -465,6 +532,8 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
   const shade = new Uint8Array(W * H)
   const region = new Uint8Array(W * H)
   const overlay = new Uint8Array(W * H)
+
+  sideMarking(region, fur, { hcx: headCx, hcy: headCy, hr: headR, bcx: bodyCx, bcy: bodyCy, brx: bodyRx, bry: bodyRy, groundY, faceSign: 1 }, preset.marking || 'solid')
 
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
