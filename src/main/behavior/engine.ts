@@ -8,7 +8,7 @@ import { refreshPlatforms, supportY } from '../desktop/world'
 
 const MOVE_TICK_MS = 16
 const WALK_SPEED = 0.35 // px per tick (~22 px/s) — a calm walking pace, not a scramble
-const PRANCE_SPEED = 0.6 // an excited prance covers ground faster
+const PRANCE_SPEED = 0.47 // an excited prance covers ground a bit faster than the walk
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
 const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never reports it
