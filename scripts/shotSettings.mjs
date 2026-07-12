@@ -11,7 +11,7 @@ const outPath = resolve(process.argv[2] || resolve(root, '.settings.png'))
 
 app.whenReady().then(async () => {
   const userPets = process.env.WITHUSERPET ? [{ id: 'user-demo', name: 'Mittens', blurb: 'Your photo cat.', geom: { bodyRx: 15, bodyRy: 12.5 }, marking: 'tuxedo', coat: { primary: '#2b2b32', white: '#f4f4f7', iris: '#e7b24e' }, personality: { energy: 0.6, sleepiness: 0.4, affection: 0.8, mischief: 0.4, curiosity: 0.6, independence: 0.4 } }] : []
-  ipcMain.handle('settings:get', () => ({ activePetId: 'tiger', scale: 5, turnMs: 80, stayPut: false, frontScale: 0.8, pupilsByTime: false, careMode: true, difficulty: 'normal', dreamMode: false, dreamChance: 0.55, petFilter: 'all', nameOverrides: {}, disabledAnims: [], ai: { provider: 'openai', model: 'gpt-4o' }, userPets, overrides: {} }))
+  ipcMain.handle('settings:get', () => ({ activePetId: 'tiger', scale: 5, turnMs: 80, stayPut: false, frontScale: 0.8, pupilsByTime: false, careMode: true, difficulty: 'normal', dreamMode: false, dreamChance: 0.55, dreamBubbleScale: 1, petFilter: 'all', nameOverrides: {}, disabledAnims: [], ai: { provider: 'openai', model: 'gpt-4o' }, userPets, overrides: {} }))
   ipcMain.handle('care:get', () => ({ enabled: true, needs: { hunger: 0.3, energy: 0.65, fun: 0.15, hygiene: 0.8, health: 0.9 }, state: { key: 'bored', label: 'Bored', emoji: '🥱' } }))
   ipcMain.handle('ai:status', () => ({ provider: 'openai', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1', hasKey: !!process.env.WITHKEY, encryptionAvailable: true }))
   ipcMain.handle('ai:set-key', () => ({ provider: 'openai', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1', hasKey: true, encryptionAvailable: true }))

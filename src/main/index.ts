@@ -320,20 +320,34 @@ function immichStatus(): ImmichStatus {
   return { serverUrl: settings.immich.serverUrl, albumId: settings.immich.albumId, hasKey: hasImmichKey() }
 }
 
+const DREAM_BASE_W = 120, DREAM_BASE_H = 112
+function dreamScale(): number { return Math.max(0.5, Math.min(2.5, settings.dreamBubbleScale ?? 1)) }
+
 function createDreamWindow(): BrowserWindow {
+  const s = dreamScale()
   const win = new BrowserWindow({
-    width: 120, height: 112, transparent: true, frame: false, resizable: false,
+    width: Math.round(DREAM_BASE_W * s), height: Math.round(DREAM_BASE_H * s),
+    transparent: true, frame: false, resizable: false,
     skipTaskbar: true, hasShadow: false, focusable: false, alwaysOnTop: true,
     maximizable: false, fullscreenable: false,
     webPreferences: { preload: join(__dirname, '../preload/dream.js'), sandbox: false }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-  win.setIgnoreMouseEvents(true, { forward: true }) // decorative, click-through
+  win.setIgnoreMouseEvents(true, { forward: true }) // decorative until the pointer is over it
+  win.webContents.once('did-finish-load', () => { if (!win.isDestroyed()) win.webContents.send('dream:scale', dreamScale()) })
   if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/dream.html`)
   else win.loadFile(join(__dirname, '../renderer/dream.html'))
   win.on('closed', () => { dreamWindow = null })
   return win
+}
+
+/** Apply a new bubble scale to the live dream window (resize + tell the renderer). */
+function applyDreamScale(): void {
+  if (!dreamWindow || dreamWindow.isDestroyed()) return
+  const s = dreamScale()
+  dreamWindow.setSize(Math.round(DREAM_BASE_W * s), Math.round(DREAM_BASE_H * s))
+  dreamWindow.webContents.send('dream:scale', s)
 }
 
 /** Rebuild the active pet's dream photo pool (on pet swap / generate / delete). */
@@ -609,6 +623,11 @@ function registerIpc(): void {
     if (dreamWindow && !dreamWindow.isDestroyed()) dreamWindow.setIgnoreMouseEvents(!on, { forward: true })
   })
   ipcMain.on('dream:open-viewer', () => { void openDreamViewerCurrent() })
+  ipcMain.on('settings:set-dreambubblescale', (_e, v: number) => {
+    settings.dreamBubbleScale = Math.max(0.5, Math.min(2.5, v))
+    saveSettings(settings)
+    applyDreamScale()
+  })
   ipcMain.handle('immich:status', () => immichStatus())
   ipcMain.on('immich:set-config', (_e, cfg: Partial<ImmichConfig>) => {
     if (typeof cfg.serverUrl === 'string') settings.immich.serverUrl = cfg.serverUrl.trim()

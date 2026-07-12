@@ -34,7 +34,7 @@ function defaultAi(): AiConfig {
 function defaults(): AppSettings {
   return {
     activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS,
-    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, careMode: false, difficulty: 'normal', dreamMode: false, dreamChance: 0.55,
+    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, pupilsByTime: false, careMode: false, difficulty: 'normal', dreamMode: false, dreamChance: 0.55, dreamBubbleScale: 1,
     immich: { serverUrl: '', albumId: '' }, disabledAnims: [],
     ai: defaultAi(), userPets: [], nameOverrides: {}, petFilter: 'all', overrides: {}
   }

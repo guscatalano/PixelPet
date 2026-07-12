@@ -19,6 +19,7 @@ interface SettingsApi {
   setPupilsByTime: (v: boolean) => void
   setDreamMode: (v: boolean) => void
   setDreamChance: (v: number) => void
+  setDreamBubbleScale: (v: number) => void
   setCareMode: (v: boolean) => void
   setDifficulty: (d: Difficulty) => void
   careStatus: () => Promise<CareStatus | null>
@@ -565,6 +566,15 @@ function buildAnimation(): void {
   dc.addEventListener('input', () => {
     showDc()
     window.settings.setDreamChance(Number(dc.value) / 100)
+  })
+
+  const bs = $<HTMLInputElement>('dreambubblescale'), bsLabel = $('dreambubblescalev')
+  const showBs = (): void => { bsLabel.textContent = `${bs.value}%` }
+  bs.value = String(Math.round((state.dreamBubbleScale ?? 1) * 100))
+  showBs()
+  bs.addEventListener('input', () => {
+    showBs()
+    window.settings.setDreamBubbleScale(Number(bs.value) / 100)
   })
 }
 

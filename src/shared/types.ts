@@ -71,6 +71,8 @@ export interface AppSettings {
   dreamMode: boolean
   /** Chance (0..1) that any given nap shows a dream bubble. */
   dreamChance: number
+  /** Dream bubble size multiplier (1 = default; ~0.6–2). */
+  dreamBubbleScale: number
   /** Optional Immich album to fold into the dream photo pool (non-secret; key stored apart). */
   immich: ImmichConfig
   /** Animations the user turned off (subset of TOGGLEABLE_ANIMS). */

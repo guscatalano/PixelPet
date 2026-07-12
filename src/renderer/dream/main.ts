@@ -2,6 +2,7 @@ export {} // module (for the global augmentation below)
 
 interface DreamApi {
   onPhoto: (handler: (dataUrl: string) => void) => void
+  onScale: (handler: (scale: number) => void) => void
   setInteractive: (on: boolean) => void
   openViewer: () => void
 }
@@ -23,6 +24,11 @@ window.dream.onPhoto((dataUrl: string) => {
     }, img.src ? 260 : 0)
   }
   next.src = dataUrl
+})
+
+// Bubble size multiplier from settings.
+window.dream.onScale((scale: number) => {
+  document.documentElement.style.setProperty('--s', String(scale))
 })
 
 // The window is click-through by default. Watch the (forwarded) cursor: while

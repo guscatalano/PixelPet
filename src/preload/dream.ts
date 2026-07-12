@@ -7,6 +7,9 @@ const api = {
   onPhoto: (handler: (dataUrl: string) => void): void => {
     ipcRenderer.on('dream:photo', (_e, dataUrl: string) => handler(dataUrl))
   },
+  onScale: (handler: (scale: number) => void): void => {
+    ipcRenderer.on('dream:scale', (_e, scale: number) => handler(scale))
+  },
   /** Toggle whether the window captures the mouse (over the bubble) or is click-through. */
   setInteractive: (on: boolean): void => { ipcRenderer.send('dream:set-interactive', on) },
   /** Ask main to open the current dream photo in a large viewer. */

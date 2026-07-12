@@ -26,6 +26,8 @@ const api = {
   setDreamMode: (v: boolean): void => ipcRenderer.send('settings:set-dreammode', v),
   /** Set the chance (0..1) that a nap shows a dream. */
   setDreamChance: (v: number): void => ipcRenderer.send('settings:set-dreamchance', v),
+  /** Set the dream bubble size multiplier (~0.6–2). */
+  setDreamBubbleScale: (v: number): void => ipcRenderer.send('settings:set-dreambubblescale', v),
 
   // ---- Immich dream album ----
   immichStatus: (): Promise<ImmichStatus> => ipcRenderer.invoke('immich:status'),
