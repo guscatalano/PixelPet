@@ -1,0 +1,39 @@
+name: Store package (MSIX)
+
+# Builds the Microsoft Store MSIX/APPX and uploads it as a downloadable workflow
+# artifact. Runs on every version tag, and on demand via "Run workflow". The
+# package is intentionally UNSIGNED — the Store signs it on ingestion — so no
+# signing secrets are needed. Kept separate from the GitHub-release pipeline
+# (build.yml), which produces the auto-updating direct-download installer.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  msix:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build MSIX (electron-builder --win appx)
+        run: npm run pack:store
+
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: pixelpet-msix
+          path: release/*.appx
+          if-no-files-found: error
