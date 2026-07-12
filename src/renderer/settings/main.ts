@@ -342,16 +342,21 @@ function buildNav(): void {
   const tabsBar = $('tabs')
   const search = $<HTMLInputElement>('search')
   const secs = Array.from(document.querySelectorAll<HTMLElement>('.sec'))
-  let activeTab = 'pet'
+  const tabBtns = Array.from(tabsBar.querySelectorAll('button'))
+  // Remember the open tab across reloads (dev HMR reloads the page otherwise).
+  let activeTab = sessionStorage.getItem('tab') ?? 'pet'
+  if (!tabBtns.some((b) => (b as HTMLElement).dataset.tab === activeTab)) activeTab = 'pet'
   const showTab = (): void => {
     $('noresults').style.display = 'none'
     for (const s of secs) s.style.display = s.dataset.tab === activeTab ? '' : 'none'
+    for (const c of tabBtns) c.classList.toggle('on', (c as HTMLElement).dataset.tab === activeTab)
   }
-  for (const b of Array.from(tabsBar.querySelectorAll('button'))) {
+  for (const b of tabBtns) {
     b.addEventListener('click', () => {
       activeTab = (b as HTMLElement).dataset.tab as string
-      for (const c of tabsBar.children) c.classList.toggle('on', c === b)
+      sessionStorage.setItem('tab', activeTab)
       showTab()
+      document.scrollingElement?.scrollTo(0, 0)
     })
   }
   const runSearch = (): void => {
@@ -792,6 +797,17 @@ async function init(): Promise<void> {
   refreshMeta()
   // Make sure the current cat is visible even if it's far down the grid.
   grid.querySelector('.card.active')?.scrollIntoView({ block: 'nearest' })
+  // Restore scroll position (dev HMR reloads the page and would otherwise jump to top).
+  const savedY = Number(sessionStorage.getItem('scrollY') ?? 0)
+  if (savedY > 0) document.scrollingElement?.scrollTo(0, savedY)
+  let raf = 0
+  window.addEventListener('scroll', () => {
+    if (raf) return
+    raf = requestAnimationFrame(() => {
+      raf = 0
+      sessionStorage.setItem('scrollY', String(document.scrollingElement?.scrollTop ?? 0))
+    })
+  }, { passive: true })
   requestAnimationFrame(animatePoses)
 }
 init()
