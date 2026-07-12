@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality, TriggerEvent } from '../shared/types'
 import { MIN_SCALE, MAX_SCALE, petWindowSize } from '../shared/constants'
-import { createTray, assetPath } from './tray'
+import { createTray, applyTrayMenu, assetPath, type TrayCallbacks } from './tray'
+import { initAutoUpdate, onUpdateStateChange, isUpdateReady, pendingVersion, checkForUpdatesManual, restartToUpdate } from './updater'
 import { PetEngine } from './behavior/engine'
 import {
   loadSettings, saveSettings, effectivePersonality, findPet, AI_PROVIDERS,
@@ -730,7 +731,7 @@ if (!gotLock) {
     settings = loadSettings()
     registerIpc()
     petWindow = createPetWindow()
-    tray = createTray({
+    const trayCb: TrayCallbacks = {
       onToggleVisible: () => {
         if (!petWindow) return
         if (petWindow.isVisible()) petWindow.hide()
@@ -738,11 +739,21 @@ if (!gotLock) {
       },
       onResetPosition: () => resetPetPosition(),
       onOpenSettings: () => openSettings(),
+      onCheckUpdates: () => { void checkForUpdatesManual() },
+      onRestartToUpdate: () => restartToUpdate(),
       onQuit: () => {
         stopDrag()
         app.quit()
       }
+    }
+    tray = createTray(trayCb)
+
+    // Auto-update: rebuild the tray menu when an update finishes downloading so
+    // "Restart to update" appears.
+    onUpdateStateChange(() => {
+      if (tray) applyTrayMenu(tray, trayCb, { updateReady: isUpdateReady(), version: pendingVersion() })
     })
+    initAutoUpdate()
 
     startDreamLoop()
 

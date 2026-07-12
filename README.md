@@ -8,6 +8,20 @@ you hover, click, or drag it. Settings live in the system tray.
 > react, personality-driven behavior). AI-generated pets from your own photos are on the
 > roadmap.
 
+## Download
+
+**[⬇️ Get the latest release](https://github.com/guscatalano/PixelPet/releases/latest)** — Windows 10/11.
+
+- **Installer** — `PixelPet-Setup-x.y.z.exe`. Installs to your user profile, adds a Start-menu
+  shortcut, and keeps itself up to date automatically.
+- **Portable** — `PixelPet-x.y.z.exe`. No install; just run it.
+
+Once it's running, look for the 🐾 icon in the system tray for settings, show/hide, and updates.
+
+> **Heads up — "Windows protected your PC."** The app isn't code-signed yet, so Microsoft
+> SmartScreen may warn you the first time. Click **More info → Run anyway**. (Code signing is
+> on the roadmap.)
+
 ## Features
 
 - **Transparent, always-on-top pet** with per-pixel interaction — only the cat's pixels
@@ -61,7 +75,10 @@ palette swap — the foundation for AI-generated pets.
 
 Pushing a `vX.Y.Z` tag triggers the GitHub Actions pipeline, which builds the Windows
 installer + portable exe and publishes them to a GitHub Release. Every push/PR also builds
-and uploads artifacts so `main` always has a working build.
+and uploads artifacts so `main` always has a working build. Installed copies **update
+themselves** from these releases (via `electron-updater`).
+
+See **[RELEASING.md](RELEASING.md)** for the step-by-step release runbook.
 
 ## License
 

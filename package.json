@@ -13,7 +13,10 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "dist": "npm run build && electron-builder --win"
+    "dist": "npm run build && electron-builder --win",
+    "release:patch": "npm version patch -m \"Release v%s\" && git push --follow-tags",
+    "release:minor": "npm version minor -m \"Release v%s\" && git push --follow-tags",
+    "release:major": "npm version major -m \"Release v%s\" && git push --follow-tags"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -62,6 +65,7 @@
     ]
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "koffi": "^3.1.1"
   }
 }

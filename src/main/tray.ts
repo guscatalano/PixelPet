@@ -5,6 +5,8 @@ export interface TrayCallbacks {
   onToggleVisible: () => void
   onResetPosition: () => void
   onOpenSettings: () => void
+  onCheckUpdates: () => void
+  onRestartToUpdate: () => void
   onQuit: () => void
 }
 
@@ -21,7 +23,15 @@ export function createTray(cb: TrayCallbacks): Tray {
   const image = nativeImage.createFromPath(assetPath('tray.png'))
   const tray = new Tray(image)
   tray.setToolTip('PixelPet')
+  applyTrayMenu(tray, cb, { updateReady: false })
+  return tray
+}
 
+/**
+ * (Re)build the tray menu. Call again when the update state changes so the
+ * "Restart to update" item can appear once a download is ready.
+ */
+export function applyTrayMenu(tray: Tray, cb: TrayCallbacks, state: { updateReady: boolean; version?: string | null }): void {
   const menu = Menu.buildFromTemplate([
     { label: 'PixelPet', enabled: false },
     { type: 'separator' },
@@ -29,9 +39,11 @@ export function createTray(cb: TrayCallbacks): Tray {
     { label: 'Reset Position', click: () => cb.onResetPosition() },
     { label: 'Settings…', click: () => cb.onOpenSettings() },
     { type: 'separator' },
+    state.updateReady
+      ? { label: `Restart to update${state.version ? ` (v${state.version})` : ''}`, click: () => cb.onRestartToUpdate() }
+      : { label: 'Check for updates…', click: () => cb.onCheckUpdates() },
+    { type: 'separator' },
     { label: 'Quit', click: () => cb.onQuit() }
   ])
-
   tray.setContextMenu(menu)
-  return tray
 }
