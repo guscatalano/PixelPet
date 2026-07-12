@@ -3,6 +3,16 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.2.0 — build your own cat
+
+### New
+- **Build a cat — no AI needed.** A new *Build a cat* panel in Settings lets you make a
+  cat by hand: choose its build (normal, chonky, slim, kitten, fluffy, big-ears), coat
+  pattern (solid, tabby, tuxedo, calico, color-points, bicolor), eye style, and colors —
+  with a **live preview** that updates as you go. Prefer a surprise? Hit **🎲 Randomize**
+  for a curated-random cat you can then tweak, and **Create** to add it to your pets. No
+  API key required (the photo-based generator is still there as an optional third path).
+
 ## v0.1.0 — first public release
 
 The first release of PixelPet: a procedural 8-bit pixel-art cat that lives on your
