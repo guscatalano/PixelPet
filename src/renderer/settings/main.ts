@@ -296,6 +296,47 @@ function thumbnail(petId: string): HTMLCanvasElement {
   return c
 }
 
+// The app icon in the header — the same branded rounded twilight tile + Ash as
+// the installer/app icon (scripts/genIcons.mjs), drawn live in a canvas.
+function drawAppIcon(): void {
+  const el = $<HTMLCanvasElement>('appicon')
+  const S = 46
+  el.width = S
+  el.height = S
+  const g = el.getContext('2d')!
+  const r = S * 0.24
+  const round = (): void => { g.beginPath(); g.roundRect(0, 0, S, S, r) }
+  const grad = g.createLinearGradient(0, 0, S, S)
+  grad.addColorStop(0, '#3f4270')
+  grad.addColorStop(1, '#1c1d30')
+  round(); g.fillStyle = grad; g.fill()
+  g.save(); round(); g.clip()
+  const rg = g.createRadialGradient(S * 0.4, S * 0.32, 0, S * 0.4, S * 0.32, S * 0.55)
+  rg.addColorStop(0, 'rgba(255,255,255,0.16)')
+  rg.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = rg; g.fillRect(0, 0, S, S)
+  const ash = PETS[0] // Ash — the brand cat, regardless of the active pet
+  const rgba = renderPet(generateGrid(ash, { eyeOpen: true, tailPhase: 0.15 }), ash.coat)
+  let minx = SPRITE_W, miny = SPRITE_H, maxx = 0, maxy = 0
+  for (let y = 0; y < SPRITE_H; y++)
+    for (let x = 0; x < SPRITE_W; x++)
+      if (rgba[(y * SPRITE_W + x) * 4 + 3]) {
+        if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y
+      }
+  const cw = maxx - minx + 1, ch = maxy - miny + 1
+  const tmp = document.createElement('canvas')
+  tmp.width = SPRITE_W; tmp.height = SPRITE_H
+  const tctx = tmp.getContext('2d')!
+  const timg = tctx.createImageData(SPRITE_W, SPRITE_H)
+  timg.data.set(rgba)
+  tctx.putImageData(timg, 0, 0)
+  g.imageSmoothingEnabled = false
+  const sc = (S * 0.74) / Math.max(cw, ch)
+  const dw = cw * sc, dh = ch * sc
+  g.drawImage(tmp, minx, miny, cw, ch, (S - dw) / 2, (S - dh) / 2 - S * 0.02, dw, dh)
+  g.restore()
+}
+
 // Tab navigation + search across the settings sections.
 function buildNav(): void {
   const tabsBar = $('tabs')
@@ -737,6 +778,7 @@ function buildImmich(): void {
 
 async function init(): Promise<void> {
   state = await window.settings.get()
+  drawAppIcon()
   buildNav()
   buildGridFilter()
   buildGrid()
