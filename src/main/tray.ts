@@ -9,7 +9,7 @@ export interface TrayCallbacks {
 }
 
 /** Resolve a bundled asset both in dev (project root) and when packaged. */
-function assetPath(name: string): string {
+export function assetPath(name: string): string {
   if (app.isPackaged) {
     return join(process.resourcesPath, 'assets', name)
   }

@@ -42,8 +42,17 @@ export async function fetchAlbumImageIds(serverUrl: string, albumId: string, key
 
 /** Fetch one asset's small thumbnail as a data URL (null on failure). */
 export async function fetchThumbnailDataUrl(serverUrl: string, assetId: string, key: string): Promise<string | null> {
+  return fetchAssetImage(serverUrl, assetId, key, 'thumbnail')
+}
+
+/** Larger preview for the full-size dream viewer. */
+export async function fetchPreviewDataUrl(serverUrl: string, assetId: string, key: string): Promise<string | null> {
+  return fetchAssetImage(serverUrl, assetId, key, 'preview')
+}
+
+async function fetchAssetImage(serverUrl: string, assetId: string, key: string, size: 'thumbnail' | 'preview'): Promise<string | null> {
   try {
-    const res = await fetch(`${base(serverUrl)}/api/assets/${assetId}/thumbnail?size=thumbnail`, { headers: { 'x-api-key': key } })
+    const res = await fetch(`${base(serverUrl)}/api/assets/${assetId}/thumbnail?size=${size}`, { headers: { 'x-api-key': key } })
     if (!res.ok) return null
     const buf = Buffer.from(await res.arrayBuffer())
     const ct = res.headers.get('content-type') || 'image/webp'

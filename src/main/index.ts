@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality, TriggerEvent } from '../shared/types'
 import { MIN_SCALE, MAX_SCALE, petWindowSize } from '../shared/constants'
-import { createTray } from './tray'
+import { createTray, assetPath } from './tray'
 import { PetEngine } from './behavior/engine'
 import {
   loadSettings, saveSettings, effectivePersonality, findPet, AI_PROVIDERS,
@@ -17,7 +17,7 @@ import { loadNeeds, saveNeeds } from './care/needs'
 import { DIFFICULTIES, type CareAction, type Difficulty } from '../shared/care'
 import { saveSourcePhotos, readPhotoDataUrl, deletePetPhotos } from './dream/store'
 import {
-  fetchAlbumImageIds, fetchThumbnailDataUrl, testImmich,
+  fetchAlbumImageIds, fetchThumbnailDataUrl, fetchPreviewDataUrl, testImmich,
   saveImmichKey, loadImmichKey, hasImmichKey, clearImmichKey
 } from './dream/immich'
 import type { ImmichConfig, ImmichStatus } from '../shared/types'
@@ -163,6 +163,7 @@ function createSettingsWindow(): BrowserWindow {
     minWidth: 560,
     minHeight: 480,
     title: 'PixelPet Settings',
+    icon: assetPath('icon.png'), // taskbar/titlebar icon (dev too; packaged uses builder icon)
     backgroundColor: '#1a1b24',
     show: false,
     autoHideMenuBar: true,
@@ -350,11 +351,58 @@ async function showDreamPhoto(): Promise<void> {
   let url: string | null = null
   if (idx < dreamPool.length) {
     url = readPhotoDataUrl(dreamPool[idx])
+    dreamCurrent = { kind: 'local', ref: dreamPool[idx] }
   } else {
     const key = loadImmichKey()
-    if (key) url = await fetchThumbnailDataUrl(settings.immich.serverUrl, dreamImmichIds[idx - dreamPool.length], key)
+    const id = dreamImmichIds[idx - dreamPool.length]
+    if (key) url = await fetchThumbnailDataUrl(settings.immich.serverUrl, id, key)
+    dreamCurrent = { kind: 'immich', ref: id }
   }
   if (url && dreamWindow && !dreamWindow.isDestroyed()) dreamWindow.webContents.send('dream:photo', url)
+}
+
+/** The photo currently in the bubble — so the viewer can load it full-size. */
+let dreamCurrent: { kind: 'local' | 'immich'; ref: string } | null = null
+let dreamViewer: BrowserWindow | null = null
+
+/** Open the current dream photo large and centered; dismiss on click / Esc / blur. */
+function openDreamViewer(dataUrl: string): void {
+  if (dreamViewer && !dreamViewer.isDestroyed()) dreamViewer.close()
+  const wa = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
+  const w = Math.round(wa.width * 0.6), h = Math.round(wa.height * 0.72)
+  const win = new BrowserWindow({
+    width: w, height: h,
+    x: Math.round(wa.x + (wa.width - w) / 2), y: Math.round(wa.y + (wa.height - h) / 2),
+    frame: false, backgroundColor: '#0b0c12', show: false, skipTaskbar: true,
+    alwaysOnTop: true, resizable: true, webPreferences: { sandbox: true }
+  })
+  win.setAlwaysOnTop(true, 'screen-saver')
+  const html = `<!doctype html><meta charset="utf-8"><style>
+    html,body{margin:0;height:100%;background:#0b0c12;overflow:hidden;cursor:zoom-out}
+    .w{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}
+    img{max-width:100%;max-height:100%;object-fit:contain;border-radius:10px;box-shadow:0 14px 44px rgba(0,0,0,.6)}
+    .h{position:fixed;bottom:12px;left:0;right:0;text-align:center;color:#7f86a0;font:600 12px system-ui,sans-serif}
+  </style><div class="w"><img src="${dataUrl}"></div><div class="h">click or press Esc to close</div>
+  <script>addEventListener('click',()=>window.close());addEventListener('keydown',e=>{if(e.key==='Escape')window.close()})</script>`
+  win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
+  win.webContents.on('before-input-event', (_e, input) => { if (input.key === 'Escape') win.close() })
+  win.once('ready-to-show', () => { win.show(); win.focus() })
+  win.on('blur', () => { if (!win.isDestroyed()) win.close() })
+  win.on('closed', () => { if (dreamViewer === win) dreamViewer = null })
+  dreamViewer = win
+}
+
+async function openDreamViewerCurrent(): Promise<void> {
+  const src = dreamCurrent
+  if (!src) return
+  let url: string | null = null
+  if (src.kind === 'local') {
+    url = readPhotoDataUrl(src.ref)
+  } else {
+    const key = loadImmichKey()
+    if (key) url = await fetchPreviewDataUrl(settings.immich.serverUrl, src.ref, key)
+  }
+  if (url) openDreamViewer(url)
 }
 
 function dreamTick(): void {
@@ -555,6 +603,12 @@ function registerIpc(): void {
     if (f === 'all' || f === 'builtin' || f === 'user') { settings.petFilter = f; saveSettings(settings) }
   })
   ipcMain.on('settings:play-clip', (_e, clip: ClipName) => engine?.forcePlay(clip))
+  // Dream bubble: flip click-through on/off as the pointer enters/leaves it, and
+  // open the current photo full-size on a double-click.
+  ipcMain.on('dream:set-interactive', (_e, on: boolean) => {
+    if (dreamWindow && !dreamWindow.isDestroyed()) dreamWindow.setIgnoreMouseEvents(!on, { forward: true })
+  })
+  ipcMain.on('dream:open-viewer', () => { void openDreamViewerCurrent() })
   ipcMain.handle('immich:status', () => immichStatus())
   ipcMain.on('immich:set-config', (_e, cfg: Partial<ImmichConfig>) => {
     if (typeof cfg.serverUrl === 'string') settings.immich.serverUrl = cfg.serverUrl.trim()
