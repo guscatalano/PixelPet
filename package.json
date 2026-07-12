@@ -14,7 +14,7 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "dist": "npm run build && electron-builder --win",
-    "pack:store": "npm run build && electron-builder --win appx",
+    "pack:store": "npm run build && electron-builder --win appx --publish never",
     "release:patch": "npm version patch -m \"Release v%s\" && git push --follow-tags",
     "release:minor": "npm version minor -m \"Release v%s\" && git push --follow-tags",
     "release:major": "npm version major -m \"Release v%s\" && git push --follow-tags"
