@@ -103,3 +103,44 @@ const p256 = iconAt(256)
 write('icon.png', p256.png, '(256x256, branded tile)')
 write('tray.png', catOnly(32).png, '(32x32, cat only)')
 write('icon.ico', encodeICO([iconAt(32), iconAt(64), iconAt(128), p256]), '(multi-size .ico)')
+
+// ---- Microsoft Store (MSIX/APPX) tiles ----
+// Full-bleed square/rectangular branded plates (no rounded corners — Windows
+// applies its own tile masking). electron-builder picks these up by filename
+// from buildResources (the assets/ dir) when building the appx target.
+function brandedRect(w, h, catFrac, biasY = 0) {
+  const out = new Uint8Array(w * h * 4)
+  const diag = w + h
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      let g = mix(TL, BR, (x + y) / diag) // diagonal twilight gradient
+      const glow = Math.max(0, 1 - Math.hypot(x - w * 0.4, y - h * 0.34) / (Math.max(w, h) * 0.6)) * 0.16
+      g = mix(g, [255, 255, 255], glow)
+      const d = (y * w + x) * 4
+      out[d] = g[0]; out[d + 1] = g[1]; out[d + 2] = g[2]; out[d + 3] = 255
+    }
+  const cs = Math.round(Math.min(w, h) * catFrac)
+  const cat = scaleCat(cs)
+  const ox = Math.floor((w - cs) / 2), oy = Math.floor((h - cs) / 2) + Math.round(h * biasY)
+  for (let y = 0; y < cs; y++)
+    for (let x = 0; x < cs; x++) {
+      const a = cat[(y * cs + x) * 4 + 3]
+      if (!a) continue
+      const dx = ox + x, dy = oy + y
+      if (dx < 0 || dx >= w || dy < 0 || dy >= h) continue
+      const s = (y * cs + x) * 4, d = (dy * w + dx) * 4, af = a / 255
+      out[d] = Math.round(cat[s] * af + out[d] * (1 - af))
+      out[d + 1] = Math.round(cat[s + 1] * af + out[d + 1] * (1 - af))
+      out[d + 2] = Math.round(cat[s + 2] * af + out[d + 2] * (1 - af))
+      out[d + 3] = 255
+    }
+  return out
+}
+const tile = (name, w, h, f, bias = 0) => write(name, encodePNG(w, h, brandedRect(w, h, f, bias)), `(${w}x${h} Store tile)`)
+tile('Square44x44Logo.png', 44, 44, 0.78)
+tile('Square71x71Logo.png', 71, 71, 0.72)
+tile('Square150x150Logo.png', 150, 150, 0.64)
+tile('Square310x310Logo.png', 310, 310, 0.58)
+tile('Wide310x150Logo.png', 310, 150, 0.72)
+tile('StoreLogo.png', 50, 50, 0.74)
+tile('SplashScreen.png', 620, 300, 0.5)

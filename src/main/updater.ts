@@ -11,6 +11,10 @@ const { autoUpdater } = electronUpdater
 
 const RECHECK_MS = 6 * 60 * 60 * 1000 // re-check a few times a day for long-running sessions
 
+// Inside a Microsoft Store (MSIX/APPX) package the Store manages updates, and a
+// self-updater is both pointless and disallowed. Electron sets this flag then.
+const isStoreBuild = (process as unknown as { windowsStore?: boolean }).windowsStore === true
+
 let updateReady = false
 let downloadedVersion: string | null = null
 let onChange: (() => void) | null = null
@@ -24,7 +28,7 @@ export function onUpdateStateChange(fn: () => void): void { onChange = fn }
 
 /** Start the background auto-update loop. Safe to call always; no-ops in dev. */
 export function initAutoUpdate(): void {
-  if (!app.isPackaged) return
+  if (!app.isPackaged || isStoreBuild) return
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true // if they just quit, the update lands next launch
 
@@ -50,6 +54,10 @@ export function restartToUpdate(): void {
 
 /** Manual "Check for updates…" from the tray, with user feedback either way. */
 export async function checkForUpdatesManual(): Promise<void> {
+  if (isStoreBuild) {
+    await dialog.showMessageBox({ type: 'info', message: 'Updates are managed by the Microsoft Store.' })
+    return
+  }
   if (!app.isPackaged) {
     await dialog.showMessageBox({ type: 'info', message: 'Updates are only checked in the installed app.' })
     return

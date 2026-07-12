@@ -47,15 +47,53 @@ copies update themselves from those releases via `electron-updater`.
 
 Keep a short human-readable summary in the GitHub release notes (what changed, any caveats).
 
+## Microsoft Store (MSIX)
+
+The Store build is a **separate track** from the GitHub Releases above — the Store signs
+the package (no SmartScreen) and manages updates, so the in-app auto-updater turns itself
+off inside a Store build (`process.windowsStore`). It is **not** attached to GitHub Releases.
+
+The identity is already registered in Partner Center and wired into `build.appx` in
+`package.json`:
+
+| Field | Value |
+|-------|-------|
+| Identity Name | `GusCatalano.PixelPets` |
+| Publisher | `CN=119E0257-3B74-437C-A728-AC7C50256853` |
+| Publisher Display Name | `Gus Catalano` |
+| Package Family Name | `GusCatalano.PixelPets_hbnb01h0zx9vj` |
+| Store ID | `9MZ89Q1DGR0R` |
+
+Store tile art (Square/Wide/Splash/StoreLogo PNGs) is generated into `assets/` by
+`npm run gen:icons`, and electron-builder picks it up by filename.
+
+### Build & submit
+
+1. **Prerequisite:** the Windows 10/11 SDK must be installed (electron-builder needs
+   `makeappx.exe`). Build on a Windows machine (or CI runner).
+2. Bump the version if needed (the Store rejects re-uploading the same version).
+3. Package the appx:
+
+   ```bash
+   npm run pack:store   # -> release/PixelPet <version>.appx
+   ```
+
+   electron-builder leaves it unsigned; **the Store signs it on ingestion**, so don't sign
+   it yourself for a Store submission.
+4. In [Partner Center](https://partner.microsoft.com/dashboard) → PixelPets → **Packages**,
+   upload the `.appx`. Fill in the store listing (description, screenshots), then submit.
+5. After it passes certification it goes live; the **Store deep link / web URL** appear then
+   and can back a `winget` entry.
+
 ## Not done yet / roadmap
 
-- **Code signing.** Releases are currently **unsigned**, so users hit a SmartScreen
-  "unknown publisher" warning (documented in the README). Adding a signing cert
-  (e.g. Azure Trusted Signing) removes it — plug the credentials into the workflow and
-  electron-builder signs automatically.
-- **winget.** Once releases are stable, submit a manifest to
-  [`microsoft/winget-pkgs`](https://github.com/microsoft/winget-pkgs) so users can
-  `winget install PixelPet`.
+- **Code signing (direct download).** The GitHub-release installer/portable are still
+  **unsigned**, so users hit a SmartScreen "unknown publisher" warning (documented in the
+  README). Adding a cert (e.g. Azure Trusted Signing) removes it — plug the credentials into
+  the workflow and electron-builder signs automatically. (The Store build doesn't need this.)
+- **winget.** Once the Store listing is live (or the signed direct download exists), submit a
+  manifest to [`microsoft/winget-pkgs`](https://github.com/microsoft/winget-pkgs) so users
+  can `winget install PixelPet`.
 
 ## Manual build (local, no publish)
 

@@ -14,6 +14,7 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "dist": "npm run build && electron-builder --win",
+    "pack:store": "npm run build && electron-builder --win appx",
     "release:patch": "npm version patch -m \"Release v%s\" && git push --follow-tags",
     "release:minor": "npm version minor -m \"Release v%s\" && git push --follow-tags",
     "release:major": "npm version major -m \"Release v%s\" && git push --follow-tags"
@@ -49,6 +50,18 @@
         "portable"
       ],
       "icon": "assets/icon.ico"
+    },
+    "appx": {
+      "identityName": "GusCatalano.PixelPets",
+      "publisher": "CN=119E0257-3B74-437C-A728-AC7C50256853",
+      "publisherDisplayName": "Gus Catalano",
+      "applicationId": "PixelPet",
+      "displayName": "PixelPet",
+      "backgroundColor": "#1c1d30",
+      "showNameOnTiles": true,
+      "languages": [
+        "en-US"
+      ]
     },
     "nsis": {
       "oneClick": false,
