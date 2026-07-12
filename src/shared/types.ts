@@ -10,7 +10,7 @@ import type { Difficulty } from './care'
  * that report back via pet:clip-ended when finished.
  */
 export type ClipName =
-  | 'idle' | 'sit' | 'walk' | 'sleep' | 'react' | 'fall'
+  | 'idle' | 'sit' | 'walk' | 'prance' | 'sleep' | 'react' | 'fall'
   | 'loaf' | 'sphinx' | 'groom' | 'teeter' | 'poof' | 'pounce' | 'yawn' | 'stretch' | 'paw' | 'sick' | 'sulk'
 
 /** Which way the pet faces (affects horizontal flip). */

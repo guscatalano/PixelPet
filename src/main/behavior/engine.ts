@@ -8,6 +8,7 @@ import { refreshPlatforms, supportY } from '../desktop/world'
 
 const MOVE_TICK_MS = 16
 const WALK_SPEED = 0.35 // px per tick (~22 px/s) — a calm walking pace, not a scramble
+const PRANCE_SPEED = 0.6 // an excited prance covers ground faster
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
 const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never reports it
@@ -118,8 +119,11 @@ export class PetEngine {
   /** "Stay here" mode: no wandering, no pounce leaps — the cat holds its spot. */
   setStayPut(v: boolean): void {
     this.stayPut = v
-    if (v && this.clip === 'walk') this.finishWander()
+    if (v && this.isWalking()) this.finishWander()
   }
+
+  /** Walk and prance share all the movement machinery; only the look differs. */
+  private isWalking(): boolean { return this.clip === 'walk' || this.clip === 'prance' }
 
   /** Per-animation opt-outs from settings. */
   setDisabled(anims: ClipName[]): void {
@@ -276,7 +280,8 @@ export class PetEngine {
     switch (clip) {
       case 'yawn': case 'stretch': case 'react': case 'paw': this.playOneShot(clip); break
       case 'pounce': this.startPounce(); break
-      case 'walk': this.startWander(); break
+      case 'walk': this.startWander('walk'); break
+      case 'prance': this.startWander('prance'); break
       case 'sleep': this.setClip('sleep'); this.scheduleAmbient(this.dwellFor('sleep')); break
       case 'loaf': this.setClip('loaf'); this.scheduleAmbient(this.dwellFor('loaf')); break
       case 'sphinx': this.setClip('sphinx'); this.scheduleAmbient(this.dwellFor('sphinx')); break
@@ -297,7 +302,7 @@ export class PetEngine {
 
   // ---- wandering + physics -------------------------------------------------------
 
-  private startWander(): void {
+  private startWander(force?: 'walk' | 'prance'): void {
     if (this.dragging || this.win.isDestroyed()) return
     const wa = screen.getDisplayMatching(this.win.getBounds()).workArea
     const minX = wa.x
@@ -315,7 +320,10 @@ export class PetEngine {
     this.walkDist = 0
     this.facing = target < this.curX ? 'left' : 'right'
     this.walkAskedAt = Date.now()
-    this.setClip('walk', this.facing)
+    // Excited cats sometimes prance instead of plodding.
+    const p = this.personality
+    const prance = force ? force === 'prance' : Math.random() < 0.12 + p.energy * 0.3 + p.mischief * 0.22
+    this.setClip(prance ? 'prance' : 'walk', this.facing)
   }
 
   // The always-on physics tick: walking, gravity onto whatever window/taskbar is
@@ -337,7 +345,7 @@ export class PetEngine {
     // or ballistic drift during a leap.
     if (this.airMode === 'leap') {
       this.curX += this.vx
-    } else if (this.wanderTarget !== null && this.clip === 'walk') {
+    } else if (this.wanderTarget !== null && this.isWalking()) {
       if (this.visualReady) {
         const feetX = this.curX + b.width / 2
         const feetY = this.curY + feetOff
@@ -357,12 +365,13 @@ export class PetEngine {
           return
         }
         const dx = this.wanderTarget - this.curX
-        if (Math.abs(dx) <= WALK_SPEED) {
+        const spd = this.clip === 'prance' ? PRANCE_SPEED : WALK_SPEED
+        if (Math.abs(dx) <= spd) {
           this.curX = this.wanderTarget
           this.finishWander()
         } else {
-          this.curX += Math.sign(dx) * WALK_SPEED
-          this.walkDist += WALK_SPEED
+          this.curX += Math.sign(dx) * spd
+          this.walkDist += spd
         }
       } else if (Date.now() - this.walkAskedAt > 5000) {
         this.finishWander() // renderer never arrived; don't stall forever
@@ -401,7 +410,7 @@ export class PetEngine {
       this.lastX = rx
       this.lastY = ry
     }
-    if (this.clip === 'walk' && this.airMode === 'none' && this.visualReady) {
+    if (this.isWalking() && this.airMode === 'none' && this.visualReady) {
       this.win.webContents.send('pet:walk-step', (this.walkDist / STRIDE) % 1)
     }
   }

@@ -442,7 +442,7 @@ function drawFace(overlay, fur, g, state) {
 // A separate pose used while the pet travels: a side view with four legs doing a
 // walk cycle (driven by `step` 0..1). Faces right; the renderer flips for left.
 // Uses the same shade/region/overlay output so render() works unchanged.
-export function generateWalkGrid(preset, step = 0, motion = 1) {
+export function generateWalkGrid(preset, step = 0, motion = 1, excite = 0) {
   // Fit the walk to the pet's build (mirror of catgen.ts).
   const g = { ...defaultGeom(), ...(preset.geom || {}) }
   const kbx = g.bodyRx / 12, kby = g.bodyRy / 11, kh = g.headRx / 11
@@ -453,11 +453,11 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
   const set = (x, y) => { if (inB(x, y)) fur[idx(x, y)] = 1 }
 
   const groundY = 43
-  const bob = Math.sin(step * Math.PI * 4) * 1.3 * motion
+  const bob = Math.sin(step * Math.PI * 4) * (1.3 + excite * 1.7) * motion
   const bodyRx = 11.5 * kbx, bodyRy = 7.4 * kby
   const bodyCx = 18, bodyCy = 33.7 - bodyRy * 0.5 + bob // hip line fixed
   const dTop = (bodyCy - bodyRy) - (30 + bob - 7.4)
-  const headCx = 32, headCy = 24 + bob + dTop * 0.85, headR = 7 * kh
+  const headCx = 32, headCy = 24 + bob + dTop * 0.85 - excite * 2.6, headR = 7 * kh
   const bodyBottom = bodyCy + bodyRy * 0.5
   const sxw = (x) => bodyCx + (x - bodyCx) * kbx
 
@@ -477,7 +477,7 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
   }
   // Stance = 75% of the cycle. A sets the horizontal foot range so a planted foot
   // slides back exactly as fast as the body advances: STRIDE = 2*A/0.75. (=12.)
-  const A = 4.5, LIFT = 3.4, SWING = 0.25
+  const A = 4.5, LIFT = 3.4 + excite * 2.4, SWING = 0.25
   const drawLeg = (lg) => {
     const p = (((step + lg.ph) % 1) + 1) % 1
     let offX, lift, flex
@@ -518,8 +518,10 @@ export function generateWalkGrid(preset, step = 0, motion = 1) {
 
   // Tail: a long tail held up and curving from the rear (cats walk tail-up).
   {
-    const tailSway = Math.sin(step * Math.PI * 2) * 2 * motion
-    const p0 = [bodyCx - bodyRx * 0.7, bodyCy - 1], p1 = [bodyCx - bodyRx - 4, bodyCy - 9], p2 = [bodyCx - bodyRx + 3 + tailSway, bodyCy - 18]
+    const tailSway = Math.sin(step * Math.PI * 2) * (2 + excite * 1.6) * motion
+    const p0 = [bodyCx - bodyRx * 0.7, bodyCy - 1]
+    const p1 = [bodyCx - bodyRx - 4 + excite * 3, bodyCy - 9 - excite * 5]
+    const p2 = [bodyCx - bodyRx + 3 + tailSway + excite * 5, bodyCy - 18 - excite * 7]
     for (let t = 0; t <= 1.0001; t += 0.05) {
       const it = 1 - t
       ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], (2.6 - t * 1.1) * kLeg, (2.6 - t * 1.1) * kLeg)

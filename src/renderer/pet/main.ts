@@ -89,6 +89,18 @@ function getWalkFrame(step: number): HTMLCanvasElement {
   return c
 }
 
+// The prance: the same gait rendered "excited" (bouncier, tail up, head proud).
+const pranceCache = new Map<number, HTMLCanvasElement>()
+function getPranceFrame(step: number): HTMLCanvasElement {
+  const s = ((Math.round(step * WALK_QUANT) % WALK_QUANT) + WALK_QUANT) % WALK_QUANT
+  let c = pranceCache.get(s)
+  if (!c) {
+    c = rgbaToCanvas(renderPet(generateWalkGrid(activePet, s / WALK_QUANT, 1, 1), activePet.coat))
+    pranceCache.set(s, c)
+  }
+  return c
+}
+
 // Rig-pose frames for node loops, cached by a caller-chosen key.
 const rigCache = new Map<string, HTMLCanvasElement>()
 function getRigFrame(key: string, make: () => RigPose): HTMLCanvasElement {
@@ -105,7 +117,7 @@ function getRigFrame(key: string, make: () => RigPose): HTMLCanvasElement {
 // (real motion: the cat turns, sits, tucks, coils). The engine requests a clip;
 // the renderer walks the graph to it and reports arrival via stateReached.
 type Node =
-  | 'front' | 'sit' | 'stand' | 'walk' | 'loaf' | 'sphinx' | 'sleep' | 'groom'
+  | 'front' | 'sit' | 'stand' | 'walk' | 'prance' | 'loaf' | 'sphinx' | 'sleep' | 'groom'
   | 'teeter' | 'crouch' | 'air' | 'fall' | 'poof' | 'sick' | 'sulk'
 
 interface Frame { img: HTMLCanvasElement; ms: number; ox?: number; oy?: number }
@@ -185,6 +197,7 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
     case 'sit>sulk': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.sulk, 4, 110)) // ears flatten back
     case 'sulk>sit': return seqFrames(key, () => rigLerpFrames(POSES.sulk, POSES.sit, 4, 110))
     case 'stand>walk': case 'walk>stand': return [] // same base pose
+    case 'stand>prance': case 'prance>stand': return [] // same base pose (just more excited legs)
     case 'stand>teeter': return seqFrames(key, () => rigLerpFrames(POSES.stand, POSES.teeter, 4, 100))
     case 'teeter>stand': return seqFrames(key, () => rigLerpFrames(POSES.teeter, POSES.stand, 4, 100))
     case 'stand>poof': return seqFrames(key, () => rigLerpFrames(POSES.stand, POSES.poof, 4, 75)) // fast — it's a scare
@@ -207,8 +220,9 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
 const EDGES: Record<Node, Node[]> = {
   front: ['sit'],
   sit: ['front', 'stand', 'loaf', 'sphinx', 'sleep', 'groom', 'sick', 'sulk'],
-  stand: ['sit', 'walk', 'teeter', 'poof', 'crouch'],
+  stand: ['sit', 'walk', 'prance', 'teeter', 'poof', 'crouch'],
   walk: ['stand'],
+  prance: ['stand'],
   loaf: ['sit', 'sphinx'],
   sphinx: ['sit', 'loaf'],
   sleep: ['sit'],
@@ -285,7 +299,7 @@ const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = { yawn: yawnFr
 
 // ---- Graph runtime state ------------------------------------------------------
 const NODE_OF: Partial<Record<ClipName, Node>> = {
-  idle: 'front', sit: 'sit', walk: 'walk', sleep: 'sleep', loaf: 'loaf', sphinx: 'sphinx',
+  idle: 'front', sit: 'sit', walk: 'walk', prance: 'prance', sleep: 'sleep', loaf: 'loaf', sphinx: 'sphinx',
   groom: 'groom', teeter: 'teeter', fall: 'fall', poof: 'poof', sick: 'sick', sulk: 'sulk'
 }
 const CROUCH_WIGGLE_MS = 1150 // butt-wiggle time before the leap
@@ -436,6 +450,7 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
     }
     case 'stand': return { img: getRigFrame('stand', () => POSES.stand) }
     case 'walk': return { img: getWalkFrame(walkStep) }
+    case 'prance': return { img: getPranceFrame(walkStep) }
     case 'fall': return { img: getWalkFrame((now / 90) % 1) } // legs scrabbling in the air
     case 'loaf': {
       // Hover a loafing cat and it turns its head to look at you (body stays
@@ -591,6 +606,7 @@ window.pet.onSetPet((next: Pet) => {
   activePet = next
   frontCache.clear()
   walkCache.clear()
+  pranceCache.clear()
   rigCache.clear()
   seqCache.clear()
   hitMask = buildHitMask()

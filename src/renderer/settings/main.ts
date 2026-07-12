@@ -192,6 +192,7 @@ function pawState(t: number): { paw: number; pawX: number } {
 const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) => Uint8ClampedArray }> = [
   { key: 'idle', label: 'Idle', rgba: (pet, t) => renderPet(generateGrid(pet, idleState(t)), pet.coat) },
   { key: 'walk', label: 'Walk', rgba: (pet, t) => renderPet(generateWalkGrid(pet, (t / 900) % 1), pet.coat) },
+  { key: 'prance', label: 'Prance', rgba: (pet, t) => renderPet(generateWalkGrid(pet, (t / 620) % 1, 1, 1), pet.coat) },
   { key: 'sit', label: 'Sit', rgba: (pet, t) => renderPet(generateRigGrid(pet, sitPose(t)), pet.coat) },
   { key: 'loaf', label: 'Loaf', rgba: (pet, t) => renderPet(generateRigGrid(pet, loafPose(t)), pet.coat) },
   { key: 'sphinx', label: 'Sphinx', rgba: (pet, t) => renderPet(generateRigGrid(pet, sphinxPose(t)), pet.coat) },
