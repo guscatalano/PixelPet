@@ -57,20 +57,9 @@
         font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
         text-transform: uppercase; color: var(--faint); margin-bottom: 12px;
       }
-      /* Collapsible sections */
-      details.sec { margin-top: 22px; border-top: 1px solid var(--hair); padding-top: 16px; }
-      details.sec:first-of-type { border-top: 0; padding-top: 0; }
-      details.sec > summary.label {
-        list-style: none; cursor: pointer; display: flex; align-items: center; gap: 7px;
-        margin-bottom: 0; padding: 2px 0;
-      }
-      details.sec > summary.label::-webkit-details-marker { display: none; }
-      details.sec > summary.label::before {
-        content: '▸'; color: var(--faint); font-size: 9px; transition: transform 0.15s; display: inline-block;
-      }
-      details.sec[open] > summary.label::before { transform: rotate(90deg); }
-      details.sec[open] > summary.label { margin-bottom: 14px; }
-      details.sec > summary.label:hover { color: var(--dim); }
+      /* Sections within a tab (always expanded — the tabs do the navigating) */
+      .sec { margin-top: 26px; }
+      .sec:first-of-type { margin-top: 4px; }
 
       /* Pet grid — scrolls within itself so the controls below stay in view */
       .grid {
@@ -247,8 +236,8 @@
       </div>
       <div class="noresults" id="noresults" style="display: none">No settings match that search.</div>
 
-      <details class="sec" open data-tab="pet">
-        <summary class="label">Your pet</summary>
+      <section class="sec" data-tab="pet">
+        <div class="label">Your pet</div>
         <div class="seg" id="gridfilter" style="margin-bottom: 10px">
           <button data-f="all" class="on">All</button>
           <button data-f="builtin">Built-in</button>
@@ -257,10 +246,10 @@
         <div class="grid" id="grid"></div>
         <div class="gridempty" id="gridempty" style="display: none">No generated cats yet — make one below.</div>
         <div class="petid" id="petid"></div>
-      </details>
+      </section>
 
-      <details class="sec" data-tab="pet">
-        <summary class="label">Create from a photo</summary>
+      <section class="sec" data-tab="pet">
+        <div class="label">Create from a photo</div>
         <div class="ai">
           <div class="field">
             <label for="aiprovider">Provider</label>
@@ -303,20 +292,20 @@
             that provider.
           </div>
         </div>
-      </details>
+      </section>
 
-      <details class="sec" open data-tab="anim">
-        <summary class="label">Animations &middot; <span id="poseWho">Ash</span> &middot; <span style="text-transform: none; letter-spacing: 0">click a tile to play it on your cat &middot; corner dot turns it on/off</span></summary>
+      <section class="sec" data-tab="anim">
+        <div class="label">Animations &middot; <span id="poseWho">Ash</span> &middot; <span style="text-transform: none; letter-spacing: 0">click a tile to play it on your cat &middot; corner dot turns it on/off</span></div>
         <div class="poses" id="poses"></div>
-      </details>
+      </section>
 
-      <details class="sec" open data-tab="pet">
-        <summary class="label">Size</summary>
+      <section class="sec" data-tab="pet">
+        <div class="label">Size</div>
         <div class="seg" id="sizes"></div>
-      </details>
+      </section>
 
-      <details class="sec" open data-tab="anim">
-        <summary class="label">Animation &amp; behavior</summary>
+      <section class="sec" data-tab="anim">
+        <div class="label">Animation &amp; behavior</div>
         <div class="traits">
           <div class="trow">
             <div class="tn">Turn speed</div>
@@ -349,10 +338,10 @@
             <div class="tv" id="dreamchancev" style="width: 74px">55%</div>
           </div>
         </div>
-      </details>
+      </section>
 
-      <details class="sec" data-tab="care">
-        <summary class="label">Care mode</summary>
+      <section class="sec" data-tab="care">
+        <div class="label">Care mode</div>
         <div class="care">
           <div class="carehead">
             <button class="toggle" id="caremode" aria-pressed="false">Off</button>
@@ -375,10 +364,10 @@
             <div class="hint">The cat has needs that slowly drain over real time — even while PixelPet is closed. Tend them and it thrives; neglect it and it gets hungry, sleepy, then unwell (but always bounces back). Its mood shapes how it behaves.</div>
           </div>
         </div>
-      </details>
+      </section>
 
-      <details class="sec" data-tab="dreams">
-        <summary class="label">Dream photos &middot; Immich album</summary>
+      <section class="sec" data-tab="dreams">
+        <div class="label">Dream photos &middot; Immich album</div>
         <div class="ai">
           <div class="field">
             <label for="imserver">Server URL</label>
@@ -403,10 +392,10 @@
             photos plus random photos pulled from this Immich album. The key is stored encrypted on this PC.
           </div>
         </div>
-      </details>
+      </section>
 
-      <details class="sec" data-tab="pet">
-        <summary class="label">Personality</summary>
+      <section class="sec" data-tab="pet">
+        <div class="label">Personality</div>
         <div class="traits">
           <div class="traits-head">
             <div class="who">Tuning <b id="who">Ash</b><span class="mod" id="mod"></span></div>
@@ -414,7 +403,7 @@
           </div>
           <div id="rows"></div>
         </div>
-      </details>
+      </section>
     </div>
     <script type="module" src="./settings/main.ts"></script>
   </body>

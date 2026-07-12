@@ -300,7 +300,7 @@ function thumbnail(petId: string): HTMLCanvasElement {
 function buildNav(): void {
   const tabsBar = $('tabs')
   const search = $<HTMLInputElement>('search')
-  const secs = Array.from(document.querySelectorAll<HTMLDetailsElement>('details.sec'))
+  const secs = Array.from(document.querySelectorAll<HTMLElement>('.sec'))
   let activeTab = 'pet'
   const showTab = (): void => {
     $('noresults').style.display = 'none'
@@ -321,7 +321,7 @@ function buildNav(): void {
     for (const s of secs) {
       const match = (s.textContent ?? '').toLowerCase().includes(q)
       s.style.display = match ? '' : 'none'
-      if (match) { s.open = true; any = true }
+      if (match) any = true
     }
     $('noresults').style.display = any ? 'none' : 'block'
   }
