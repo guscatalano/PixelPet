@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality } from '../shared/types'
 import type { AppPet } from '../shared/pets'
+import type { PetDNA } from '../shared/petdna'
 import type { CareStatus, CareAction, Difficulty } from '../shared/care'
 import type { ImmichStatus, ImmichConfig } from '../shared/types'
 
@@ -70,6 +71,8 @@ const api = {
   testAi: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('ai:test'),
   /** Generate a pet from photo data URLs; on success it's added + made active. */
   generateFromPhotos: (dataUrls: string[]): Promise<GenResult> => ipcRenderer.invoke('ai:generate', dataUrls),
+  /** Build a cat from DNA (manual editor / randomizer); added + made active. */
+  createPet: (dna: PetDNA): Promise<GenResult> => ipcRenderer.invoke('pets:create', dna),
   /** Delete a user-generated pet. */
   deleteUserPet: (petId: string): void => ipcRenderer.send('pets:delete-user', petId),
   /** Rename any cat (empty name clears the override back to its default). */

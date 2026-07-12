@@ -71,6 +71,36 @@ export function sanitizeDNA(raw: unknown): PetDNA {
   }
 }
 
+// ---- Random cat (no AI) ----------------------------------------------------
+// Produce a curated-random PetDNA that always looks on-model: colors are picked
+// PER MARKING (a calico gets a pale base, a tuxedo a dark one, a Siamese-style
+// points cat gets a pale body + dark points + blue eyes), then the same
+// dnaToPet() the photo flow uses turns it into a real pet.
+const RAND_NAMES = ['Mochi', 'Clover', 'Waffles', 'Nimbus', 'Olive', 'Tofu', 'Comet', 'Poppy', 'Bean', 'Maple', 'Dusty', 'Willow', 'Jasper', 'Cinnamon', 'Noodle', 'Suki', 'Gizmo', 'Pip', 'Mango', 'Basil', 'Yuki', 'Cricket', 'Otis', 'Momo', 'Ziggy', 'Pesto', 'Sprout', 'Ember', 'Pixel', 'Biscotti']
+const RAND_BLURBS = ['A one-of-a-kind cat.', 'No two are ever the same.', 'Freshly dreamed up.', 'A happy little accident.', 'Rolled fresh off the dice.']
+const IRISES = ['#8fae5a', '#e0a93e', '#5b93c9', '#b6772e', '#6fae86', '#c98a3a']
+const DARKS = ['#2a2b31', '#33343d', '#3f3a44', '#463b33', '#2e2f39']
+const MIDS = ['#d9a35f', '#c8823c', '#9aa0ad', '#6d7280', '#a5734a', '#7a5236', '#b8b0c4', '#8a8f9c']
+const PALES = ['#ece7dc', '#e7c9a0', '#eceaf0', '#e6d8c4', '#dcd6e2']
+const rpick = <T>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)]
+
+/** A curated random cat DNA — no AI, no setup. */
+export function randomPetDNA(): PetDNA {
+  const marking = rpick(MARKING_NAMES)
+  const colors = { primary: '#c8c8d0', iris: rpick(IRISES) } as PetDNA['colors']
+  switch (marking) {
+    case 'tuxedo': colors.primary = rpick(DARKS); break
+    case 'bicolor': colors.primary = rpick(MIDS); break
+    case 'tabby': colors.primary = rpick([...MIDS, DARKS[0], DARKS[3]]); break
+    case 'points': colors.primary = rpick(PALES); colors.iris = '#5b93c9'; colors.secondary = rpick(['#5a4636', '#4a3a30', '#514038']); break
+    case 'calico': colors.primary = rpick(PALES); colors.secondary = rpick(['#e2963f', '#d98a35', '#c47a2f']); colors.tertiary = rpick(['#3a3038', '#2e2a2e', '#43373a']); break
+    default: colors.primary = rpick([...MIDS, ...DARKS, ...PALES]); break // solid
+  }
+  const personality = {} as Personality
+  for (const k of TRAIT_KEYS) personality[k] = Math.round(Math.random() * 100) / 100
+  return { name: rpick(RAND_NAMES), blurb: rpick(RAND_BLURBS), build: rpick(BUILD_NAMES), marking, eyeStyle: rpick(EYE_STYLES), colors, personality }
+}
+
 /** A slightly darker shade of a hex color, for auto-filled secondary/shadow. */
 function darken(h: string, amt = 0.32): string {
   const n = parseInt(h.slice(1), 16)

@@ -2,6 +2,7 @@ import { generateGrid, generateWalkGrid, render as renderPet, setFrontScale, typ
 import { generateRigGrid, lerpPose, POSES as RIG } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
 import { PETS, type AppPet } from '../../shared/pets'
+import { randomPetDNA, dnaToPet, BUILD_NAMES, MARKING_NAMES, EYE_STYLES, type PetDNA } from '../../shared/petdna'
 import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
 import { TRAIT_KEYS, TOGGLEABLE_ANIMS, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Personality } from '../../shared/types'
 import { NEED_KEYS, type CareStatus, type CareAction, type Difficulty, type Needs } from '../../shared/care'
@@ -35,6 +36,7 @@ interface SettingsApi {
   clearAiKey: () => Promise<AiStatus>
   testAi: () => Promise<{ ok: boolean; message: string }>
   generateFromPhotos: (dataUrls: string[]) => Promise<GenResult>
+  createPet: (dna: PetDNA) => Promise<GenResult>
   deleteUserPet: (petId: string) => void
   renamePet: (petId: string, name: string) => void
   immichStatus: () => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
@@ -579,6 +581,82 @@ function buildAnimation(): void {
   })
 }
 
+// ---- Build a cat (no AI): manual DNA editor + live preview + randomizer ------
+const BUILD_LABELS: Record<string, string> = { normal: 'Normal', chonky: 'Chonky', slim: 'Slim', kitten: 'Kitten', fluffy: 'Fluffy', bigears: 'Big ears' }
+const MARKING_LABELS: Record<string, string> = { solid: 'Solid', tabby: 'Tabby', tuxedo: 'Tuxedo', calico: 'Calico', points: 'Color-points', bicolor: 'Bicolor' }
+const EYE_LABELS: Record<string, string> = { round: 'Round', almond: 'Almond', sleepy: 'Sleepy' }
+
+function buildBuilder(): void {
+  const name = $<HTMLInputElement>('bname'), build = $<HTMLSelectElement>('bbuild')
+  const marking = $<HTMLSelectElement>('bmarking'), eyes = $<HTMLSelectElement>('beyes')
+  const primary = $<HTMLInputElement>('bprimary'), iris = $<HTMLInputElement>('biris')
+  const secondary = $<HTMLInputElement>('bsecondary'), white = $<HTMLInputElement>('bwhite'), tertiary = $<HTMLInputElement>('btertiary')
+  const secWrap = $('bsecwrap'), whiteWrap = $('bwhitewrap'), tertWrap = $('btertwrap')
+  const preview = $<HTMLCanvasElement>('bpreview'), pctx = preview.getContext('2d')!
+  const create = $<HTMLButtonElement>('bcreate'), status = $('bstatus')
+
+  for (const b of BUILD_NAMES) build.append(new Option(BUILD_LABELS[b] ?? b, b))
+  for (const m of MARKING_NAMES) marking.append(new Option(MARKING_LABELS[m] ?? m, m))
+  for (const e of EYE_STYLES) eyes.append(new Option(EYE_LABELS[e] ?? e, e))
+
+  let personality = randomPetDNA().personality // hidden; the randomizer refreshes it
+
+  const dna = (): PetDNA => {
+    const mk = marking.value as PetDNA['marking']
+    const colors: PetDNA['colors'] = { primary: primary.value, iris: iris.value }
+    if (mk === 'tabby' || mk === 'points') colors.secondary = secondary.value
+    if (mk === 'tuxedo' || mk === 'bicolor') colors.white = white.value
+    if (mk === 'calico') { colors.secondary = secondary.value; colors.tertiary = tertiary.value; colors.white = white.value }
+    return { name: name.value.trim() || 'New Cat', blurb: 'A cat I made.', build: build.value as PetDNA['build'], marking: mk, eyeStyle: eyes.value as PetDNA['eyeStyle'], colors, personality }
+  }
+
+  const syncFields = (): void => {
+    const mk = marking.value
+    secWrap.classList.toggle('hide', !(mk === 'tabby' || mk === 'points' || mk === 'calico'))
+    whiteWrap.classList.toggle('hide', !(mk === 'tuxedo' || mk === 'bicolor' || mk === 'calico'))
+    tertWrap.classList.toggle('hide', mk !== 'calico')
+    if (secWrap.firstChild) secWrap.firstChild.nodeValue = mk === 'points' ? 'Points' : mk === 'calico' ? 'Ginger' : 'Stripes'
+  }
+
+  const draw = (): void => {
+    const pet = dnaToPet(dna(), 'preview')
+    const rgba = renderPet(generateGrid(pet, { eyeOpen: true, tailPhase: 0.15 }), pet.coat)
+    const tmp = document.createElement('canvas'); tmp.width = SPRITE_W; tmp.height = SPRITE_H
+    const tc = tmp.getContext('2d')!, img = tc.createImageData(SPRITE_W, SPRITE_H)
+    img.data.set(rgba); tc.putImageData(img, 0, 0)
+    pctx.clearRect(0, 0, preview.width, preview.height); pctx.imageSmoothingEnabled = false
+    pctx.drawImage(tmp, 0, 0, SPRITE_W, SPRITE_H, 0, 0, preview.width, preview.height)
+  }
+
+  const load = (d: PetDNA): void => {
+    name.value = d.name; build.value = d.build; marking.value = d.marking; eyes.value = d.eyeStyle
+    primary.value = d.colors.primary; iris.value = d.colors.iris
+    secondary.value = d.colors.secondary ?? '#c56a24'
+    tertiary.value = d.colors.tertiary ?? '#3a3038'
+    white.value = d.colors.white ?? '#f4f4f7'
+    personality = d.personality
+    syncFields(); draw()
+  }
+
+  for (const el of [name, build, marking, eyes, primary, iris, secondary, white, tertiary]) {
+    el.addEventListener('input', () => { syncFields(); draw() })
+  }
+  $<HTMLButtonElement>('brandom').addEventListener('click', () => { load(randomPetDNA()); status.textContent = ''; status.className = 'status' })
+  create.addEventListener('click', async () => {
+    create.disabled = true
+    const r = await window.settings.createPet(dna())
+    create.disabled = false
+    status.className = 'status ' + (r.ok ? 'ok' : 'err')
+    if (!r.ok) { status.textContent = r.error; return }
+    status.textContent = `Created ${r.pet.name} — added to your pets and made active.`
+    state = await window.settings.get() // main added it + made it active
+    buildGrid(); buildTraits(); refreshMeta()
+    grid.querySelector('.card.active')?.scrollIntoView({ block: 'nearest' })
+  })
+
+  load(randomPetDNA()) // start on a random cat so the editor isn't empty
+}
+
 const DEFAULT_MODELS: Record<AiProviderId, string> = { openai: 'gpt-4o', anthropic: 'claude-sonnet-5' }
 
 function buildAi(): void {
@@ -802,6 +880,7 @@ async function init(): Promise<void> {
   buildSizes()
   buildAnimation()
   buildCare()
+  buildBuilder()
   buildAi()
   buildImmich()
   buildTraits()

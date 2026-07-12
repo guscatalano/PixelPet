@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, screen, Menu, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { dnaToPet } from '../shared/petdna'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality, TriggerEvent } from '../shared/types'
 import { MIN_SCALE, MAX_SCALE, petWindowSize } from '../shared/constants'
 import { createTray, applyTrayMenu, assetPath, type TrayCallbacks } from './tray'
@@ -691,6 +693,20 @@ function registerIpc(): void {
       const pet = await generatePetFromPhotos(shots.map(dataUrlToImage), cfg)
       const saved = saveSourcePhotos(pet.id, shots) // the cat dreams of these later
       if (saved.length) pet.dreamPhotos = saved
+      settings.userPets.push(pet)
+      settings.activePetId = pet.id
+      saveSettings(settings)
+      applyActivePet()
+      return { ok: true, pet }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  // Build a cat without AI: the renderer sends a PetDNA (from the manual editor
+  // or the randomizer); dnaToPet validates/clamps it into a real user pet.
+  ipcMain.handle('pets:create', (_e, dna: unknown) => {
+    try {
+      const pet = dnaToPet(dna, `user-${randomUUID().slice(0, 8)}`)
       settings.userPets.push(pet)
       settings.activePetId = pet.id
       saveSettings(settings)
