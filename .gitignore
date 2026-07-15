@@ -11,6 +11,7 @@ store-assets/
 assets/icon.png
 assets/tray.png
 assets/icon.ico
+assets/appx/
 .preview*.png
 
 # Gallery build outputs

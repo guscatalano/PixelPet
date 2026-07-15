@@ -4,7 +4,7 @@
 // same tile design is drawn in the settings header (see settings/main.ts).
 
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { encodePNG, encodeICO } from './pngEncoder.mjs'
 import { renderCat, W, H } from './catgen.mjs'
@@ -106,8 +106,10 @@ write('icon.ico', encodeICO([iconAt(32), iconAt(64), iconAt(128), p256]), '(mult
 
 // ---- Microsoft Store (MSIX/APPX) tiles ----
 // Full-bleed square/rectangular branded plates (no rounded corners — Windows
-// applies its own tile masking). electron-builder picks these up by filename
-// from buildResources (the assets/ dir) when building the appx target.
+// applies its own tile masking). electron-builder looks for these by filename in
+// the `appx` SUBFOLDER of buildResources (assets/appx/) — getResource(_, "appx")
+// — so writing them to assets/ root is silently ignored and it uses its generic
+// defaults (a Store certification failure, policy 10.1.1.11). Write to assets/appx/.
 function brandedRect(w, h, catFrac, biasY = 0) {
   const out = new Uint8Array(w * h * 4)
   const diag = w + h
@@ -136,7 +138,7 @@ function brandedRect(w, h, catFrac, biasY = 0) {
     }
   return out
 }
-const tile = (name, w, h, f, bias = 0) => write(name, encodePNG(w, h, brandedRect(w, h, f, bias)), `(${w}x${h} Store tile)`)
+const tile = (name, w, h, f, bias = 0) => write(join('appx', name), encodePNG(w, h, brandedRect(w, h, f, bias)), `(${w}x${h} Store tile)`)
 tile('Square44x44Logo.png', 44, 44, 0.78)
 tile('Square71x71Logo.png', 71, 71, 0.72)
 tile('Square150x150Logo.png', 150, 150, 0.64)
