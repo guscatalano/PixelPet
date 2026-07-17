@@ -43,6 +43,11 @@ const CSS = `
   .row img { image-rendering: pixelated; filter: drop-shadow(0 10px 16px rgba(0,0,0,.4)); }
   .emoji { position: absolute; filter: drop-shadow(0 6px 10px rgba(0,0,0,.4)); }
   .win { position: absolute; border-radius: 13px; overflow: hidden; box-shadow: 0 40px 90px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.06); }
+  /* dream photo bubble (matches the in-app bubble, scaled up) */
+  .dbubble { position: absolute; background: #eef1f8; border: 7px solid #2a2c38; border-radius: 30px; padding: 12px; box-shadow: 0 16px 38px rgba(0,0,0,.5); width: 280px; height: 224px; }
+  .dphoto { width: 100%; height: 100%; border-radius: 19px; background: linear-gradient(135deg, #f7dcae 0%, #e79a6b 60%, #d97e57 100%); display: flex; align-items: center; justify-content: center; font-size: 150px; box-shadow: inset 0 0 26px rgba(0,0,0,.14); }
+  .dzzz { position: absolute; top: -46px; right: -10px; color: #d7ddf2; font: 800 46px 'Cascadia Code', 'Segoe UI', monospace; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  .dtail { position: absolute; bottom: -27px; left: 50%; margin-left: -18px; width: 0; height: 0; border: 18px solid transparent; border-top-color: #2a2c38; }
 `
 
 const taskbar = (ic) => `<div class="taskbar"><img class="app" src="${ic}"><span class="ph"></span><span class="ph"></span><span class="ph"></span></div>`
@@ -85,6 +90,18 @@ function scenes(ic, settingsShot) {
         <div class="emoji" style="font-size:96px; left:1080px; bottom:360px;">🐟</div>
         <div class="emoji" style="font-size:70px; left:1520px; bottom:430px;">💗</div>
         <div class="emoji" style="font-size:52px; left:1430px; bottom:520px;">💗</div>
+        ${taskbar(ic)}`
+    },
+    { // 6 — dream mode
+      name: 'screenshot-6-dream.png',
+      body: `<div class="copy"><h1>It dreams of<br>your photos.</h1>
+        <div class="sub">While your cat naps, it drifts through little photo bubbles of the pictures you love.</div></div>
+        <img class="cat" src="${rig('ash', POSES.curl)}" style="width:360px; left:1290px; bottom:150px;">
+        <div class="dbubble" style="left:1330px; bottom:360px;">
+          <div class="dphoto">🐈</div>
+          <div class="dzzz">z</div>
+          <div class="dtail"></div>
+        </div>
         ${taskbar(ic)}`
     },
     { // 5 — settings (real window)
