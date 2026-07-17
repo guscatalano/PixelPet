@@ -2,7 +2,7 @@
 // the real settings window composed onto branded desktop scenes with captions.
 // Run:  npx electron scripts/genStoreScreens.mjs
 import { app, BrowserWindow, ipcMain, nativeImage } from 'electron'
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { renderCat, render, generateWalkGrid, W, H } from './catgen.mjs'
@@ -22,10 +22,21 @@ const iconUrl = () => {
   // small branded plate for the faux taskbar
   return front('ash')
 }
+// The dream bubble's photo: a real image if DREAM_PHOTO=<path> is set, else a
+// warm illustrated placeholder (we can't ship a stranger's photo by default).
+function dreamPhoto() {
+  const p = process.env.DREAM_PHOTO
+  if (p && existsSync(p)) {
+    const ext = (p.split('.').pop() || '').toLowerCase()
+    const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
+    return `<img class="dphoto" src="data:${mime};base64,${readFileSync(p).toString('base64')}">`
+  }
+  return `<div class="dphoto"><span class="subj">🐈</span></div>`
+}
 
 const CSS = `
   * { margin: 0; box-sizing: border-box; }
-  html, body { width: 1920px; height: 1080px; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+  html, body { width: 1920px; height: 100vh; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
   .wall { position: absolute; inset: 0; background:
       radial-gradient(130% 120% at 24% 12%, #4a5488 0%, #2b2f4e 46%, #191c30 100%); }
   .grain { position: absolute; inset: 0; opacity: .05;
@@ -45,7 +56,15 @@ const CSS = `
   .win { position: absolute; border-radius: 13px; overflow: hidden; box-shadow: 0 40px 90px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.06); }
   /* dream photo bubble (matches the in-app bubble, scaled up) */
   .dbubble { position: absolute; background: #eef1f8; border: 7px solid #2a2c38; border-radius: 30px; padding: 12px; box-shadow: 0 16px 38px rgba(0,0,0,.5); width: 280px; height: 224px; }
-  .dphoto { width: 100%; height: 100%; border-radius: 19px; background: linear-gradient(135deg, #f7dcae 0%, #e79a6b 60%, #d97e57 100%); display: flex; align-items: center; justify-content: center; font-size: 150px; box-shadow: inset 0 0 26px rgba(0,0,0,.14); }
+  .dphoto { width: 100%; height: 100%; border-radius: 19px; object-fit: cover; position: relative; overflow: hidden;
+    background:
+      radial-gradient(68% 52% at 72% 20%, rgba(255,245,216,.95), rgba(255,245,216,0) 62%),
+      linear-gradient(180deg, #e7c79b 0%, #dcb488 52%, #c08f61 52%, #a97a51 100%);
+    box-shadow: inset 0 0 44px rgba(78,40,18,.3);
+    display: flex; align-items: flex-end; justify-content: center; }
+  .subj { font-size: 128px; line-height: 1; margin-bottom: 8px; filter: drop-shadow(0 12px 7px rgba(0,0,0,.3)); }
+  .chips { margin-top: 26px; }
+  .chip { display: inline-block; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #e8ecff; font: 600 23px 'Segoe UI', sans-serif; padding: 10px 20px; border-radius: 999px; }
   .dzzz { position: absolute; top: -46px; right: -10px; color: #d7ddf2; font: 800 46px 'Cascadia Code', 'Segoe UI', monospace; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
   .dtail { position: absolute; bottom: -27px; left: 50%; margin-left: -18px; width: 0; height: 0; border: 18px solid transparent; border-top-color: #2a2c38; }
 `
@@ -95,10 +114,11 @@ function scenes(ic, settingsShot) {
     { // 6 — dream mode
       name: 'screenshot-6-dream.png',
       body: `<div class="copy"><h1>It dreams of<br>your photos.</h1>
-        <div class="sub">While your cat naps, it drifts through little photo bubbles of the pictures you love.</div></div>
+        <div class="sub">While your cat naps, it drifts through little photo bubbles of the pictures you love.</div>
+        <div class="chips"><span class="chip">🖼️ Works with your Immich photo server</span></div></div>
         <img class="cat" src="${rig('ash', POSES.curl)}" style="width:360px; left:1290px; bottom:150px;">
         <div class="dbubble" style="left:1330px; bottom:360px;">
-          <div class="dphoto">🐈</div>
+          ${dreamPhoto()}
           <div class="dzzz">z</div>
           <div class="dtail"></div>
         </div>
@@ -128,25 +148,30 @@ app.whenReady().then(async () => {
   for (const ch of ['settings:set-pet', 'settings:set-scale', 'settings:set-trait', 'settings:reset-traits', 'ai:set-config', 'pets:delete-user', 'settings:set-pupils', 'settings:set-caremode', 'settings:set-difficulty', 'care:action', 'settings:set-dreammode', 'settings:set-dreamchance', 'settings:set-dreambubblescale', 'settings:set-petfilter', 'settings:play-clip', 'pets:rename']) {
     ipcMain.on(ch, () => {})
   }
-  const sw = new BrowserWindow({ width: 720, height: 720, show: true, backgroundColor: '#1a1b24', webPreferences: { preload: resolve(root, 'out/preload/settings.js'), sandbox: false } })
+  const sw = new BrowserWindow({ width: 720, height: 720, show: false, backgroundColor: '#1a1b24', webPreferences: { offscreen: true, preload: resolve(root, 'out/preload/settings.js'), sandbox: false } })
+  sw.webContents.setFrameRate(30)
   await sw.loadFile(resolve(root, 'out/renderer/settings.html'))
-  await new Promise((r) => setTimeout(r, 1100))
-  const settingsShot = 'data:image/png;base64,' + (await sw.webContents.capturePage()).toPNG().toString('base64')
+  await new Promise((r) => setTimeout(r, 1300))
+  let sImg = await sw.webContents.capturePage()
+  for (let t = 0; sImg.isEmpty() && t < 5; t++) { await new Promise((r) => setTimeout(r, 400)); sImg = await sw.webContents.capturePage() }
+  const settingsShot = 'data:image/png;base64,' + sImg.toPNG().toString('base64')
   sw.destroy()
 
   // --- render the scenes ---
   const ic = iconUrl()
-  const win = new BrowserWindow({ width: 1920, height: 1080, useContentSize: true, show: true, webPreferences: { offscreen: false } })
+  const win = new BrowserWindow({ width: 1920, height: 1080, frame: false, useContentSize: true, show: false, webPreferences: { offscreen: true } })
+  win.webContents.setFrameRate(30)
   const tmp = resolve(outDir, '_scene.html')
   for (const s of scenes(ic, settingsShot)) {
     writeFileSync(tmp, `<!doctype html><meta charset="utf-8"><style>${CSS}</style><body><div class="wall"></div><div class="grain"></div>${s.body}</body>`)
     await win.loadFile(tmp)
-    await new Promise((r) => setTimeout(r, 500))
+    await new Promise((r) => setTimeout(r, 700))
     let img = await win.webContents.capturePage()
+    for (let t = 0; img.isEmpty() && t < 5; t++) { await new Promise((r) => setTimeout(r, 400)); img = await win.webContents.capturePage() }
     const sz = img.getSize()
-    if (sz.width !== 1920) img = img.resize({ width: 1920, height: 1080 })
+    if (!img.isEmpty()) img = img.resize({ width: 1920, height: 1080 })
     writeFileSync(resolve(outDir, s.name), img.toPNG())
-    console.log('wrote store-assets/' + s.name)
+    console.log(`wrote ${s.name} (from ${sz.width}x${sz.height}, empty=${img.isEmpty()})`)
   }
   app.quit()
  } catch (e) { console.error('SCENE ERROR', e); app.exit(1) }
