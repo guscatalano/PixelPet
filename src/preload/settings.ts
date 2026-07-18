@@ -73,6 +73,8 @@ const api = {
   generateFromPhotos: (dataUrls: string[]): Promise<GenResult> => ipcRenderer.invoke('ai:generate', dataUrls),
   /** Build a cat from DNA (manual editor / randomizer); added + made active. */
   createPet: (dna: PetDNA): Promise<GenResult> => ipcRenderer.invoke('pets:create', dna),
+  /** The app version string (for the About footer). */
+  getVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
   /** Delete a user-generated pet. */
   deleteUserPet: (petId: string): void => ipcRenderer.send('pets:delete-user', petId),
   /** Rename any cat (empty name clears the override back to its default). */

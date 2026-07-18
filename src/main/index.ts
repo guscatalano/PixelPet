@@ -551,6 +551,7 @@ function registerIpc(): void {
 
   // ---- settings channels ----
   ipcMain.handle('settings:get', () => settings)
+  ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.on('settings:set-pet', (_e, petId: string) => {
     // Persist the outgoing pet's needs under its own id before switching.
     if (settings.careMode && engine) saveNeeds(settings.activePetId, engine.getStatus().needs, Date.now())

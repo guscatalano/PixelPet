@@ -37,6 +37,7 @@ interface SettingsApi {
   testAi: () => Promise<{ ok: boolean; message: string }>
   generateFromPhotos: (dataUrls: string[]) => Promise<GenResult>
   createPet: (dna: PetDNA) => Promise<GenResult>
+  getVersion: () => Promise<string>
   deleteUserPet: (petId: string) => void
   renamePet: (petId: string, name: string) => void
   immichStatus: () => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
@@ -339,6 +340,33 @@ function drawAppIcon(): void {
   const dw = cw * sc, dh = ch * sc
   g.drawImage(tmp, minx, miny, cw, ch, (S - dw) / 2, (S - dh) / 2 - S * 0.02, dw, dh)
   g.restore()
+}
+
+// The quiet dedication footer: a small Ash + the version.
+async function buildAbout(): Promise<void> {
+  const cv = $<HTMLCanvasElement>('aboutcat')
+  const S = cv.width
+  const g = cv.getContext('2d')!
+  const ash = PETS[0] // Ash — always Ash here
+  const rgba = renderPet(generateGrid(ash, { eyeOpen: true, tailPhase: 0.15 }), ash.coat)
+  let minx = SPRITE_W, miny = SPRITE_H, maxx = 0, maxy = 0
+  for (let y = 0; y < SPRITE_H; y++)
+    for (let x = 0; x < SPRITE_W; x++)
+      if (rgba[(y * SPRITE_W + x) * 4 + 3]) {
+        if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y
+      }
+  const cw = maxx - minx + 1, ch = maxy - miny + 1
+  const tmp = document.createElement('canvas')
+  tmp.width = SPRITE_W; tmp.height = SPRITE_H
+  const tctx = tmp.getContext('2d')!
+  const timg = tctx.createImageData(SPRITE_W, SPRITE_H)
+  timg.data.set(rgba); tctx.putImageData(timg, 0, 0)
+  g.clearRect(0, 0, S, S)
+  g.imageSmoothingEnabled = false
+  const sc = S / Math.max(cw, ch)
+  const dw = cw * sc, dh = ch * sc
+  g.drawImage(tmp, minx, miny, cw, ch, (S - dw) / 2, (S - dh) / 2, dw, dh)
+  try { $('aboutver').textContent = 'v' + (await window.settings.getVersion()) } catch { /* ignore */ }
 }
 
 // Tab navigation + search across the settings sections.
@@ -873,6 +901,7 @@ function buildImmich(): void {
 async function init(): Promise<void> {
   state = await window.settings.get()
   drawAppIcon()
+  void buildAbout()
   buildNav()
   buildGridFilter()
   buildGrid()
