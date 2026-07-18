@@ -3,6 +3,11 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.3.3 — for Ash
+
+- A quiet **dedication** at the bottom of Settings, in loving memory of **Ash** — the cat
+  PixelPet is named for, and all the joy she brought.
+
 ## v0.3.1 — macOS: fixed & universal
 
 ### Fixed
