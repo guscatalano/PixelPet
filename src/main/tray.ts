@@ -20,7 +20,11 @@ export function assetPath(name: string): string {
 }
 
 export function createTray(cb: TrayCallbacks): Tray {
-  const image = nativeImage.createFromPath(assetPath('tray.png'))
+  const mac = process.platform === 'darwin'
+  // macOS wants a monochrome "template" menu-bar icon (auto-picks @2x); Windows
+  // uses the full-color cat in the notification area.
+  const image = nativeImage.createFromPath(assetPath(mac ? 'trayTemplate.png' : 'tray.png'))
+  if (mac) image.setTemplateImage(true)
   const tray = new Tray(image)
   tray.setToolTip('PixelPet')
   applyTrayMenu(tray, cb, { updateReady: false })

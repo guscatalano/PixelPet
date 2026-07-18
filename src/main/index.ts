@@ -744,6 +744,8 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    // macOS: run as a menu-bar agent (no Dock icon) — the pet + tray are the UI.
+    if (process.platform === 'darwin') app.dock?.hide()
     settings = loadSettings()
     registerIpc()
     petWindow = createPetWindow()

@@ -14,6 +14,7 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "dist": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
     "pack:store": "npm run build && electron-builder --win appx --publish never",
     "release:patch": "npm version patch -m \"Release v%s\" && git push --follow-tags",
     "release:minor": "npm version minor -m \"Release v%s\" && git push --follow-tags",
@@ -50,6 +51,18 @@
         "portable"
       ],
       "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "assets/icon-mac.png",
+      "category": "public.app-category.entertainment",
+      "identity": null,
+      "extendInfo": {
+        "LSUIElement": true
+      }
     },
     "appx": {
       "identityName": "GusCatalano.PixelPets",

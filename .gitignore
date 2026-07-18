@@ -11,6 +11,9 @@ store-assets/
 assets/icon.png
 assets/tray.png
 assets/icon.ico
+assets/icon-mac.png
+assets/trayTemplate.png
+assets/trayTemplate@2x.png
 assets/appx/
 .preview*.png
 

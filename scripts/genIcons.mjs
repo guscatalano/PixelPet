@@ -52,6 +52,14 @@ function scaleCat(size) {
 }
 const catOnly = (size) => ({ size, png: encodePNG(size, size, scaleCat(size)) })
 
+// macOS menu-bar icons are "template" images: black shape + alpha, tinted by the
+// system for light/dark menu bars. Recolor the cat silhouette to solid black.
+function catSilhouette(size) {
+  const src = scaleCat(size), dst = new Uint8Array(size * size * 4)
+  for (let i = 0; i < size * size; i++) { dst[i * 4] = 0; dst[i * 4 + 1] = 0; dst[i * 4 + 2] = 0; dst[i * 4 + 3] = src[i * 4 + 3] }
+  return dst
+}
+
 // ---- the branded rounded-tile icon: twilight gradient + the cat ----
 const mix = (a, b, t) => [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)]
 const TL = [63, 66, 112], BR = [28, 29, 48] // twilight (periwinkle -> deep navy)
@@ -103,6 +111,11 @@ const p256 = iconAt(256)
 write('icon.png', p256.png, '(256x256, branded tile)')
 write('tray.png', catOnly(32).png, '(32x32, cat only)')
 write('icon.ico', encodeICO([iconAt(32), iconAt(64), iconAt(128), p256]), '(multi-size .ico)')
+
+// ---- macOS ----
+write('trayTemplate.png', encodePNG(16, 16, catSilhouette(16)), '(16x16 mac menu-bar template)')
+write('trayTemplate@2x.png', encodePNG(32, 32, catSilhouette(32)), '(32x32 mac menu-bar template @2x)')
+write('icon-mac.png', encodePNG(1024, 1024, appIcon(1024)), '(1024x1024 mac app icon -> .icns)')
 
 // ---- Microsoft Store (MSIX/APPX) tiles ----
 // Full-bleed square/rectangular branded plates (no rounded corners — Windows
