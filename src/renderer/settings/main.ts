@@ -3,6 +3,7 @@ import { generateRigGrid, lerpPose, POSES as RIG } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
 import { PETS, type AppPet } from '../../shared/pets'
 import { randomPetDNA, dnaToPet, BUILD_NAMES, MARKING_NAMES, EYE_STYLES, type PetDNA } from '../../shared/petdna'
+import { ashPhoto } from '../ashPhoto'
 import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
 import { TRAIT_KEYS, TOGGLEABLE_ANIMS, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Personality } from '../../shared/types'
 import { NEED_KEYS, type CareStatus, type CareAction, type Difficulty, type Needs } from '../../shared/care'
@@ -342,8 +343,9 @@ function drawAppIcon(): void {
   g.restore()
 }
 
-// The quiet dedication footer: a small Ash + the version.
+// The quiet dedication footer: Ash's photo, her pixel form, and the version.
 async function buildAbout(): Promise<void> {
+  $<HTMLImageElement>('aboutphoto').src = ashPhoto
   const cv = $<HTMLCanvasElement>('aboutcat')
   const S = cv.width
   const g = cv.getContext('2d')!

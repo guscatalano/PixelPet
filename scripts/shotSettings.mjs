@@ -25,9 +25,10 @@ app.whenReady().then(async () => {
   }
 
   const win = new BrowserWindow({
-    width: 720, height: 620, show: true, backgroundColor: '#1a1b24',
-    webPreferences: { preload: resolve(root, 'out/preload/settings.js'), sandbox: false }
+    width: 720, height: 900, show: false, backgroundColor: '#1a1b24',
+    webPreferences: { offscreen: true, preload: resolve(root, 'out/preload/settings.js'), sandbox: false }
   })
+  win.webContents.setFrameRate(30)
   win.webContents.on('console-message', (_e, lvl, msg, line, src) => console.log(`[console:${lvl}] ${msg} (${src}:${line})`))
   win.webContents.on('render-process-gone', (_e, d) => console.log('[gone] ' + d.reason))
   if (process.env.DEVURL) await win.loadURL(process.env.DEVURL)
@@ -36,7 +37,8 @@ app.whenReady().then(async () => {
   if (process.env.SCROLLTO) await win.webContents.executeJavaScript(`document.getElementById('${process.env.SCROLLTO}').scrollIntoView({block:'center'})`)
   else if (process.env.SCROLL) await win.webContents.executeJavaScript('window.scrollTo(0, document.body.scrollHeight)')
   await new Promise((r) => setTimeout(r, 400))
-  const img = await win.webContents.capturePage()
+  let img = await win.webContents.capturePage()
+  for (let t = 0; img.isEmpty() && t < 5; t++) { await new Promise((r) => setTimeout(r, 400)); img = await win.webContents.capturePage() }
   writeFileSync(outPath, img.toPNG())
   console.log('saved ' + outPath)
   app.quit()
