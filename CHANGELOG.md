@@ -3,6 +3,18 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.3.0 — now on macOS
+
+### New
+- **macOS build.** PixelPet now runs on macOS as a menu-bar app — your cat lives along the
+  bottom of the screen, wanders, naps, and reacts, with Care Mode, Dream Mode, and the cat
+  builder all working. (Unsigned for now: on first launch, right-click the app → **Open**.
+  "Stands on your windows" remains Windows-only for the moment.)
+
+### Fixed
+- Shortened the neck in the **sit** and **sulk** poses — it read too long on slimmer cats.
+- Store: the MSIX now ships the branded tile icons instead of the default placeholder.
+
 ## v0.2.0 — build your own cat
 
 ### New
