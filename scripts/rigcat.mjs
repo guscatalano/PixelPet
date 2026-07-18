@@ -195,7 +195,7 @@ export const POSES = {
     ]
   },
   sit: {
-    body: [17, 31, 11, 8], head: [33, 21, 7], neck: [27, 26, 6, 5.5],
+    body: [17, 31, 11, 8], head: [32, 22.5, 7], neck: [27.5, 28, 5.5, 4.4],
     tail: { root: [7, 33], ctrl: [7, 42], tip: [22, 42] }, eye: 1,
     legs: [
       { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false }, // hind folded
@@ -205,7 +205,7 @@ export const POSES = {
     ]
   },
   sulk: {
-    body: [17, 31.5, 11, 8], head: [33, 23, 6.8], neck: [27, 27, 6, 5.5], eye: 1, earsBack: 1,
+    body: [17, 31.5, 11, 8], head: [32, 24, 6.8], neck: [27.5, 28.8, 5.5, 4.4], eye: 1, earsBack: 1,
     tail: { root: [7, 35], ctrl: [4, 43], tip: [17, 43] },
     legs: [
       { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false },
