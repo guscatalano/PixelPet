@@ -1,6 +1,6 @@
 {
   "name": "pixelpet",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A customizable 8-bit pixel-art desktop pet.",
   "main": "./out/main/index.js",
   "author": "guscatalano",
