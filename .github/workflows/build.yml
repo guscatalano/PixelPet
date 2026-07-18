@@ -50,6 +50,10 @@ jobs:
 
   mac:
     runs-on: macos-latest
+    # Run AFTER windows so the two don't race to create the GitHub Release (which
+    # dropped the Windows assets when both published concurrently). Windows creates
+    # the release; mac then appends its dmg/zip to the existing one.
+    needs: windows
     permissions:
       contents: write # publish the Release on tag builds
     steps:
