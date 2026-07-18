@@ -3,6 +3,14 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.3.1 — macOS: fixed & universal
+
+### Fixed
+- **macOS launch crash** — the Windows-only window-enumeration FFI was being initialized on
+  startup; it's now loaded lazily and only on Windows.
+- **Universal Mac build** — the macOS app is now a universal binary, so it runs on both
+  **Intel** and **Apple Silicon** Macs.
+
 ## v0.3.0 — now on macOS
 
 ### New

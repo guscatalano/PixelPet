@@ -54,15 +54,19 @@
     },
     "mac": {
       "target": [
-        "dmg",
-        "zip"
+        { "target": "dmg", "arch": "universal" },
+        { "target": "zip", "arch": "universal" }
       ],
       "icon": "assets/icon-mac.png",
       "category": "public.app-category.entertainment",
       "identity": null,
       "extendInfo": {
         "LSUIElement": true
-      }
+      },
+      "files": [
+        "!node_modules/koffi/**",
+        "!node_modules/@koromix/**"
+      ]
     },
     "appx": {
       "identityName": "GusCatalano.PixelPets",
