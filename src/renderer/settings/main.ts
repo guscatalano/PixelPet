@@ -620,7 +620,7 @@ const MARKING_LABELS: Record<string, string> = { solid: 'Solid', tabby: 'Tabby',
 const EYE_LABELS: Record<string, string> = { round: 'Round', almond: 'Almond', sleepy: 'Sleepy' }
 const EAR_LABELS: Record<string, string> = { pointy: 'Pointy', tufted: 'Tufted', floppy: 'Floppy' }
 const TAIL_LABELS: Record<string, string> = { default: 'Normal', bushy: 'Bushy', thin: 'Thin', nub: 'Nub' }
-const GAIT_LABELS: Record<string, string> = { walk: 'Walk', hop: 'Hop' }
+const GAIT_LABELS: Record<string, string> = { walk: 'Walk', trot: 'Trot', stalk: 'Stalk', hop: 'Hop' }
 
 function buildBuilder(): void {
   const name = $<HTMLInputElement>('bname'), build = $<HTMLSelectElement>('bbuild')

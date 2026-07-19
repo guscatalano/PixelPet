@@ -503,12 +503,14 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   // A hop (bunny bound): one big up-arc per cycle with the legs tucking under at
   // the apex, instead of the 4-beat walk. `air` = 0 grounded … 1 at the apex.
   const hop = g.gait === 'hop'
+  const ex = Math.min(1.2, excite + (g.gait === 'trot' ? 0.7 : 0)) // trot = a bouncy, lifted walk
+  const crouch = g.gait === 'stalk' ? 3 : 0 // stalk = a low, slinking creep
   const air = hop ? Math.sin((((step % 1) + 1) % 1) * Math.PI) : 0
-  const bob = hop ? -air * 5 * motion : Math.sin(step * Math.PI * 4) * (1.3 + excite * 1.7) * motion
+  const bob = hop ? -air * 5 * motion : Math.sin(step * Math.PI * 4) * (1.3 + ex * 1.7) * (g.gait === 'stalk' ? 0.4 : 1) * motion
   const bodyRx = 11.5 * kbx, bodyRy = 7.4 * kby
-  const bodyCx = 18, bodyCy = 33.7 - bodyRy * 0.5 + bob // hip line fixed at 33.7
+  const bodyCx = 18, bodyCy = 33.7 - bodyRy * 0.5 + bob + crouch // hip line fixed at 33.7
   const dTop = (bodyCy - bodyRy) - (30 + bob - 7.4)
-  const headCx = 32, headCy = 24 + bob + dTop * 0.85 - excite * 2.6, headR = 7 * kh
+  const headCx = 32, headCy = 24 + bob + dTop * 0.85 - ex * 2.6 + crouch * 0.7, headR = 7 * kh
   const bodyBottom = bodyCy + bodyRy * 0.5
   const sxw = (x: number): number => bodyCx + (x - bodyCx) * kbx
 
@@ -526,7 +528,7 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   }
   // Stance = 75% of the cycle. A sets the horizontal foot range so a planted foot
   // slides back exactly as fast as the body advances: STRIDE = 2*A/0.75. (=12.)
-  const A = 4.5, LIFT = 3.4 + excite * 2.4, SWING = 0.25
+  const A = 4.5, LIFT = (3.4 + ex * 2.4) * (g.gait === 'stalk' ? 0.5 : 1), SWING = 0.25
   const drawLeg = (lg: { x: number; ph: number; near: boolean; back: boolean }): void => {
     if (hop) { // all four legs move together: extended at the bottom, tucked at the apex
       const tag = lg.near ? 1 : 2
@@ -577,11 +579,11 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   }
 
   {
-    const tailSway = Math.sin(step * Math.PI * 2) * (2 + excite * 1.6) * motion
-    // Excited: the tail rises upright (proud "question-mark" carriage).
+    const tailSway = Math.sin(step * Math.PI * 2) * (2 + ex * 1.6) * motion
+    // Excited/trotting: the tail rises upright (proud "question-mark" carriage).
     const p0 = [bodyCx - bodyRx * 0.7, bodyCy - 1]
-    const p1 = [bodyCx - bodyRx - 4 + excite * 3, bodyCy - 9 - excite * 5]
-    const p2 = [bodyCx - bodyRx + 3 + tailSway + excite * 5, bodyCy - 18 - excite * 7]
+    const p1 = [bodyCx - bodyRx - 4 + ex * 3, bodyCy - 9 - ex * 5]
+    const p2 = [bodyCx - bodyRx + 3 + tailSway + ex * 5, bodyCy - 18 - ex * 7]
     const wts = g.tailStyle
     const wtb = 2.6 * (wts === 'bushy' ? 1.8 : wts === 'thin' ? 0.6 : 1)
     const wtEnd = wts === 'nub' ? 0.34 : 1.0001

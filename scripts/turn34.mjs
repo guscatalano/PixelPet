@@ -107,6 +107,7 @@ export function generate34Grid(preset, t, state = {}) {
   }
   ellipse(set, (hx + bx) / 2, (g.headCy + g.bodyCy) / 2 + 1, g.headRx * 0.78, (g.bodyCy - g.headCy) * 0.55) // neck
   ellipse(set, hx, g.headCy, g.headRx, g.headRy * 0.96) // head (front shape)
+  if (g.snout > 0) ellipse(set, hx + g.headRx * 0.55 + g.snout * 0.35, g.headCy + g.headRy * 0.28, g.snout, g.snout * 0.62) // ¾ muzzle
   { // cheeks: near (left) cheek fuller, far (right) reduced — sells the angle
     const chR = g.headRx * 0.46
     ellipse(set, hx - g.headRx * (0.64 + 0.06 * t), g.headCy + g.headRy * 0.3, chR * (1 + 0.12 * t), chR * 0.8)
@@ -116,8 +117,13 @@ export function generate34Grid(preset, t, state = {}) {
   const earL = hx - g.earSpread * (1 + 0.10 * t)          // near ear drifts out
   const earR = hx + g.earSpread * (1 - 0.28 * t)          // far ear folds toward centre
   const earRW = g.earW * (1 - 0.22 * t), earRH = g.earH * (1 - 0.15 * t)
-  triangle(set, earL - g.earW / 2, earBaseY + 1, earL + g.earW / 2, earBaseY + 1, earL - g.earLean, earBaseY - g.earH)
-  triangle(set, earR - earRW / 2, earBaseY + 1, earR + earRW / 2, earBaseY + 1, earR + g.earLean * (1 - 0.4 * t), earBaseY - earRH)
+  if (g.earStyle === 'floppy') {
+    triangle(set, earL - g.earW / 2, earBaseY + 1, earL + g.earW / 2, earBaseY + 1, hx - g.headRx * 0.85, g.headCy + g.headRy * 0.42)
+    triangle(set, earR - earRW / 2, earBaseY + 1, earR + earRW / 2, earBaseY + 1, hx + g.headRx * 0.82, g.headCy + g.headRy * 0.34)
+  } else {
+    triangle(set, earL - g.earW / 2, earBaseY + 1, earL + g.earW / 2, earBaseY + 1, earL - g.earLean, earBaseY - g.earH)
+    triangle(set, earR - earRW / 2, earBaseY + 1, earR + earRW / 2, earBaseY + 1, earR + g.earLean * (1 - 0.4 * t), earBaseY - earRH)
+  }
 
   // --- outline, shading (same treatment as the front pose) ---
   const shade = new Uint8Array(W * H), region = new Uint8Array(W * H), overlay = new Uint8Array(W * H)
@@ -227,7 +233,7 @@ export function generate34Grid(preset, t, state = {}) {
     put(overlay, Math.round(noseX), Math.round(noseY) + 2, O.MOUTH)
     for (const dx of [-2, -1, 1, 2]) put(overlay, Math.round(noseX) + dx, Math.round(noseY) + 3, O.MOUTH)
   }
-  { // inner ears (white-rimmed, like the front pose)
+  if (g.earStyle !== 'floppy') { // inner ears; floppy dogs show none
     const iw = g.earW * 0.26
     triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
       earL + 0.5 - iw, earBaseY - 0.5, earL + 0.5 + iw, earBaseY - 0.5, earL + 0.3 - g.earLean * 0.4, earBaseY - g.earH * 0.5)

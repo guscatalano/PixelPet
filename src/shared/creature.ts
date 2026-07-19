@@ -13,7 +13,7 @@ import { dnaToPet, EYE_STYLES } from './petdna'
 
 export const EAR_STYLES = ['pointy', 'tufted', 'floppy'] as const
 export const TAIL_STYLES = ['default', 'bushy', 'thin', 'nub'] as const
-export const GAITS = ['walk', 'hop'] as const
+export const GAITS = ['walk', 'trot', 'stalk', 'hop'] as const
 
 /** The silhouette knobs a creature may set, beyond coat/build DNA. */
 export interface CreatureStyle {
