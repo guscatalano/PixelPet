@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, screen, Menu, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, Menu, dialog, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { loadCreature } from '../shared/creature'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality, TriggerEvent } from '../shared/types'
@@ -707,6 +707,35 @@ function registerIpc(): void {
   // from the editor/randomizer; loadCreature validates/clamps it into a user pet.
   ipcMain.handle('pets:create', (_e, def: unknown) => {
     try {
+      const pet = loadCreature(def, `user-${randomUUID().slice(0, 8)}`)
+      settings.userPets.push(pet)
+      settings.activePetId = pet.id
+      saveSettings(settings)
+      applyActivePet()
+      return { ok: true, pet }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  // Export the current creature as a shareable .pixelpet.json pack.
+  ipcMain.handle('pets:export', async (_e, def: unknown) => {
+    try {
+      const nm = (def && typeof def === 'object' && typeof (def as { name?: unknown }).name === 'string' ? (def as { name: string }).name : 'creature').replace(/[^\w-]+/g, '_') || 'creature'
+      const res = await dialog.showSaveDialog({ title: 'Export creature', defaultPath: `${nm}.pixelpet.json`, filters: [{ name: 'PixelPet creature', extensions: ['json'] }] })
+      if (res.canceled || !res.filePath) return { ok: false, error: 'Cancelled' }
+      writeFileSync(res.filePath, JSON.stringify({ pixelpet: 1, kind: 'creature', creature: def }, null, 2))
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  // Import a creature pack (or a bare CreatureDef); validated by loadCreature.
+  ipcMain.handle('pets:import', async () => {
+    try {
+      const res = await dialog.showOpenDialog({ title: 'Import creature', filters: [{ name: 'PixelPet creature', extensions: ['json'] }], properties: ['openFile'] })
+      if (res.canceled || !res.filePaths.length) return { ok: false, error: 'Cancelled' }
+      const raw = JSON.parse(readFileSync(res.filePaths[0], 'utf8')) as Record<string, unknown>
+      const def = raw && typeof raw === 'object' && 'creature' in raw ? raw.creature : raw // wrapped pack or bare def
       const pet = loadCreature(def, `user-${randomUUID().slice(0, 8)}`)
       settings.userPets.push(pet)
       settings.activePetId = pet.id

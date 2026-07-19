@@ -39,6 +39,8 @@ interface SettingsApi {
   testAi: () => Promise<{ ok: boolean; message: string }>
   generateFromPhotos: (dataUrls: string[]) => Promise<GenResult>
   createPet: (def: CreatureDef) => Promise<GenResult>
+  exportCreature: (def: CreatureDef) => Promise<{ ok: boolean; error?: string }>
+  importCreature: () => Promise<GenResult>
   getVersion: () => Promise<string>
   deleteUserPet: (petId: string) => void
   renamePet: (petId: string, name: string) => void
@@ -696,6 +698,20 @@ function buildBuilder(): void {
     if (!r.ok) { status.textContent = r.error; return }
     status.textContent = `Created ${r.pet.name} — added to your pets and made active.`
     state = await window.settings.get() // main added it + made it active
+    buildGrid(); buildTraits(); refreshMeta()
+    grid.querySelector('.card.active')?.scrollIntoView({ block: 'nearest' })
+  })
+  // Share: export the current creature to a file, or import someone else's.
+  $<HTMLButtonElement>('bexport').addEventListener('click', async () => {
+    const r = await window.settings.exportCreature(def())
+    if (r.ok) { status.className = 'status ok'; status.textContent = 'Exported to a .pixelpet.json file.' }
+    else if (r.error !== 'Cancelled') { status.className = 'status err'; status.textContent = r.error ?? 'Export failed.' }
+  })
+  $<HTMLButtonElement>('bimport').addEventListener('click', async () => {
+    const r = await window.settings.importCreature()
+    if (!r.ok) { if (r.error !== 'Cancelled') { status.className = 'status err'; status.textContent = r.error } return }
+    status.className = 'status ok'; status.textContent = `Imported ${r.pet.name} — added to your pets and made active.`
+    state = await window.settings.get()
     buildGrid(); buildTraits(); refreshMeta()
     grid.querySelector('.card.active')?.scrollIntoView({ block: 'nearest' })
   })

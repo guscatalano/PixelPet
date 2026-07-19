@@ -73,6 +73,10 @@ const api = {
   generateFromPhotos: (dataUrls: string[]): Promise<GenResult> => ipcRenderer.invoke('ai:generate', dataUrls),
   /** Build a creature from a CreatureDef (editor / randomizer); added + made active. */
   createPet: (def: CreatureDef): Promise<GenResult> => ipcRenderer.invoke('pets:create', def),
+  /** Save the current creature to a shareable .pixelpet.json pack. */
+  exportCreature: (def: CreatureDef): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('pets:export', def),
+  /** Import a creature pack from a file; on success it's added + made active. */
+  importCreature: (): Promise<GenResult> => ipcRenderer.invoke('pets:import'),
   /** The app version string (for the About footer). */
   getVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
   /** Delete a user-generated pet. */
