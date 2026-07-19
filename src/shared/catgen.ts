@@ -426,26 +426,29 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
       for (let x = Math.round(ex - g.eyeRx); x <= Math.round(ex + g.eyeRx); x++) put(overlay, x, ey, O.OUTLINE)
       continue
     }
-    ellipse((x, y) => put(overlay, x, y, O.IRIS), ex, ey, g.eyeRx, g.eyeRy)
-    if (g.eyeStyle === 'sleepy')
-      for (let x = Math.round(ex - g.eyeRx - 1); x <= Math.round(ex + g.eyeRx + 1); x++) {
-        put(overlay, x, ey - Math.round(g.eyeRy) + 1, O.OUTLINE)
-        put(overlay, x, ey - Math.round(g.eyeRy), O.OUTLINE)
+    // Eye shape by style: round = big & open; almond = sleeker/wider with a slit
+    // pupil; sleepy = half-lidded under a heavy droop.
+    const erx = g.eyeStyle === 'almond' ? g.eyeRx * 1.06 : g.eyeRx
+    const ery = g.eyeStyle === 'almond' ? g.eyeRy * 0.72 : g.eyeStyle === 'sleepy' ? g.eyeRy * 0.56 : g.eyeRy
+    ellipse((x, y) => put(overlay, x, y, O.IRIS), ex, ey, erx, ery)
+    if (g.eyeStyle === 'sleepy') // a heavy droopy lid across the top
+      for (let x = Math.round(ex - erx - 1); x <= Math.round(ex + erx + 1); x++) {
+        put(overlay, x, Math.round(ey - ery), O.OUTLINE)
+        put(overlay, x, Math.round(ey - ery) - 1, O.OUTLINE)
       }
-    const pupRy = g.eyeStyle === 'round' ? g.eyeRy * 0.72 : g.eyeRy * 0.9
     const look = (state.look || 0) * (g.eyeRx * 0.5)
-    // Pupil dilation (state.dilation 0..1): a narrow vertical slit in bright light
-    // (0) widening to a big round pupil in the dark (1). Undefined = the default
-    // resting shape, so the feature toggled off looks exactly as before.
-    let pupRx = Math.max(0.85, g.eyeRx * 0.45)
-    let pRy = pupRy
+    // Pupil: round style = a rounder pupil; almond/sleepy = a narrower slit.
+    let pupRx = Math.max(0.85, g.eyeRx * (g.eyeStyle === 'round' ? 0.45 : 0.36))
+    let pRy = g.eyeStyle === 'round' ? ery * 0.72 : ery * 0.96
+    // Pupil dilation (state.dilation 0..1): a narrow slit in bright light (0)
+    // widening to a big round pupil in the dark (1). Undefined = resting shape.
     if (state.dilation !== undefined) {
       const d = state.dilation
       pupRx = Math.max(0.6, g.eyeRx * (0.26 + 0.42 * d))
-      pRy = g.eyeRy * (0.96 - 0.24 * d)
+      pRy = ery * (0.96 - 0.24 * d)
     }
     ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex + look, ey + 0.3, pupRx, pRy)
-    put(overlay, Math.round(ex + look - g.eyeRx * 0.35), Math.round(ey - g.eyeRy * 0.4), O.GLINT)
+    put(overlay, Math.round(ex + look - g.eyeRx * 0.35), Math.round(ey - ery * 0.4), O.GLINT)
   }
 
   const nx = g.headCx, ny = g.noseY
