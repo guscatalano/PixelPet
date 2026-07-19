@@ -206,9 +206,16 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
     // Side profile (matches the walk pose exactly).
     inear(hcx + 2 * eW, hcx + 3.6 * eW, hcx + 3.2 * eW)
     if (pose.eye > 0.5) {
-      ellipse((x, y) => put(overlay, x, y, O.IRIS), hcx + 1.6 * kh, hcy - 0.5, 1.7 * kEye, 2 * kEye)
-      ellipse((x, y) => put(overlay, x, y, O.PUPIL), hcx + 2 * kh, hcy - 0.3, 0.9 * kEye, 1.4 * kEye)
+      // Eye shape by style (matches the front view): round = open, almond =
+      // sleeker with a slit, sleepy = half-lidded.
+      const es = g.eyeStyle
+      const iry = (es === 'almond' ? 1.5 : es === 'sleepy' ? 1.15 : 2) * kEye
+      ellipse((x, y) => put(overlay, x, y, O.IRIS), hcx + 1.6 * kh, hcy - 0.5, 1.7 * kEye, iry)
+      const prx = (es === 'round' ? 0.9 : 0.66) * kEye
+      ellipse((x, y) => put(overlay, x, y, O.PUPIL), hcx + 2 * kh, hcy - 0.3, prx, Math.min(1.4 * kEye, iry * 0.95))
       put(overlay, Math.round(hcx + 1.2 * kh), Math.round(hcy - 1.3), O.GLINT)
+      if (es === 'sleepy') // droopy lid across the top
+        for (const dx of [-1, 0, 1, 2]) put(overlay, Math.round(hcx + 1 * kh + dx), Math.round(hcy - 0.5 - iry), O.OUTLINE)
     } else {
       for (const dx of [0, 1, 2]) put(overlay, Math.round(hcx + 1 * kh + dx), Math.round(hcy - 0.3), O.OUTLINE)
     }

@@ -663,7 +663,9 @@ function buildBuilder(): void {
 
   const draw = (): void => {
     const pet = loadCreature(def(), 'preview')
-    const rgba = renderPet(generateGrid(pet, { eyeOpen: true, tailPhase: 0.15 }), pet.coat)
+    // Side "sit" pose so the whole creature reads — ears, snout, TAIL, body — and
+    // the eye style (now applied in profile too) shows.
+    const rgba = renderPet(generateRigGrid(pet, RIG.sit), pet.coat)
     const tmp = document.createElement('canvas'); tmp.width = SPRITE_W; tmp.height = SPRITE_H
     const tc = tmp.getContext('2d')!, img = tc.createImageData(SPRITE_W, SPRITE_H)
     img.data.set(rgba); tc.putImageData(img, 0, 0)
