@@ -140,8 +140,10 @@ function buildFur(g: Geom, state: AnimState): Uint8Array {
   for (const s of [-1, 1]) {
     const bx = g.headCx + s * g.earSpread
     const half = g.earW / 2
-    if (g.earStyle === 'floppy') { // dog ears hang down the sides of the head
-      triangle(set, bx - half, earBaseY + 1, bx + half, earBaseY + 1, g.headCx + s * g.headRx * 0.92, g.headCy + g.headRy * 0.4)
+    if (g.earStyle === 'floppy') { // dog ears: a flap that flares out then hangs down beside the face
+      const e = floppyEarPts(g, s)
+      triangle(set, e.topI[0], e.topI[1], e.topO[0], e.topO[1], e.botO[0], e.botO[1])
+      triangle(set, e.topI[0], e.topI[1], e.botO[0], e.botO[1], e.botI[0], e.botI[1])
     } else {
       const tipX = bx + s * g.earLean
       const tipY = earBaseY - g.earH + (s > 0 ? twitch : 0)
@@ -411,8 +413,35 @@ export function generateGrid(preset: Pet, state: AnimState = {}): Parts {
 
 function put(overlay: Uint8Array, x: number, y: number, role: number): void { if (inB(x, y)) overlay[idx(x, y)] = role }
 
+/** Corner points of one front-view floppy ear (s = -1 left, +1 right). Shared by the
+ * silhouette (buildFur) and the crease (drawFace) so they always line up. */
+function floppyEarPts(g: Geom, s: number): { topI: number[]; topO: number[]; botO: number[]; botI: number[] } {
+  const earBaseY = g.headCy - g.headRy * 0.55
+  const half = g.earW / 2
+  const bx = g.headCx + s * g.earSpread
+  return {
+    topI: [bx - s * half * 0.2, earBaseY - 0.5],                          // inner anchor, on top of the head
+    topO: [g.headCx + s * g.headRx * 0.9, earBaseY - 1.5],                // outer anchor, at the head's top edge
+    botO: [g.headCx + s * g.headRx * 1.18, g.headCy + g.headRy * 0.62],   // outer tip, flared out past the outline
+    botI: [g.headCx + s * g.headRx * 0.66, g.headCy + g.headRy * 0.98]    // inner tip, hanging down by the jaw
+  }
+}
+
+/** Stamp an OUTLINE stroke along a segment, but only over fur pixels. */
+function lineOutline(overlay: Uint8Array, fur: Uint8Array, x1: number, y1: number, x2: number, y2: number): void {
+  const n = Math.ceil(Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))) * 2 || 1
+  for (let i = 0; i <= n; i++) {
+    const x = Math.round(x1 + (x2 - x1) * (i / n)), y = Math.round(y1 + (y2 - y1) * (i / n))
+    if (fur[idx(x, y)]) put(overlay, x, y, O.OUTLINE)
+  }
+}
+
 function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimState): void {
   const earBaseY = g.headCy - g.headRy * 0.55
+  if (g.earStyle === 'floppy') for (const s of [-1, 1]) { // crease where the drooping ear overlaps the face
+    const e = floppyEarPts(g, s)
+    lineOutline(overlay, fur, e.topI[0], e.topI[1], e.botI[0], e.botI[1])
+  }
   if (g.earStyle !== 'floppy') for (const s of [-1, 1]) { // floppy (dog) ears show no pink lining from the front
     const bx = g.headCx + s * g.earSpread
     // Inner ear: a smaller triangle nudged toward the face centre, leaving a
@@ -571,8 +600,9 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   ellipse(set, headCx, headCy, headR * 1.02, headR * 0.98)
   if (g.snout > 0) ellipse(set, headCx + headR * 0.82, headCy + headR * 0.3, g.snout, g.snout * 0.62) // dog muzzle (walk faces right)
 
-  if (g.earStyle === 'floppy') {
-    for (const s of [-1, 1]) seg(set, headCx + s * headR * 0.5, headCy - headR + 3, headCx + s * headR * 0.95, headCy + headR * 0.3, 2.4, 1.5)
+  if (g.earStyle === 'floppy') { // a big ear hangs down the side of the head, past the jaw (profile faces right)
+    triangle(set, headCx - headR * 0.55, headCy - headR + 2, headCx + headR * 0.12, headCy - headR + 1, headCx + headR * 0.05, headCy + headR * 0.92)
+    triangle(set, headCx - headR * 0.55, headCy - headR + 2, headCx + headR * 0.05, headCy + headR * 0.92, headCx - headR * 0.7, headCy + headR * 0.72)
   } else {
     triangle(set, headCx - 4, headCy - headR + 2, headCx, headCy - headR + 2, headCx - 4.5, headCy - headR - 4)
     triangle(set, headCx + 1, headCy - headR + 2, headCx + 5, headCy - headR + 2, headCx + 4, headCy - headR - 4)
@@ -630,6 +660,8 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
       else shade[idx(x, y)] = BASE
     }
 
+  if (g.earStyle === 'floppy') // crease along the ear's front edge, separating the flap from the cheek
+    lineOutline(overlay, fur, headCx + headR * 0.12, headCy - headR + 1, headCx + headR * 0.05, headCy + headR * 0.92)
   if (g.earStyle !== 'floppy')
     triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
       headCx + 2, headCy - headR + 1.5, headCx + 3.6, headCy - headR + 1.5, headCx + 3.2, headCy - headR - 1)
@@ -812,4 +844,4 @@ export function renderCat(pet: Pet, state: AnimState = {}): { w: number; h: numb
  * Internal drawing primitives, shared with the pose/rig generators (rigcat,
  * turn34) so the raster helpers exist in exactly one place.
  */
-export const internals = { ellipse, triangle, idx, inB, put, sphereBright, shadeLevel, O, HI, BASE, SHADOW, DEEP }
+export const internals = { ellipse, triangle, idx, inB, put, lineOutline, sphereBright, shadeLevel, O, HI, BASE, SHADOW, DEEP }

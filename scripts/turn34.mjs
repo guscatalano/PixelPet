@@ -18,6 +18,10 @@ const LIGHT = (() => { const v = [-0.35, -0.5, 0.79]; const m = Math.hypot(...v)
 function sphereBright(x, y, cx, cy, rx, ry) { const nx = (x - cx) / rx, ny = (y - cy) / ry; const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny)); return nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2] }
 function shadeLevel(b) { return b > 0.62 ? HI : b > 0.2 ? BASE : b > -0.15 ? SHADOW : DEEP }
 function put(overlay, x, y, role) { if (inB(x, y)) overlay[idx(x, y)] = role }
+function lineOutline(overlay, fur, x1, y1, x2, y2) {
+  const n = Math.ceil(Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))) * 2 || 1
+  for (let i = 0; i <= n; i++) { const x = Math.round(x1 + (x2 - x1) * (i / n)), y = Math.round(y1 + (y2 - y1) * (i / n)); if (fur[idx(x, y)]) put(overlay, x, y, O.OUTLINE) }
+}
 const defaultGeom = () => ({ headCx: 22, headCy: 16, headRx: 11, headRy: 10, bodyCx: 22, bodyCy: 33, bodyRx: 12, bodyRy: 11,
   earW: 7.5, earH: 8.5, earSpread: 7.5, earLean: 1.5, eyeDX: 5.2, eyeY: 17, eyeRx: 2.5, eyeRy: 3.0, noseY: 22 })
 
@@ -117,9 +121,12 @@ export function generate34Grid(preset, t, state = {}) {
   const earL = hx - g.earSpread * (1 + 0.10 * t)          // near ear drifts out
   const earR = hx + g.earSpread * (1 - 0.28 * t)          // far ear folds toward centre
   const earRW = g.earW * (1 - 0.22 * t), earRH = g.earH * (1 - 0.15 * t)
-  if (g.earStyle === 'floppy') {
-    triangle(set, earL - g.earW / 2, earBaseY + 1, earL + g.earW / 2, earBaseY + 1, hx - g.headRx * 0.85, g.headCy + g.headRy * 0.42)
-    triangle(set, earR - earRW / 2, earBaseY + 1, earR + earRW / 2, earBaseY + 1, hx + g.headRx * 0.82, g.headCy + g.headRy * 0.34)
+  if (g.earStyle === 'floppy') { // dog ears: flaps that hang down either side of the angled head
+    const fw = 1 - 0.28 * t
+    triangle(set, earL, earBaseY - 0.5, hx - g.headRx * 0.9, earBaseY - 1.5, hx - g.headRx * 1.16, g.headCy + g.headRy * 0.6)
+    triangle(set, earL, earBaseY - 0.5, hx - g.headRx * 1.16, g.headCy + g.headRy * 0.6, hx - g.headRx * 0.6, g.headCy + g.headRy * 0.95)
+    triangle(set, earR, earBaseY - 0.5, hx + g.headRx * 0.86 * fw, earBaseY - 1.5, hx + g.headRx * 1.05 * fw, g.headCy + g.headRy * 0.55)
+    triangle(set, earR, earBaseY - 0.5, hx + g.headRx * 1.05 * fw, g.headCy + g.headRy * 0.55, hx + g.headRx * 0.48, g.headCy + g.headRy * 0.9)
   } else {
     triangle(set, earL - g.earW / 2, earBaseY + 1, earL + g.earW / 2, earBaseY + 1, earL - g.earLean, earBaseY - g.earH)
     triangle(set, earR - earRW / 2, earBaseY + 1, earR + earRW / 2, earBaseY + 1, earR + g.earLean * (1 - 0.4 * t), earBaseY - earRH)
@@ -131,6 +138,10 @@ export function generate34Grid(preset, t, state = {}) {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (fur[idx(x, y)]) continue; let near = false
     for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if (inB(x + dx, y + dy) && fur[idx(x + dx, y + dy)]) { near = true; break }
     if (near) overlay[idx(x, y)] = O.OUTLINE }
+  if (g.earStyle === 'floppy') { // creases separating each drooping ear from the face
+    lineOutline(overlay, fur, earL, earBaseY - 0.5, hx - g.headRx * 0.6, g.headCy + g.headRy * 0.95)
+    lineOutline(overlay, fur, earR, earBaseY - 0.5, hx + g.headRx * 0.48, g.headCy + g.headRy * 0.9)
+  }
   const inHead = (x, y) => { const dx = (x - hx) / (g.headRx + 0.5), dy = (y - g.headCy) / (g.headRy + 0.5); return dx * dx + dy * dy <= 1.05 }
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (!fur[idx(x, y)]) continue
     if (pawMask[idx(x, y)]) shade[idx(x, y)] = BASE // the raised paw is a near limb — plain fur

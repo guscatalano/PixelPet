@@ -9,7 +9,7 @@
 
 import { W, H, internals, sideMarking, type Pet, type Parts, defaultGeom } from './catgen'
 
-const { ellipse, triangle, idx, inB, put, sphereBright, shadeLevel, O, BASE, SHADOW } = internals
+const { ellipse, triangle, idx, inB, put, lineOutline, sphereBright, shadeLevel, O, BASE, SHADOW } = internals
 
 export interface RigLeg { hip: number[]; mid: number[]; foot: number[]; near: boolean }
 export interface RigPose {
@@ -115,10 +115,10 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
   // earsBack (0..1) flattens the ears down and back — the grumpy/sulky signal.
   const back = pose.earsBack ?? 0
   if (g.earStyle === 'floppy') {
-    // Dog-style ears: soft flaps hanging down the sides of the head.
-    for (const s of [-1, 1]) {
-      seg(set, hcx + s * hr * 0.5, hcy - hr + 3, hcx + s * hr * 0.95, hcy + hr * (0.3 - back * 0.15), 2.4 * eW, 1.5 * eW)
-    }
+    // Dog-style ear: a big flap hanging down the side of the head, past the jaw.
+    const fs = faceSign, drop = hr * back * 0.14 // sulky ears sag a touch lower
+    triangle(set, hcx - fs * hr * 0.55, hcy - hr + 2, hcx + fs * hr * 0.12, hcy - hr + 1, hcx + fs * hr * 0.05, hcy + hr * 0.92 + drop)
+    triangle(set, hcx - fs * hr * 0.55, hcy - hr + 2, hcx + fs * hr * 0.05, hcy + hr * 0.92 + drop, hcx - fs * hr * 0.7, hcy + hr * 0.72 + drop)
   } else {
     // Cat-style ears: two upright triangles. A perked ear rises only modestly.
     const earTipL = hcy - hr - (3.4 + perk * 1.2) * eH * (1 - back * 0.6) + back * 2
@@ -179,6 +179,8 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
   const inear = (ax: number, bx: number, tx: number): void =>
     triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
       ax, hcy - hr + 1.5, bx, hcy - hr + 1.5, tx, hcy - hr - 1)
+  if (g.earStyle === 'floppy' && face < 0.75) // crease along the profile ear's front edge
+    lineOutline(overlay, fur, hcx + faceSign * hr * 0.12, hcy - hr + 1, hcx + faceSign * hr * 0.05, hcy + hr * 0.92)
   if (face >= 0.75) {
     // Facing you: both eyes, centred pink nose, pink in both ears.
     inear(hcx + 2 * eW, hcx + 3.6 * eW, hcx + 3.2 * eW)

@@ -11,7 +11,7 @@
 
 import { W, H, internals, applyMarking, defaultGeom, frontScaled, type Pet, type Parts } from './catgen'
 
-const { ellipse, triangle, idx, inB, put, sphereBright, shadeLevel, O, HI, BASE, SHADOW, DEEP } = internals
+const { ellipse, triangle, idx, inB, put, lineOutline, sphereBright, shadeLevel, O, HI, BASE, SHADOW, DEEP } = internals
 
 export interface State34 {
   eyeOpen?: boolean
@@ -98,9 +98,13 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
   const earL = hx - g.earSpread * (1 + 0.10 * t)          // near ear drifts out
   const earR = hx + g.earSpread * (1 - 0.28 * t)          // far ear folds toward centre
   const earRW = g.earW * (1 - 0.22 * t), earRH = g.earH * (1 - 0.15 * t)
-  if (g.earStyle === 'floppy') { // dog ears hang down either side of the angled head
-    triangle(set, earL - g.earW / 2, earBaseY + 1, earL + g.earW / 2, earBaseY + 1, hx - g.headRx * 0.85, g.headCy + g.headRy * 0.42)
-    triangle(set, earR - earRW / 2, earBaseY + 1, earR + earRW / 2, earBaseY + 1, hx + g.headRx * 0.82, g.headCy + g.headRy * 0.34)
+  if (g.earStyle === 'floppy') { // dog ears: flaps that hang down either side of the angled head
+    // near (left) ear — full size; far (right) ear folds toward centre with the turn
+    const fw = 1 - 0.28 * t
+    triangle(set, earL, earBaseY - 0.5, hx - g.headRx * 0.9, earBaseY - 1.5, hx - g.headRx * 1.16, g.headCy + g.headRy * 0.6)
+    triangle(set, earL, earBaseY - 0.5, hx - g.headRx * 1.16, g.headCy + g.headRy * 0.6, hx - g.headRx * 0.6, g.headCy + g.headRy * 0.95)
+    triangle(set, earR, earBaseY - 0.5, hx + g.headRx * 0.86 * fw, earBaseY - 1.5, hx + g.headRx * 1.05 * fw, g.headCy + g.headRy * 0.55)
+    triangle(set, earR, earBaseY - 0.5, hx + g.headRx * 1.05 * fw, g.headCy + g.headRy * 0.55, hx + g.headRx * 0.48, g.headCy + g.headRy * 0.9)
   } else {
     triangle(set, earL - g.earW / 2, earBaseY + 1, earL + g.earW / 2, earBaseY + 1, earL - g.earLean, earBaseY - g.earH)
     triangle(set, earR - earRW / 2, earBaseY + 1, earR + earRW / 2, earBaseY + 1, earR + g.earLean * (1 - 0.4 * t), earBaseY - earRH)
@@ -119,6 +123,10 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
           if (inB(x + dx, y + dy) && fur[idx(x + dx, y + dy)]) { near = true; break }
       if (near) overlay[idx(x, y)] = O.OUTLINE
     }
+  if (g.earStyle === 'floppy') { // creases separating each drooping ear from the face
+    lineOutline(overlay, fur, earL, earBaseY - 0.5, hx - g.headRx * 0.6, g.headCy + g.headRy * 0.95)
+    lineOutline(overlay, fur, earR, earBaseY - 0.5, hx + g.headRx * 0.48, g.headCy + g.headRy * 0.9)
+  }
   const inHead = (x: number, y: number): boolean => {
     const dx = (x - hx) / (g.headRx + 0.5), dy = (y - g.headCy) / (g.headRy + 0.5)
     return dx * dx + dy * dy <= 1.05

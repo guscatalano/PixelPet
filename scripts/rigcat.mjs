@@ -32,6 +32,13 @@ const LIGHT = (() => { const v = [-0.35, -0.5, 0.79]; const m = Math.hypot(...v)
 function sphereBright(x, y, cx, cy, rx, ry) { const nx = (x - cx) / rx, ny = (y - cy) / ry; const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny)); return nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2] }
 function shadeLevel(b) { return b > 0.62 ? HI : b > 0.2 ? BASE : b > -0.15 ? SHADOW : DEEP }
 function put(overlay, x, y, role) { if (inB(x, y)) overlay[idx(x, y)] = role }
+function lineOutline(overlay, fur, x1, y1, x2, y2) {
+  const n = Math.ceil(Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))) * 2 || 1
+  for (let i = 0; i <= n; i++) {
+    const x = Math.round(x1 + (x2 - x1) * (i / n)), y = Math.round(y1 + (y2 - y1) * (i / n))
+    if (fur[idx(x, y)]) put(overlay, x, y, O.OUTLINE)
+  }
+}
 
 // ---- the posable rig -------------------------------------------------------
 // pose = { body:[cx,cy,rx,ry], head:[cx,cy,r], neck:[cx,cy,rx,ry],
@@ -95,7 +102,9 @@ export function generateRigGrid(pet, pose) {
   const perk = pose.earPerk ?? 0
   const back = pose.earsBack ?? 0
   if (g.earStyle === 'floppy') {
-    for (const s of [-1, 1]) seg(set, hcx + s * hr * 0.5, hcy - hr + 3, hcx + s * hr * 0.95, hcy + hr * (0.3 - back * 0.15), 2.4 * eW, 1.5 * eW)
+    const fs = faceSign, drop = hr * back * 0.14
+    triangle(set, hcx - fs * hr * 0.55, hcy - hr + 2, hcx + fs * hr * 0.12, hcy - hr + 1, hcx + fs * hr * 0.05, hcy + hr * 0.92 + drop)
+    triangle(set, hcx - fs * hr * 0.55, hcy - hr + 2, hcx + fs * hr * 0.05, hcy + hr * 0.92 + drop, hcx - fs * hr * 0.7, hcy + hr * 0.72 + drop)
   } else {
     const earTipL = hcy - hr - (3.4 + perk * 1.2) * eH * (1 - back * 0.6) + back * 2
     const bk = back * 5 * eW
@@ -145,6 +154,8 @@ export function generateRigGrid(pet, pose) {
   const inear = (ax, bx, tx) =>
     triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
       ax, hcy - hr + 1.5, bx, hcy - hr + 1.5, tx, hcy - hr - 1)
+  if (g.earStyle === 'floppy' && face < 0.75) // crease along the profile ear's front edge
+    lineOutline(overlay, fur, hcx + faceSign * hr * 0.12, hcy - hr + 1, hcx + faceSign * hr * 0.05, hcy + hr * 0.92)
   if (face >= 0.75) {
     inear(hcx + 2 * eW, hcx + 3.6 * eW, hcx + 3.2 * eW)
     inear(hcx - 3.6 * eW, hcx - 2 * eW, hcx - 3.2 * eW)
