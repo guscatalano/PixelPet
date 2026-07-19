@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, screen, Menu, type MenuItemConstructorOpti
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { dnaToPet } from '../shared/petdna'
+import { loadCreature } from '../shared/creature'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality, TriggerEvent } from '../shared/types'
 import { MIN_SCALE, MAX_SCALE, petWindowSize } from '../shared/constants'
 import { createTray, applyTrayMenu, assetPath, type TrayCallbacks } from './tray'
@@ -703,11 +703,11 @@ function registerIpc(): void {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
-  // Build a cat without AI: the renderer sends a PetDNA (from the manual editor
-  // or the randomizer); dnaToPet validates/clamps it into a real user pet.
-  ipcMain.handle('pets:create', (_e, dna: unknown) => {
+  // Build a creature without AI: the renderer sends a CreatureDef (style + coat)
+  // from the editor/randomizer; loadCreature validates/clamps it into a user pet.
+  ipcMain.handle('pets:create', (_e, def: unknown) => {
     try {
-      const pet = dnaToPet(dna, `user-${randomUUID().slice(0, 8)}`)
+      const pet = loadCreature(def, `user-${randomUUID().slice(0, 8)}`)
       settings.userPets.push(pet)
       settings.activePetId = pet.id
       saveSettings(settings)

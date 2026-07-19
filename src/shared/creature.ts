@@ -11,7 +11,7 @@ import type { Geom } from './catgen'
 import type { AppPet } from './pets'
 import { dnaToPet, EYE_STYLES } from './petdna'
 
-const EAR_STYLES = ['pointy', 'tufted', 'floppy'] as const
+export const EAR_STYLES = ['pointy', 'tufted', 'floppy'] as const
 
 /** The silhouette knobs a creature may set, beyond coat/build DNA. */
 export interface CreatureStyle {

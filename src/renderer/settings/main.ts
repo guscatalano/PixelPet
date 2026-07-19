@@ -2,7 +2,8 @@ import { generateGrid, generateWalkGrid, render as renderPet, setFrontScale, typ
 import { generateRigGrid, lerpPose, POSES as RIG } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
 import { PETS, type AppPet } from '../../shared/pets'
-import { randomPetDNA, dnaToPet, BUILD_NAMES, MARKING_NAMES, EYE_STYLES, type PetDNA } from '../../shared/petdna'
+import { randomPetDNA, BUILD_NAMES, MARKING_NAMES, EYE_STYLES, type PetDNA } from '../../shared/petdna'
+import { loadCreature, EAR_STYLES, type CreatureDef } from '../../shared/creature'
 import { ashPhoto } from '../ashPhoto'
 import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
 import { TRAIT_KEYS, TOGGLEABLE_ANIMS, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Personality } from '../../shared/types'
@@ -37,7 +38,7 @@ interface SettingsApi {
   clearAiKey: () => Promise<AiStatus>
   testAi: () => Promise<{ ok: boolean; message: string }>
   generateFromPhotos: (dataUrls: string[]) => Promise<GenResult>
-  createPet: (dna: PetDNA) => Promise<GenResult>
+  createPet: (def: CreatureDef) => Promise<GenResult>
   getVersion: () => Promise<string>
   deleteUserPet: (petId: string) => void
   renamePet: (petId: string, name: string) => void
@@ -615,10 +616,12 @@ function buildAnimation(): void {
 const BUILD_LABELS: Record<string, string> = { normal: 'Normal', chonky: 'Chonky', slim: 'Slim', kitten: 'Kitten', fluffy: 'Fluffy', bigears: 'Big ears' }
 const MARKING_LABELS: Record<string, string> = { solid: 'Solid', tabby: 'Tabby', tuxedo: 'Tuxedo', calico: 'Calico', points: 'Color-points', bicolor: 'Bicolor' }
 const EYE_LABELS: Record<string, string> = { round: 'Round', almond: 'Almond', sleepy: 'Sleepy' }
+const EAR_LABELS: Record<string, string> = { pointy: 'Pointy', tufted: 'Tufted', floppy: 'Floppy' }
 
 function buildBuilder(): void {
   const name = $<HTMLInputElement>('bname'), build = $<HTMLSelectElement>('bbuild')
-  const marking = $<HTMLSelectElement>('bmarking'), eyes = $<HTMLSelectElement>('beyes')
+  const marking = $<HTMLSelectElement>('bmarking'), eyes = $<HTMLSelectElement>('beyes'), ears = $<HTMLSelectElement>('bears')
+  const snout = $<HTMLInputElement>('bsnout')
   const primary = $<HTMLInputElement>('bprimary'), iris = $<HTMLInputElement>('biris')
   const secondary = $<HTMLInputElement>('bsecondary'), white = $<HTMLInputElement>('bwhite'), tertiary = $<HTMLInputElement>('btertiary')
   const secWrap = $('bsecwrap'), whiteWrap = $('bwhitewrap'), tertWrap = $('btertwrap')
@@ -626,18 +629,24 @@ function buildBuilder(): void {
   const create = $<HTMLButtonElement>('bcreate'), status = $('bstatus')
 
   for (const b of BUILD_NAMES) build.append(new Option(BUILD_LABELS[b] ?? b, b))
-  for (const m of MARKING_NAMES) marking.append(new Option(MARKING_LABELS[m] ?? m, m))
+  for (const e of EAR_STYLES) ears.append(new Option(EAR_LABELS[e] ?? e, e))
   for (const e of EYE_STYLES) eyes.append(new Option(EYE_LABELS[e] ?? e, e))
+  for (const m of MARKING_NAMES) marking.append(new Option(MARKING_LABELS[m] ?? m, m))
 
-  let personality = randomPetDNA().personality // hidden; the randomizer refreshes it
+  let personality = randomPetDNA().personality as unknown as Record<string, number> // hidden; randomizer refreshes it
 
-  const dna = (): PetDNA => {
-    const mk = marking.value as PetDNA['marking']
-    const colors: PetDNA['colors'] = { primary: primary.value, iris: iris.value }
-    if (mk === 'tabby' || mk === 'points') colors.secondary = secondary.value
-    if (mk === 'tuxedo' || mk === 'bicolor') colors.white = white.value
-    if (mk === 'calico') { colors.secondary = secondary.value; colors.tertiary = tertiary.value; colors.white = white.value }
-    return { name: name.value.trim() || 'New Cat', blurb: 'A cat I made.', build: build.value as PetDNA['build'], marking: mk, eyeStyle: eyes.value as PetDNA['eyeStyle'], colors, personality }
+  // The editor now builds a CreatureDef (style + coat), so it can make dogs/rabbits too.
+  const def = (): CreatureDef => {
+    const mk = marking.value
+    const coat: Record<string, string> = { primary: primary.value, iris: iris.value }
+    if (mk === 'tabby' || mk === 'points') coat.secondary = secondary.value
+    if (mk === 'tuxedo' || mk === 'bicolor') coat.white = white.value
+    if (mk === 'calico') { coat.secondary = secondary.value; coat.tertiary = tertiary.value; coat.white = white.value }
+    return {
+      name: name.value.trim() || 'New Friend',
+      style: { build: build.value, eyeStyle: eyes.value, earStyle: ears.value, snout: Number(snout.value) / 10 },
+      coat, marking: mk, personality
+    }
   }
 
   const syncFields = (): void => {
@@ -649,7 +658,7 @@ function buildBuilder(): void {
   }
 
   const draw = (): void => {
-    const pet = dnaToPet(dna(), 'preview')
+    const pet = loadCreature(def(), 'preview')
     const rgba = renderPet(generateGrid(pet, { eyeOpen: true, tailPhase: 0.15 }), pet.coat)
     const tmp = document.createElement('canvas'); tmp.width = SPRITE_W; tmp.height = SPRITE_H
     const tc = tmp.getContext('2d')!, img = tc.createImageData(SPRITE_W, SPRITE_H)
@@ -658,23 +667,30 @@ function buildBuilder(): void {
     pctx.drawImage(tmp, 0, 0, SPRITE_W, SPRITE_H, 0, 0, preview.width, preview.height)
   }
 
-  const load = (d: PetDNA): void => {
+  const load = (d: PetDNA, style?: { earStyle?: string; snout?: number }): void => {
     name.value = d.name; build.value = d.build; marking.value = d.marking; eyes.value = d.eyeStyle
+    ears.value = style?.earStyle ?? 'pointy'
+    snout.value = String(Math.round((style?.snout ?? 0) * 10))
     primary.value = d.colors.primary; iris.value = d.colors.iris
     secondary.value = d.colors.secondary ?? '#c56a24'
     tertiary.value = d.colors.tertiary ?? '#3a3038'
     white.value = d.colors.white ?? '#f4f4f7'
-    personality = d.personality
+    personality = d.personality as unknown as Record<string, number>
     syncFields(); draw()
   }
 
-  for (const el of [name, build, marking, eyes, primary, iris, secondary, white, tertiary]) {
+  for (const el of [name, build, marking, eyes, ears, snout, primary, iris, secondary, white, tertiary]) {
     el.addEventListener('input', () => { syncFields(); draw() })
   }
-  $<HTMLButtonElement>('brandom').addEventListener('click', () => { load(randomPetDNA()); status.textContent = ''; status.className = 'status' })
+  $<HTMLButtonElement>('brandom').addEventListener('click', () => {
+    // Sometimes roll a floppy-eared, snouted friend (a dog!) to show the range.
+    const dog = Math.random() < 0.3
+    load(randomPetDNA(), dog ? { earStyle: 'floppy', snout: 2.6 + Math.random() * 2 } : {})
+    status.textContent = ''; status.className = 'status'
+  })
   create.addEventListener('click', async () => {
     create.disabled = true
-    const r = await window.settings.createPet(dna())
+    const r = await window.settings.createPet(def())
     create.disabled = false
     status.className = 'status ' + (r.ok ? 'ok' : 'err')
     if (!r.ok) { status.textContent = r.error; return }
@@ -684,7 +700,7 @@ function buildBuilder(): void {
     grid.querySelector('.card.active')?.scrollIntoView({ block: 'nearest' })
   })
 
-  load(randomPetDNA()) // start on a random cat so the editor isn't empty
+  load(randomPetDNA()) // start on a random creature so the editor isn't empty
 }
 
 const DEFAULT_MODELS: Record<AiProviderId, string> = { openai: 'gpt-4o', anthropic: 'claude-sonnet-5' }

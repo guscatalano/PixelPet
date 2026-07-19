@@ -280,17 +280,21 @@
       </section>
 
       <section class="sec" data-tab="pet">
-        <div class="label">Build a cat</div>
+        <div class="label">Build a creature</div>
         <div class="builder">
           <div class="bpreviewwrap">
             <canvas id="bpreview" width="130" height="130"></canvas>
           </div>
           <div class="bctrls">
-            <div class="field"><label for="bname">Name</label><input type="text" id="bname" maxlength="24" spellcheck="false" autocomplete="off" placeholder="New Cat" /></div>
+            <div class="field"><label for="bname">Name</label><input type="text" id="bname" maxlength="24" spellcheck="false" autocomplete="off" placeholder="New Friend" /></div>
             <div class="brow2">
               <div class="field"><label for="bbuild">Build</label><select id="bbuild"></select></div>
-              <div class="field"><label for="bmarking">Pattern</label><select id="bmarking"></select></div>
+              <div class="field"><label for="bears">Ears</label><select id="bears"></select></div>
               <div class="field"><label for="beyes">Eyes</label><select id="beyes"></select></div>
+              <div class="field"><label for="bmarking">Pattern</label><select id="bmarking"></select></div>
+            </div>
+            <div class="brow2">
+              <div class="field"><label for="bsnout">Snout</label><input type="range" id="bsnout" min="0" max="55" step="1" /></div>
             </div>
             <div class="bcolors">
               <label class="cfield">Coat<input type="color" id="bprimary" /></label>
@@ -301,7 +305,7 @@
             </div>
             <div class="brow2" style="margin-top: 4px">
               <button class="btn" id="brandom">🎲 Randomize</button>
-              <button class="btn primary" id="bcreate">Create cat</button>
+              <button class="btn primary" id="bcreate">Create</button>
             </div>
             <div class="status" id="bstatus"></div>
           </div>
