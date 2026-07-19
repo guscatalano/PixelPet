@@ -119,17 +119,19 @@ function buildFur(g, state) {
     ellipse(set, g.headCx + g.headRx * 0.8, g.headCy + g.headRy * 0.4, g.cheekFluff, g.cheekFluff * 0.8)
   }
 
+  if (g.snout > 0) ellipse(set, g.headCx, g.noseY + g.snout * 0.35, g.snout * 0.85, g.snout * 0.6) // front muzzle
   const earBaseY = g.headCy - g.headRy * 0.55
   const twitch = (state.earPhase || 0) * 1.2
   for (const s of [-1, 1]) {
     const bx = g.headCx + s * g.earSpread
     const half = g.earW / 2
-    const tipX = bx + s * g.earLean
-    const tipY = earBaseY - g.earH + (s > 0 ? twitch : 0)
-    triangle(set, bx - half, earBaseY + 1, bx + half, earBaseY + 1, tipX, tipY)
-    if (g.earStyle === 'tufted') {
-      // lynx tuft sprouting from the ear tip
-      triangle(set, tipX - 1, tipY + 1, tipX + 1, tipY + 1, tipX + s * 1.6, tipY - 3.2)
+    if (g.earStyle === 'floppy') {
+      triangle(set, bx - half, earBaseY + 1, bx + half, earBaseY + 1, g.headCx + s * g.headRx * 0.92, g.headCy + g.headRy * 0.4)
+    } else {
+      const tipX = bx + s * g.earLean
+      const tipY = earBaseY - g.earH + (s > 0 ? twitch : 0)
+      triangle(set, bx - half, earBaseY + 1, bx + half, earBaseY + 1, tipX, tipY)
+      if (g.earStyle === 'tufted') triangle(set, tipX - 1, tipY + 1, tipX + 1, tipY + 1, tipX + s * 1.6, tipY - 3.2)
     }
   }
   return fur
@@ -386,7 +388,7 @@ function put(overlay, x, y, role) { if (inB(x, y)) overlay[idx(x, y)] = role }
 
 function drawFace(overlay, fur, g, state) {
   const earBaseY = g.headCy - g.headRy * 0.55
-  for (const s of [-1, 1]) {
+  if (g.earStyle !== 'floppy') for (const s of [-1, 1]) {
     const bx = g.headCx + s * g.earSpread
     // Inner ear: a smaller triangle nudged toward the face centre, leaving a
     // white rim, so it reads as the ear's pink lining from the front.

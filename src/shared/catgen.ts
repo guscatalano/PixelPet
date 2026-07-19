@@ -130,15 +130,20 @@ function buildFur(g: Geom, state: AnimState): Uint8Array {
     ellipse(set, g.headCx + g.headRx * 0.8, g.headCy + g.headRy * 0.4, g.cheekFluff, g.cheekFluff * 0.8)
   }
 
+  if (g.snout > 0) ellipse(set, g.headCx, g.noseY + g.snout * 0.35, g.snout * 0.85, g.snout * 0.6) // front muzzle
   const earBaseY = g.headCy - g.headRy * 0.55
   const twitch = (state.earPhase || 0) * 1.2
   for (const s of [-1, 1]) {
     const bx = g.headCx + s * g.earSpread
     const half = g.earW / 2
-    const tipX = bx + s * g.earLean
-    const tipY = earBaseY - g.earH + (s > 0 ? twitch : 0)
-    triangle(set, bx - half, earBaseY + 1, bx + half, earBaseY + 1, tipX, tipY)
-    if (g.earStyle === 'tufted') triangle(set, tipX - 1, tipY + 1, tipX + 1, tipY + 1, tipX + s * 1.6, tipY - 3.2)
+    if (g.earStyle === 'floppy') { // dog ears hang down the sides of the head
+      triangle(set, bx - half, earBaseY + 1, bx + half, earBaseY + 1, g.headCx + s * g.headRx * 0.92, g.headCy + g.headRy * 0.4)
+    } else {
+      const tipX = bx + s * g.earLean
+      const tipY = earBaseY - g.earH + (s > 0 ? twitch : 0)
+      triangle(set, bx - half, earBaseY + 1, bx + half, earBaseY + 1, tipX, tipY)
+      if (g.earStyle === 'tufted') triangle(set, tipX - 1, tipY + 1, tipX + 1, tipY + 1, tipX + s * 1.6, tipY - 3.2)
+    }
   }
   return fur
 }
@@ -404,7 +409,7 @@ function put(overlay: Uint8Array, x: number, y: number, role: number): void { if
 
 function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimState): void {
   const earBaseY = g.headCy - g.headRy * 0.55
-  for (const s of [-1, 1]) {
+  if (g.earStyle !== 'floppy') for (const s of [-1, 1]) { // floppy (dog) ears show no pink lining from the front
     const bx = g.headCx + s * g.earSpread
     // Inner ear: a smaller triangle nudged toward the face centre, leaving a
     // white rim, so it reads as the ear's pink lining from the front.
