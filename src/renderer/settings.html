@@ -203,7 +203,9 @@
 
       /* Build-a-cat editor */
       .builder { display: flex; gap: 18px; align-items: flex-start; background: var(--panel); border: 1px solid var(--hair); border-radius: 12px; padding: 16px 18px; }
-      .bpreviewwrap { flex: 0 0 auto; width: 130px; height: 130px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--hair); display: flex; align-items: center; justify-content: center; }
+      .bpreviewcol { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+      .bpreviewwrap { width: 130px; height: 130px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--hair); display: flex; align-items: center; justify-content: center; }
+      .bpreanim { width: 130px; }
       #bpreview { image-rendering: pixelated; width: 118px; height: 118px; }
       .bctrls { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
       .bctrls .field { grid-template-columns: 58px 1fr; padding: 2px 0; }
@@ -282,8 +284,11 @@
       <section class="sec" data-tab="pet">
         <div class="label">Build a creature</div>
         <div class="builder">
-          <div class="bpreviewwrap">
-            <canvas id="bpreview" width="130" height="130"></canvas>
+          <div class="bpreviewcol">
+            <div class="bpreviewwrap">
+              <canvas id="bpreview" width="130" height="130"></canvas>
+            </div>
+            <select id="bpreanim" class="bpreanim" title="Preview animation"></select>
           </div>
           <div class="bctrls">
             <div class="field"><label for="bname">Name</label><input type="text" id="bname" maxlength="24" spellcheck="false" autocomplete="off" placeholder="New Friend" /></div>

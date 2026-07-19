@@ -633,7 +633,23 @@ function buildBuilder(): void {
   const secondary = $<HTMLInputElement>('bsecondary'), white = $<HTMLInputElement>('bwhite'), tertiary = $<HTMLInputElement>('btertiary')
   const secWrap = $('bsecwrap'), whiteWrap = $('bwhitewrap'), tertWrap = $('btertwrap')
   const preview = $<HTMLCanvasElement>('bpreview'), pctx = preview.getContext('2d')!
+  const preAnim = $<HTMLSelectElement>('bpreanim')
   const create = $<HTMLButtonElement>('bcreate'), status = $('bstatus')
+
+  // What the preview plays. "Move" follows the creature's chosen gait; the rest let
+  // you watch the same creature in every resting/idle animation before you Create it.
+  const PREVIEW_ANIMS: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) => Uint8ClampedArray }> = [
+    { key: 'move', label: 'Move', rgba: (pet, t) => renderPet(generateWalkGrid(pet, (t / 720) % 1, 1), pet.coat) },
+    { key: 'idle', label: 'Idle', rgba: (pet, t) => renderPet(generateGrid(pet, idleState(t)), pet.coat) },
+    { key: 'sit', label: 'Sit', rgba: (pet, t) => renderPet(generateRigGrid(pet, sitPose(t)), pet.coat) },
+    { key: 'loaf', label: 'Loaf', rgba: (pet, t) => renderPet(generateRigGrid(pet, loafPose(t)), pet.coat) },
+    { key: 'sphinx', label: 'Sphinx', rgba: (pet, t) => renderPet(generateRigGrid(pet, sphinxPose(t)), pet.coat) },
+    { key: 'sleep', label: 'Sleep', rgba: (pet, t) => renderPet(generateRigGrid(pet, sleepPose(t)), pet.coat) },
+    { key: 'groom', label: 'Groom', rgba: (pet, t) => renderPet(generateRigGrid(pet, lerpPose(RIG.groom, RIG.groomLick, 0.5 + 0.5 * Math.sin(t / 140))), pet.coat) },
+    { key: 'stretch', label: 'Stretch', rgba: (pet, t) => renderPet(generateRigGrid(pet, stretchPose(t)), pet.coat) },
+    { key: 'pounce', label: 'Pounce', rgba: (pet, t) => renderPet(generateRigGrid(pet, pouncePose(t)), pet.coat) }
+  ]
+  for (const a of PREVIEW_ANIMS) preAnim.append(new Option(a.label, a.key))
 
   for (const b of BUILD_NAMES) build.append(new Option(BUILD_LABELS[b] ?? b, b))
   for (const e of EAR_STYLES) ears.append(new Option(EAR_LABELS[e] ?? e, e))
@@ -673,8 +689,8 @@ function buildBuilder(): void {
   let previewPet = loadCreature(def(), 'preview')
   const draw = (): void => { previewPet = loadCreature(def(), 'preview') } // rebuild on any change
   const animate = (now: number): void => {
-    const step = (now / 720) % 1
-    const rgba = renderPet(generateWalkGrid(previewPet, step, 1), previewPet.coat)
+    const anim = PREVIEW_ANIMS.find(a => a.key === preAnim.value) ?? PREVIEW_ANIMS[0]
+    const rgba = anim.rgba(previewPet, now)
     const img = tc.createImageData(SPRITE_W, SPRITE_H); img.data.set(rgba); tc.putImageData(img, 0, 0)
     pctx.clearRect(0, 0, preview.width, preview.height); pctx.imageSmoothingEnabled = false
     pctx.drawImage(tmp, 0, 0, SPRITE_W, SPRITE_H, 0, 0, preview.width, preview.height)

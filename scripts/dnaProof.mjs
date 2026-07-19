@@ -10,7 +10,7 @@ const BUILDS = {
   normal: {},
   chonky: { bodyRx: 15, bodyRy: 12.5, headRx: 11.5, headRy: 10.5, earSpread: 8 },
   slim: { bodyRx: 9.8, bodyRy: 9.5, headRx: 9.8, headRy: 9, earH: 9 },
-  kitten: { headRx: 12.5, headRy: 11.2, bodyRx: 9.8, bodyRy: 8.2, eyeRx: 3.1, eyeRy: 3.7, eyeDX: 5.4, earW: 8, noseY: 22 },
+  kitten: { headRx: 10.6, headRy: 9.7, bodyRx: 10.2, bodyRy: 8.7, eyeRx: 3.1, eyeRy: 3.7, eyeDX: 5.2, earW: 7.8, noseY: 21 },
   fluffy: { earH: 11, earStyle: 'tufted', cheekFluff: 5, bodyRx: 14, bodyRy: 12 },
   bigears: { earH: 12.5, earW: 8.5, earSpread: 8 }
 }
