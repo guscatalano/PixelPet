@@ -1,0 +1,35 @@
+{
+  "pixelpet": 1,
+  "kind": "creature",
+  "creature": {
+    "name": "Rex",
+    "species": "Dog",
+    "author": "PixelPet",
+    "style": {
+      "build": "normal",
+      "earStyle": "floppy",
+      "eyeStyle": "round",
+      "snout": 3.4,
+      "headRx": 10,
+      "headRy": 9.5,
+      "bodyRx": 13,
+      "bodyRy": 9.5,
+      "earW": 6.5
+    },
+    "coat": {
+      "primary": "#a6743f",
+      "secondary": "#7d5330",
+      "iris": "#5a3a22",
+      "nose": "#3a2a20"
+    },
+    "marking": "solid",
+    "personality": {
+      "energy": 0.78,
+      "sleepiness": 0.35,
+      "affection": 0.9,
+      "mischief": 0.5,
+      "curiosity": 0.7,
+      "independence": 0.3
+    }
+  }
+}

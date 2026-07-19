@@ -1,0 +1,36 @@
+{
+  "pixelpet": 1,
+  "kind": "creature",
+  "creature": {
+    "name": "Clover",
+    "species": "Rabbit",
+    "author": "PixelPet",
+    "style": {
+      "build": "normal",
+      "earStyle": "pointy",
+      "eyeStyle": "round",
+      "snout": 0,
+      "headRx": 9,
+      "headRy": 9,
+      "bodyRx": 11,
+      "bodyRy": 11,
+      "earW": 4.6,
+      "earH": 17
+    },
+    "coat": {
+      "primary": "#cfccd4",
+      "secondary": "#a7a4ae",
+      "iris": "#8a5a3a",
+      "nose": "#c98a9a"
+    },
+    "marking": "solid",
+    "personality": {
+      "energy": 0.6,
+      "sleepiness": 0.45,
+      "affection": 0.6,
+      "mischief": 0.5,
+      "curiosity": 0.8,
+      "independence": 0.55
+    }
+  }
+}
