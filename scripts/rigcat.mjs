@@ -171,8 +171,13 @@ export function generateRigGrid(pet, pose) {
     } else {
       for (const dx of [0, 1, 2]) put(overlay, Math.round(hcx + 1 * kh + dx), Math.round(hcy - 0.3), O.OUTLINE)
     }
-    const nfx = hcx + hr - 1, nfy = hcy + 0.8
-    if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+    if (g.snout > 0) {
+      const nfx = hcx + faceSign * (hr * 0.82 + g.snout * 0.85), nfy = hcy + hr * 0.32
+      ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, nfx, nfy, 1.3, 1.1)
+    } else {
+      const nfx = hcx + hr - 1, nfy = hcy + 0.8
+      if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+    }
   }
 
   if (pose.cone) {
