@@ -35,6 +35,8 @@ export interface Geom {
   snout: number
   /** Tail shape: default | bushy (fox/husky) | thin | nub (short stub). */
   tailStyle: string
+  /** How it travels: walk (4-beat) | hop (bunny bound). */
+  gait: string
 }
 export interface CoatSpec {
   primary: string; secondary?: string; white?: string; tertiary?: string
@@ -57,7 +59,7 @@ export function defaultGeom(): Geom {
     bodyCx: 22, bodyCy: 33, bodyRx: 12, bodyRy: 11,
     earW: 7.5, earH: 8.5, earSpread: 7.5, earLean: 1.5, earStyle: 'pointy',
     eyeDX: 5.2, eyeY: 17, eyeRx: 2.5, eyeRy: 3.0, eyeStyle: 'round',
-    noseY: 22, hasTail: true, tailSide: 1, cheekFluff: 0, snout: 0, tailStyle: 'default'
+    noseY: 22, hasTail: true, tailSide: 1, cheekFluff: 0, snout: 0, tailStyle: 'default', gait: 'walk'
   }
 }
 
@@ -498,7 +500,11 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   // Head and body move as one unit. `motion` (0..) scales the whole effect.
   // `excite` (0..1) turns the calm walk into a prance: bigger bounce, higher
   // knees, a proud lifted head and an upright waving tail.
-  const bob = Math.sin(step * Math.PI * 4) * (1.3 + excite * 1.7) * motion
+  // A hop (bunny bound): one big up-arc per cycle with the legs tucking under at
+  // the apex, instead of the 4-beat walk. `air` = 0 grounded … 1 at the apex.
+  const hop = g.gait === 'hop'
+  const air = hop ? Math.sin((((step % 1) + 1) % 1) * Math.PI) : 0
+  const bob = hop ? -air * 5 * motion : Math.sin(step * Math.PI * 4) * (1.3 + excite * 1.7) * motion
   const bodyRx = 11.5 * kbx, bodyRy = 7.4 * kby
   const bodyCx = 18, bodyCy = 33.7 - bodyRy * 0.5 + bob // hip line fixed at 33.7
   const dTop = (bodyCy - bodyRy) - (30 + bob - 7.4)
@@ -522,6 +528,19 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   // slides back exactly as fast as the body advances: STRIDE = 2*A/0.75. (=12.)
   const A = 4.5, LIFT = 3.4 + excite * 2.4, SWING = 0.25
   const drawLeg = (lg: { x: number; ph: number; near: boolean; back: boolean }): void => {
+    if (hop) { // all four legs move together: extended at the bottom, tucked at the apex
+      const tag = lg.near ? 1 : 2
+      const paintH: SetFn = (x, y) => { set(x, y); if (inB(x, y)) legTag[idx(x, y)] = tag }
+      const hipX = sxw(lg.x), hipY = bodyBottom
+      const footY = groundY - air * (groundY - bodyBottom - 2)
+      const footX = hipX + (lg.back ? -2 : 3) * (1 - air)
+      const midY = hipY + (footY - hipY) * 0.5 - air * 1.2
+      const jointX = lg.back ? hipX - 2 : hipX + 1.5
+      seg(paintH, hipX, hipY, jointX, midY, 2.2, 1.5)
+      seg(paintH, jointX, midY, footX, footY, 1.5, 1.0)
+      ellipse(paintH, footX, footY + 0.2, 1.8, 1.2)
+      return
+    }
     const p = (((step + lg.ph) % 1) + 1) % 1
     let offX: number, lift: number, flex: number
     if (p < SWING) { const s = p / SWING; offX = -A + s * 2 * A; flex = Math.sin(s * Math.PI); lift = flex * LIFT * (lg.back ? 0.95 : 0.85) }
@@ -563,9 +582,13 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
     const p0 = [bodyCx - bodyRx * 0.7, bodyCy - 1]
     const p1 = [bodyCx - bodyRx - 4 + excite * 3, bodyCy - 9 - excite * 5]
     const p2 = [bodyCx - bodyRx + 3 + tailSway + excite * 5, bodyCy - 18 - excite * 7]
-    for (let t = 0; t <= 1.0001; t += 0.05) {
+    const wts = g.tailStyle
+    const wtb = 2.6 * (wts === 'bushy' ? 1.8 : wts === 'thin' ? 0.6 : 1)
+    const wtEnd = wts === 'nub' ? 0.34 : 1.0001
+    for (let t = 0; t <= wtEnd; t += 0.05) {
       const it = 1 - t
-      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], 2.6 - t * 1.1, 2.6 - t * 1.1)
+      const r = wts === 'nub' ? wtb * (1 - t * 0.4) : wtb - t * (wts === 'bushy' ? 0.5 : 1.1)
+      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], r, r)
     }
   }
 
@@ -605,11 +628,15 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
       else shade[idx(x, y)] = BASE
     }
 
-  triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
-    headCx + 2, headCy - headR + 1.5, headCx + 3.6, headCy - headR + 1.5, headCx + 3.2, headCy - headR - 1)
-  ellipse((x, y) => put(overlay, x, y, O.IRIS), headCx + 1.6, headCy - 0.5, 1.7, 2)
-  ellipse((x, y) => put(overlay, x, y, O.PUPIL), headCx + 2, headCy - 0.3, 0.9, 1.4)
+  if (g.earStyle !== 'floppy')
+    triangle((x, y) => { if (fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
+      headCx + 2, headCy - headR + 1.5, headCx + 3.6, headCy - headR + 1.5, headCx + 3.2, headCy - headR - 1)
+  const wes = g.eyeStyle
+  const wiry = wes === 'almond' ? 1.5 : wes === 'sleepy' ? 1.15 : 2
+  ellipse((x, y) => put(overlay, x, y, O.IRIS), headCx + 1.6, headCy - 0.5, 1.7, wiry)
+  ellipse((x, y) => put(overlay, x, y, O.PUPIL), headCx + 2, headCy - 0.3, wes === 'round' ? 0.9 : 0.66, Math.min(1.4, wiry * 0.95))
   put(overlay, Math.round(headCx + 1.2), Math.round(headCy - 1.3), O.GLINT)
+  if (wes === 'sleepy') for (const dx of [-1, 0, 1, 2]) put(overlay, Math.round(headCx + 1 + dx), Math.round(headCy - 0.5 - wiry), O.OUTLINE)
   // Just a tiny nose at the front of the face (no mouth line — a dark trail on
   // a white profile reads as a smudge, ref cats keep it to the nose).
   if (g.snout > 0) { // dog nose on the muzzle tip

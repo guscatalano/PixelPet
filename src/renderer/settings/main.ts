@@ -3,7 +3,7 @@ import { generateRigGrid, lerpPose, POSES as RIG } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
 import { PETS, type AppPet } from '../../shared/pets'
 import { randomPetDNA, BUILD_NAMES, MARKING_NAMES, EYE_STYLES, type PetDNA } from '../../shared/petdna'
-import { loadCreature, EAR_STYLES, TAIL_STYLES, type CreatureDef } from '../../shared/creature'
+import { loadCreature, EAR_STYLES, TAIL_STYLES, GAITS, type CreatureDef } from '../../shared/creature'
 import { ashPhoto } from '../ashPhoto'
 import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
 import { TRAIT_KEYS, TOGGLEABLE_ANIMS, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Personality } from '../../shared/types'
@@ -620,11 +620,12 @@ const MARKING_LABELS: Record<string, string> = { solid: 'Solid', tabby: 'Tabby',
 const EYE_LABELS: Record<string, string> = { round: 'Round', almond: 'Almond', sleepy: 'Sleepy' }
 const EAR_LABELS: Record<string, string> = { pointy: 'Pointy', tufted: 'Tufted', floppy: 'Floppy' }
 const TAIL_LABELS: Record<string, string> = { default: 'Normal', bushy: 'Bushy', thin: 'Thin', nub: 'Nub' }
+const GAIT_LABELS: Record<string, string> = { walk: 'Walk', hop: 'Hop' }
 
 function buildBuilder(): void {
   const name = $<HTMLInputElement>('bname'), build = $<HTMLSelectElement>('bbuild')
   const marking = $<HTMLSelectElement>('bmarking'), eyes = $<HTMLSelectElement>('beyes'), ears = $<HTMLSelectElement>('bears')
-  const tail = $<HTMLSelectElement>('btail'), snout = $<HTMLInputElement>('bsnout')
+  const tail = $<HTMLSelectElement>('btail'), gaitSel = $<HTMLSelectElement>('bgait'), snout = $<HTMLInputElement>('bsnout')
   const primary = $<HTMLInputElement>('bprimary'), iris = $<HTMLInputElement>('biris')
   const secondary = $<HTMLInputElement>('bsecondary'), white = $<HTMLInputElement>('bwhite'), tertiary = $<HTMLInputElement>('btertiary')
   const secWrap = $('bsecwrap'), whiteWrap = $('bwhitewrap'), tertWrap = $('btertwrap')
@@ -636,6 +637,7 @@ function buildBuilder(): void {
   for (const e of EYE_STYLES) eyes.append(new Option(EYE_LABELS[e] ?? e, e))
   for (const m of MARKING_NAMES) marking.append(new Option(MARKING_LABELS[m] ?? m, m))
   for (const t of TAIL_STYLES) tail.append(new Option(TAIL_LABELS[t] ?? t, t))
+  for (const gt of GAITS) gaitSel.append(new Option(GAIT_LABELS[gt] ?? gt, gt))
 
   let personality = randomPetDNA().personality as unknown as Record<string, number> // hidden; randomizer refreshes it
 
@@ -648,7 +650,7 @@ function buildBuilder(): void {
     if (mk === 'calico') { coat.secondary = secondary.value; coat.tertiary = tertiary.value; coat.white = white.value }
     return {
       name: name.value.trim() || 'New Friend',
-      style: { build: build.value, eyeStyle: eyes.value, earStyle: ears.value, tailStyle: tail.value, snout: Number(snout.value) / 10 },
+      style: { build: build.value, eyeStyle: eyes.value, earStyle: ears.value, tailStyle: tail.value, gait: gaitSel.value, snout: Number(snout.value) / 10 },
       coat, marking: mk, personality
     }
   }
@@ -661,22 +663,27 @@ function buildBuilder(): void {
     if (secWrap.firstChild) secWrap.firstChild.nodeValue = mk === 'points' ? 'Points' : mk === 'calico' ? 'Ginger' : 'Stripes'
   }
 
-  const draw = (): void => {
-    const pet = loadCreature(def(), 'preview')
-    // Side "sit" pose so the whole creature reads — ears, snout, TAIL, body — and
-    // the eye style (now applied in profile too) shows.
-    const rgba = renderPet(generateRigGrid(pet, RIG.sit), pet.coat)
-    const tmp = document.createElement('canvas'); tmp.width = SPRITE_W; tmp.height = SPRITE_H
-    const tc = tmp.getContext('2d')!, img = tc.createImageData(SPRITE_W, SPRITE_H)
-    img.data.set(rgba); tc.putImageData(img, 0, 0)
+  // Live preview: the creature walking (or hopping) in place, so every control —
+  // ears, eyes, tail, snout, and the gait itself — is visible in motion.
+  const tmp = document.createElement('canvas'); tmp.width = SPRITE_W; tmp.height = SPRITE_H
+  const tc = tmp.getContext('2d')!
+  let previewPet = loadCreature(def(), 'preview')
+  const draw = (): void => { previewPet = loadCreature(def(), 'preview') } // rebuild on any change
+  const animate = (now: number): void => {
+    const step = (now / 720) % 1
+    const rgba = renderPet(generateWalkGrid(previewPet, step, 1), previewPet.coat)
+    const img = tc.createImageData(SPRITE_W, SPRITE_H); img.data.set(rgba); tc.putImageData(img, 0, 0)
     pctx.clearRect(0, 0, preview.width, preview.height); pctx.imageSmoothingEnabled = false
     pctx.drawImage(tmp, 0, 0, SPRITE_W, SPRITE_H, 0, 0, preview.width, preview.height)
+    requestAnimationFrame(animate)
   }
+  requestAnimationFrame(animate)
 
-  const load = (d: PetDNA, style?: { earStyle?: string; tailStyle?: string; snout?: number }): void => {
+  const load = (d: PetDNA, style?: { earStyle?: string; tailStyle?: string; gait?: string; snout?: number }): void => {
     name.value = d.name; build.value = d.build; marking.value = d.marking; eyes.value = d.eyeStyle
     ears.value = style?.earStyle ?? 'pointy'
     tail.value = style?.tailStyle ?? 'default'
+    gaitSel.value = style?.gait ?? 'walk'
     snout.value = String(Math.round((style?.snout ?? 0) * 10))
     primary.value = d.colors.primary; iris.value = d.colors.iris
     secondary.value = d.colors.secondary ?? '#c56a24'
@@ -686,7 +693,7 @@ function buildBuilder(): void {
     syncFields(); draw()
   }
 
-  for (const el of [name, build, marking, eyes, ears, tail, snout, primary, iris, secondary, white, tertiary]) {
+  for (const el of [name, build, marking, eyes, ears, tail, gaitSel, snout, primary, iris, secondary, white, tertiary]) {
     el.addEventListener('input', () => { syncFields(); draw() })
   }
   $<HTMLButtonElement>('brandom').addEventListener('click', () => {

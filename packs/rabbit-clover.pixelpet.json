@@ -9,6 +9,8 @@
       "build": "normal",
       "earStyle": "pointy",
       "eyeStyle": "round",
+      "tailStyle": "nub",
+      "gait": "hop",
       "snout": 0,
       "headRx": 9,
       "headRy": 9,
