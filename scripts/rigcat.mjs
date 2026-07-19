@@ -88,17 +88,23 @@ export function generateRigGrid(pet, pose) {
   ellipse(set, bcx, bcy, brx, bry) // body
   if (pose.body2) ellipse(set, pose.body2[0], pose.body2[1], pose.body2[2], pose.body2[3]) // optional 2nd mass (e.g. raised rear in a stretch)
   ellipse(set, pose.neck[0], pose.neck[1], pose.neck[2], pose.neck[3]) // neck
-  ellipse(set, hcx, hcy, hr * 1.02, hr * 0.98) // round head (our cat's head)
+  ellipse(set, hcx, hcy, hr * 1.02, hr * 0.98) // round head
+  const faceSign = hcx >= bcx ? 1 : -1
+  if (g.snout > 0) ellipse(set, hcx + faceSign * hr * 0.82, hcy + hr * 0.3, g.snout, g.snout * 0.62) // dog muzzle
   if (g.cheekFluff > 0) ellipse(set, hcx - hr * 0.72, hcy + hr * 0.42, g.cheekFluff * 0.45, g.cheekFluff * 0.35)
-  const perk = pose.earPerk ?? 0 // 0 = normal; 1 = ears fully perked (taller, more upright)
+  const perk = pose.earPerk ?? 0
   const back = pose.earsBack ?? 0
-  const earTipL = hcy - hr - (3.4 + perk * 1.2) * eH * (1 - back * 0.6) + back * 2
-  const bk = back * 5 * eW
-  triangle(set, hcx - 4 * eW, hcy - hr + 2, hcx, hcy - hr + 2, hcx + (-4.5 + perk * 0.8) * eW - bk, earTipL)
-  triangle(set, hcx + 1 * eW, hcy - hr + 2, hcx + 5 * eW, hcy - hr + 2, hcx + (4 - perk * 0.8) * eW - bk, earTipL)
-  if (g.earStyle === 'tufted') {
-    triangle(set, hcx - 5 * eW, earTipL + 1.5, hcx - 3.5 * eW, earTipL + 1.5, hcx - 5 * eW, earTipL - 1.5)
-    triangle(set, hcx + 3.3 * eW, earTipL + 1.5, hcx + 4.8 * eW, earTipL + 1.5, hcx + 4.6 * eW, earTipL - 1.5)
+  if (g.earStyle === 'floppy') {
+    for (const s of [-1, 1]) seg(set, hcx + s * hr * 0.5, hcy - hr + 3, hcx + s * hr * 0.95, hcy + hr * (0.3 - back * 0.15), 2.4 * eW, 1.5 * eW)
+  } else {
+    const earTipL = hcy - hr - (3.4 + perk * 1.2) * eH * (1 - back * 0.6) + back * 2
+    const bk = back * 5 * eW
+    triangle(set, hcx - 4 * eW, hcy - hr + 2, hcx, hcy - hr + 2, hcx + (-4.5 + perk * 0.8) * eW - bk, earTipL)
+    triangle(set, hcx + 1 * eW, hcy - hr + 2, hcx + 5 * eW, hcy - hr + 2, hcx + (4 - perk * 0.8) * eW - bk, earTipL)
+    if (g.earStyle === 'tufted') {
+      triangle(set, hcx - 5 * eW, earTipL + 1.5, hcx - 3.5 * eW, earTipL + 1.5, hcx - 5 * eW, earTipL - 1.5)
+      triangle(set, hcx + 3.3 * eW, earTipL + 1.5, hcx + 4.8 * eW, earTipL + 1.5, hcx + 4.6 * eW, earTipL - 1.5)
+    }
   }
   { const p0 = pose.tail.root, p1 = pose.tail.ctrl, p2 = pose.tail.tip
     const tr = pose.tailR ?? 2.6 // base tail radius; crank it up for the scared poof
