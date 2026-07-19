@@ -3,6 +3,16 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.4.1 — more gaits, fuller species
+
+### New
+- Two more ways to move: **Trot** (a bouncy, tail-up walk) and **Stalk** (a low, slinking
+  creep) — so a creature can Walk, Trot, Stalk, or Hop.
+
+### Fixed
+- Dogs (and any floppy-eared / snouted creature) now look right in the **¾ head-turn** too —
+  they're consistent across every view now.
+
 ## v0.4.0 — bring your own creatures
 
 ### New
