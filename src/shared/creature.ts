@@ -12,12 +12,14 @@ import type { AppPet } from './pets'
 import { dnaToPet, EYE_STYLES } from './petdna'
 
 export const EAR_STYLES = ['pointy', 'tufted', 'floppy'] as const
+export const TAIL_STYLES = ['default', 'bushy', 'thin', 'nub'] as const
 
 /** The silhouette knobs a creature may set, beyond coat/build DNA. */
 export interface CreatureStyle {
   build?: string      // proportion archetype (normal/chonky/slim/kitten/fluffy/bigears)
   eyeStyle?: string   // round | almond | sleepy
   earStyle?: string   // pointy | tufted | floppy
+  tailStyle?: string  // default | bushy | thin | nub
   snout?: number      // 0 = flat cat face, >0 = a dog-like muzzle
   headRx?: number; headRy?: number
   bodyRx?: number; bodyRy?: number
@@ -70,6 +72,8 @@ export function loadCreature(raw: unknown, id: string): AppPet {
   const g = pet.geom as Partial<Geom>
   const ear = oneOf(s.earStyle, EAR_STYLES)
   if (ear) g.earStyle = ear
+  const tail = oneOf(s.tailStyle, TAIL_STYLES)
+  if (tail) g.tailStyle = tail
   const eye = oneOf(s.eyeStyle, EYE_STYLES)
   if (eye) g.eyeStyle = eye
   clampInto(g, 'snout', s.snout, 0, 6)

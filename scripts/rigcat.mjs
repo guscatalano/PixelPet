@@ -107,9 +107,13 @@ export function generateRigGrid(pet, pose) {
     }
   }
   { const p0 = pose.tail.root, p1 = pose.tail.ctrl, p2 = pose.tail.tip
-    const tr = pose.tailR ?? 2.6 // base tail radius; crank it up for the scared poof
-    for (let t = 0; t <= 1.0001; t += 0.05) { const it = 1 - t
-      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], tr - t * 1.1, tr - t * 1.1) } }
+    const ts = g.tailStyle
+    const base = (pose.tailR ?? 2.6) * (ts === 'bushy' ? 1.8 : ts === 'thin' ? 0.6 : 1)
+    const taper = ts === 'bushy' ? 0.5 : 1.1
+    const tEnd = ts === 'nub' ? 0.34 : 1.0001
+    for (let t = 0; t <= tEnd; t += 0.05) { const it = 1 - t
+      const r = ts === 'nub' ? base * (1 - t * 0.4) : base - t * taper
+      ellipse(set, it * it * p0[0] + 2 * it * t * p1[0] + t * t * p2[0], it * it * p0[1] + 2 * it * t * p1[1] + t * t * p2[1], r, r) } }
   pose.legs.filter((l) => l.near).forEach(drawLeg) // near legs on top
 
   const shade = new Uint8Array(W * H), region = new Uint8Array(W * H), overlay = new Uint8Array(W * H)

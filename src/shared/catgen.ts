@@ -33,6 +33,8 @@ export interface Geom {
   noseY: number; hasTail: boolean; tailSide: number; cheekFluff: number
   /** Muzzle length forward of the head (0 = flat cat face; >0 = a dog-like snout). */
   snout: number
+  /** Tail shape: default | bushy (fox/husky) | thin | nub (short stub). */
+  tailStyle: string
 }
 export interface CoatSpec {
   primary: string; secondary?: string; white?: string; tertiary?: string
@@ -55,7 +57,7 @@ export function defaultGeom(): Geom {
     bodyCx: 22, bodyCy: 33, bodyRx: 12, bodyRy: 11,
     earW: 7.5, earH: 8.5, earSpread: 7.5, earLean: 1.5, earStyle: 'pointy',
     eyeDX: 5.2, eyeY: 17, eyeRx: 2.5, eyeRy: 3.0, eyeStyle: 'round',
-    noseY: 22, hasTail: true, tailSide: 1, cheekFluff: 0, snout: 0
+    noseY: 22, hasTail: true, tailSide: 1, cheekFluff: 0, snout: 0, tailStyle: 'default'
   }
 }
 

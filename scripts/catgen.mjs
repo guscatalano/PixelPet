@@ -42,7 +42,7 @@ export function defaultGeom() {
     earW: 7.5, earH: 8.5, earSpread: 7.5, earLean: 1.5, earStyle: 'pointy',
     eyeDX: 5.2, eyeY: 17, eyeRx: 2.5, eyeRy: 3.0, eyeStyle: 'round',
     noseY: 22,
-    hasTail: true, tailSide: 1, cheekFluff: 0, snout: 0
+    hasTail: true, tailSide: 1, cheekFluff: 0, snout: 0, tailStyle: 'default'
   }
 }
 
