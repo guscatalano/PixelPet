@@ -9,6 +9,9 @@ import { refreshPlatforms, supportY } from '../desktop/world'
 const MOVE_TICK_MS = 16
 const WALK_SPEED = 0.35 // px per tick (~22 px/s) — a calm walking pace, not a scramble
 const PRANCE_SPEED = 0.47 // an excited prance covers ground a bit faster than the walk
+// Every clip that travels across the screen (a gait). Its speed comes from GAIT_SPEED.
+const WALK_CLIPS = new Set<ClipName>(['walk', 'prance', 'stalk', 'trot', 'hop'])
+const GAIT_SPEED: Partial<Record<ClipName, number>> = { prance: PRANCE_SPEED, trot: PRANCE_SPEED, stalk: 0.22, hop: 0.42 }
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
 const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never reports it
@@ -123,7 +126,7 @@ export class PetEngine {
   }
 
   /** Walk and prance share all the movement machinery; only the look differs. */
-  private isWalking(): boolean { return this.clip === 'walk' || this.clip === 'prance' }
+  private isWalking(): boolean { return WALK_CLIPS.has(this.clip) }
 
   /** Per-animation opt-outs from settings. */
   setDisabled(anims: ClipName[]): void {
@@ -280,8 +283,7 @@ export class PetEngine {
     switch (clip) {
       case 'yawn': case 'stretch': case 'react': case 'paw': this.playOneShot(clip); break
       case 'pounce': this.startPounce(); break
-      case 'walk': this.startWander('walk'); break
-      case 'prance': this.startWander('prance'); break
+      case 'walk': case 'prance': case 'stalk': case 'trot': case 'hop': this.startWander(clip); break
       case 'sleep': this.setClip('sleep'); this.scheduleAmbient(this.dwellFor('sleep')); break
       case 'loaf': this.setClip('loaf'); this.scheduleAmbient(this.dwellFor('loaf')); break
       case 'sphinx': this.setClip('sphinx'); this.scheduleAmbient(this.dwellFor('sphinx')); break
@@ -302,7 +304,7 @@ export class PetEngine {
 
   // ---- wandering + physics -------------------------------------------------------
 
-  private startWander(force?: 'walk' | 'prance'): void {
+  private startWander(force?: ClipName): void {
     if (this.dragging || this.win.isDestroyed()) return
     const wa = screen.getDisplayMatching(this.win.getBounds()).workArea
     const minX = wa.x
@@ -320,10 +322,17 @@ export class PetEngine {
     this.walkDist = 0
     this.facing = target < this.curX ? 'left' : 'right'
     this.walkAskedAt = Date.now()
-    // Excited cats sometimes prance instead of plodding.
-    const p = this.personality
-    const prance = force ? force === 'prance' : Math.random() < 0.12 + p.energy * 0.3 + p.mischief * 0.22
-    this.setClip(prance ? 'prance' : 'walk', this.facing)
+    // Pick how to travel: usually a plain walk, but sometimes a livelier gait.
+    let clip: ClipName = 'walk'
+    if (force && WALK_CLIPS.has(force)) clip = force
+    else {
+      const p = this.personality, r = Math.random()
+      if (r < 0.1 + p.energy * 0.25 + p.mischief * 0.2) clip = 'prance'
+      else if (r < 0.16) clip = 'trot'
+      else if (r < 0.2 + p.mischief * 0.08) clip = 'stalk'
+      else if (r < 0.24) clip = 'hop'
+    }
+    this.setClip(clip, this.facing)
   }
 
   // The always-on physics tick: walking, gravity onto whatever window/taskbar is
@@ -365,7 +374,7 @@ export class PetEngine {
           return
         }
         const dx = this.wanderTarget - this.curX
-        const spd = this.clip === 'prance' ? PRANCE_SPEED : WALK_SPEED
+        const spd = GAIT_SPEED[this.clip] ?? WALK_SPEED
         if (Math.abs(dx) <= spd) {
           this.curX = this.wanderTarget
           this.finishWander()
