@@ -54,7 +54,7 @@ declare global {
   interface Window { settings: SettingsApi }
 }
 
-const SIZE_LABELS: Record<number, string> = { 2: 'XS', 3: 'S', 4: 'M', 5: 'L', 6: 'XL', 7: 'XXL' }
+const SIZE_LABELS: Record<number, string> = { 1: 'XXS', 2: 'XS', 3: 'S', 4: 'M', 5: 'L', 6: 'XL', 7: 'XXL' }
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T
 const grid = $('grid'), sizes = $('sizes'), rows = $('rows'), who = $('who'), resetBtn = $<HTMLButtonElement>('reset')

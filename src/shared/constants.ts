@@ -14,7 +14,7 @@ export const SPRITE_H = H
  * size). Kept integer so pixels stay crisp.
  */
 export const DEFAULT_SCALE = 4
-export const MIN_SCALE = 2
+export const MIN_SCALE = 1 // XXS — a tiny 1:1 pet (44px); most people want S–L
 export const MAX_SCALE = 7
 
 /**
