@@ -538,9 +538,14 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   // Round head, no protruding muzzle — pixel cats read better with a rounded
   // head + a tiny nose near the eye than with a snout + a lone nose (ref study).
   ellipse(set, headCx, headCy, headR * 1.02, headR * 0.98)
+  if (g.snout > 0) ellipse(set, headCx + headR * 0.82, headCy + headR * 0.3, g.snout, g.snout * 0.62) // dog muzzle (walk faces right)
 
-  triangle(set, headCx - 4, headCy - headR + 2, headCx, headCy - headR + 2, headCx - 4.5, headCy - headR - 4)
-  triangle(set, headCx + 1, headCy - headR + 2, headCx + 5, headCy - headR + 2, headCx + 4, headCy - headR - 4)
+  if (g.earStyle === 'floppy') {
+    for (const s of [-1, 1]) seg(set, headCx + s * headR * 0.5, headCy - headR + 3, headCx + s * headR * 0.95, headCy + headR * 0.3, 2.4, 1.5)
+  } else {
+    triangle(set, headCx - 4, headCy - headR + 2, headCx, headCy - headR + 2, headCx - 4.5, headCy - headR - 4)
+    triangle(set, headCx + 1, headCy - headR + 2, headCx + 5, headCy - headR + 2, headCx + 4, headCy - headR - 4)
+  }
 
   {
     const tailSway = Math.sin(step * Math.PI * 2) * (2 + excite * 1.6) * motion
@@ -597,8 +602,12 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   put(overlay, Math.round(headCx + 1.2), Math.round(headCy - 1.3), O.GLINT)
   // Just a tiny nose at the front of the face (no mouth line — a dark trail on
   // a white profile reads as a smudge, ref cats keep it to the nose).
-  const nfx = headCx + headR - 1, nfy = headCy + 0.8
-  if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+  if (g.snout > 0) { // dog nose on the muzzle tip
+    ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, headCx + headR * 0.82 + g.snout * 0.85, headCy + headR * 0.32, 1.3, 1.1)
+  } else {
+    const nfx = headCx + headR - 1, nfy = headCy + 0.8
+    if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+  }
 
   return { shade, region, overlay, geom: defaultGeom(), fur }
 }

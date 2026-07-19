@@ -505,15 +505,20 @@ export function generateWalkGrid(preset, step = 0, motion = 1, excite = 0) {
   // Round head, no protruding muzzle — pixel cats read better with a rounded
   // head + a tiny nose near the eye than with a snout + a lone nose (ref study).
   ellipse(set, headCx, headCy, headR * 1.02, headR * 0.98)
+  if (g.snout > 0) ellipse(set, headCx + headR * 0.82, headCy + headR * 0.3, g.snout, g.snout * 0.62) // dog muzzle
 
   if (g.cheekFluff > 0) ellipse(set, headCx - headR * 0.72, headCy + headR * 0.42, g.cheekFluff * 0.45, g.cheekFluff * 0.35)
-  // Ears (scaled to the pet's, tufts for tufted styles).
-  const earTipY = headCy - headR - 4 * eH
-  triangle(set, headCx - 4 * eW, headCy - headR + 2, headCx, headCy - headR + 2, headCx - 4.5 * eW, earTipY)
-  triangle(set, headCx + 1 * eW, headCy - headR + 2, headCx + 5 * eW, headCy - headR + 2, headCx + 4 * eW, earTipY)
-  if (g.earStyle === 'tufted') {
-    triangle(set, headCx - 5 * eW, earTipY + 1.5, headCx - 3.5 * eW, earTipY + 1.5, headCx - 5 * eW, earTipY - 2.6)
-    triangle(set, headCx + 3.3 * eW, earTipY + 1.5, headCx + 4.8 * eW, earTipY + 1.5, headCx + 4.6 * eW, earTipY - 2.6)
+  if (g.earStyle === 'floppy') {
+    for (const s of [-1, 1]) seg(set, headCx + s * headR * 0.5, headCy - headR + 3, headCx + s * headR * 0.95, headCy + headR * 0.3, 2.4, 1.5)
+  } else {
+    // Ears (scaled to the pet's, tufts for tufted styles).
+    const earTipY = headCy - headR - 4 * eH
+    triangle(set, headCx - 4 * eW, headCy - headR + 2, headCx, headCy - headR + 2, headCx - 4.5 * eW, earTipY)
+    triangle(set, headCx + 1 * eW, headCy - headR + 2, headCx + 5 * eW, headCy - headR + 2, headCx + 4 * eW, earTipY)
+    if (g.earStyle === 'tufted') {
+      triangle(set, headCx - 5 * eW, earTipY + 1.5, headCx - 3.5 * eW, earTipY + 1.5, headCx - 5 * eW, earTipY - 2.6)
+      triangle(set, headCx + 3.3 * eW, earTipY + 1.5, headCx + 4.8 * eW, earTipY + 1.5, headCx + 4.6 * eW, earTipY - 2.6)
+    }
   }
 
   // Tail: a long tail held up and curving from the rear (cats walk tail-up).
@@ -574,8 +579,12 @@ export function generateWalkGrid(preset, step = 0, motion = 1, excite = 0) {
   put(overlay, Math.round(headCx + 1.2 * kh), Math.round(headCy - 1.3), O.GLINT)
   // Just a tiny nose at the front of the face (no mouth line — a dark trail on
   // a white profile reads as a smudge, ref cats keep it to the nose).
-  const nfx = headCx + headR - 1, nfy = headCy + 0.8
-  if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+  if (g.snout > 0) {
+    ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, headCx + headR * 0.82 + g.snout * 0.85, headCy + headR * 0.32, 1.3, 1.1)
+  } else {
+    const nfx = headCx + headR - 1, nfy = headCy + 0.8
+    if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+  }
 
   return { shade, region, overlay, geom: {}, fur }
 }
