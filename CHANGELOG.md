@@ -3,6 +3,22 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.4.0 — bring your own creatures
+
+### New
+- **Build your own creature — no AI.** A new *Build a creature* editor lets you make a
+  **cat, dog, rabbit, fox**… by hand: choose the **build, ears** (pointy / tufted / floppy),
+  **eyes, tail** (normal / bushy / thin / nub), **coat pattern & colors**, a **snout**, and
+  how it **moves** — with a **live animated preview**.
+- **A hop gait.** Set *Moves → Hop* and your creature bounds like a rabbit instead of walking.
+- **Shareable creature packs.** **Export** your creature to a `.pixelpet.json` file and
+  **Import** someone else's — validated on load, so packs are safe to share. Two example
+  packs (a dog and a rabbit) and the format docs ship in `packs/`.
+- **A quiet dedication** in Settings, in loving memory of **Ash**.
+
+### Fixed
+- Eye styles (round / almond / sleepy) now look clearly different.
+
 ## v0.3.3 — for Ash
 
 - A quiet **dedication** at the bottom of Settings, in loving memory of **Ash** — the cat
