@@ -146,7 +146,18 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
 
   const shade = new Uint8Array(W * H), region = new Uint8Array(W * H), overlay = new Uint8Array(W * H)
   const groundY = Math.max(...pose.legs.map((l) => l.foot[1]))
-  sideMarking(region, fur, { hcx, hcy, hr, bcx, bcy, brx, bry, groundY, faceSign: hcx >= bcx ? 1 : -1 }, pet.marking || 'solid')
+  // Coat pattern spans the whole torso: for poses with a second body mass (the
+  // stretch's raised rear, the poof's arch) the marking must cover body ∪ body2,
+  // or the pattern is placed from the small front ellipse and slides across the
+  // fur as the pose deforms.
+  let mbcx = bcx, mbcy = bcy, mbrx = brx, mbry = bry
+  if (pose.body2) {
+    const [b2x, b2y, b2rx, b2ry] = pose.body2
+    const x0 = Math.min(bcx - brx, b2x - b2rx), x1 = Math.max(bcx + brx, b2x + b2rx)
+    const y0 = Math.min(bcy - bry, b2y - b2ry), y1 = Math.max(bcy + bry, b2y + b2ry)
+    mbcx = (x0 + x1) / 2; mbcy = (y0 + y1) / 2; mbrx = (x1 - x0) / 2; mbry = (y1 - y0) / 2
+  }
+  sideMarking(region, fur, { hcx, hcy, hr, bcx: mbcx, bcy: mbcy, brx: mbrx, bry: mbry, groundY, faceSign: hcx >= bcx ? 1 : -1 }, pet.marking || 'solid')
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (fur[idx(x, y)]) continue
