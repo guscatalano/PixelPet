@@ -598,16 +598,19 @@ window.pet.onPlay((cmd: PlayCommand) => {
 // cat is fronting, sitting, loafing, or curled) ---------------------------------
 let hitMask: boolean[] = buildHitMask()
 function buildHitMask(): boolean[] {
-  // Kept at LOGICAL 44×44 resolution (hit-testing works in sprite units), so a
-  // device rgba (RW×RH) is downsampled: mark a logical cell if any device pixel
-  // maps into it.
+  // Kept at LOGICAL 44×44 resolution (hit-testing works in sprite units). For each
+  // logical cell, mark it opaque if ANY device pixel in the block it covers is
+  // opaque. Iterating logical cells (not device pixels) keeps the mask solid when
+  // the detail factor shrinks the device grid below 44 (Chunky), where a
+  // device-first scan would leave every other logical cell empty.
   const mask = new Array<boolean>(SPRITE_W * SPRITE_H).fill(false)
   const add = (rgba: Uint8ClampedArray): void => {
-    for (let dy = 0; dy < RH; dy++) for (let dx = 0; dx < RW; dx++) {
-      if (rgba[(dy * RW + dx) * 4 + 3] > 0) {
-        const lx = Math.floor((dx / RW) * SPRITE_W), ly = Math.floor((dy / RH) * SPRITE_H)
-        mask[ly * SPRITE_W + lx] = true
-      }
+    for (let ly = 0; ly < SPRITE_H; ly++) for (let lx = 0; lx < SPRITE_W; lx++) {
+      const dx0 = Math.floor((lx / SPRITE_W) * RW), dx1 = Math.max(dx0 + 1, Math.floor(((lx + 1) / SPRITE_W) * RW))
+      const dy0 = Math.floor((ly / SPRITE_H) * RH), dy1 = Math.max(dy0 + 1, Math.floor(((ly + 1) / SPRITE_H) * RH))
+      let hit = false
+      for (let dy = dy0; dy < dy1 && !hit; dy++) for (let dx = dx0; dx < dx1; dx++) if (rgba[(dy * RW + dx) * 4 + 3] > 0) { hit = true; break }
+      if (hit) mask[ly * SPRITE_W + lx] = true
     }
   }
   add(frontRGBA({ eyeOpen: true, tailPhase: 0 }))
