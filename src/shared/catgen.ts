@@ -6,8 +6,22 @@
 // spherical top-left shading -> face + coat markings, with shade/region/overlay
 // layers so markings stay properly shaded.
 
-export const W = 44
-export const H = 44
+// Logical sprite is 44×44 units. The raster grid (W×H) can be supersampled by a
+// "detail" factor SS so the same geometry is drawn into more (or fewer) pixels:
+// SS=1 is the classic chunky look (default), 2 = finer/higher-res, 0.5 = chunkier.
+// All geometry is authored in the 44-unit space; only the rasterizer scales.
+export const BASE_W = 44
+export const BASE_H = 44
+export let W = 44
+export let H = 44
+let SS = 1
+/** Set the supersample/detail factor (0.5 chunky · 1 default · 2 fine). */
+export function setDetail(mult: number): void {
+  SS = mult > 0 ? mult : 1
+  W = Math.max(1, Math.round(BASE_W * SS))
+  H = Math.max(1, Math.round(BASE_H * SS))
+}
+export function getDetail(): number { return SS }
 
 // Shade levels (1..4); 0 = not fur.
 const HI = 1, BASE = 2, SHADOW = 3, DEEP = 4
@@ -63,7 +77,10 @@ export function defaultGeom(): Geom {
   }
 }
 
+// Primitives take authored 44-unit coords and rasterize into the (possibly
+// supersampled) device grid; callbacks receive device pixel coords.
 function ellipse(cb: SetFn, cx: number, cy: number, rx: number, ry: number): void {
+  cx *= SS; cy *= SS; rx *= SS; ry *= SS
   const x0 = Math.floor(cx - rx), x1 = Math.ceil(cx + rx)
   const y0 = Math.floor(cy - ry), y1 = Math.ceil(cy + ry)
   for (let y = y0; y <= y1; y++)
@@ -73,6 +90,7 @@ function ellipse(cb: SetFn, cx: number, cy: number, rx: number, ry: number): voi
     }
 }
 function triangle(cb: SetFn, ax: number, ay: number, bx: number, by: number, cx: number, cy: number): void {
+  ax *= SS; ay *= SS; bx *= SS; by *= SS; cx *= SS; cy *= SS
   const minX = Math.floor(Math.min(ax, bx, cx)), maxX = Math.ceil(Math.max(ax, bx, cx))
   const minY = Math.floor(Math.min(ay, by, cy)), maxY = Math.ceil(Math.max(ay, by, cy))
   for (let y = minY; y <= maxY; y++)
@@ -85,6 +103,8 @@ function triangle(cb: SetFn, ax: number, ay: number, bx: number, by: number, cx:
 }
 const idx = (x: number, y: number): number => y * W + x
 const inB = (x: number, y: number): boolean => x >= 0 && x < W && y >= 0 && y < H
+/** Round an authored-unit block size to whole device pixels (≥1). */
+const blk = (): number => Math.max(1, Math.round(SS))
 
 function buildFur(g: Geom, state: AnimState): Uint8Array {
   const fur = new Uint8Array(W * H)
@@ -155,7 +175,8 @@ function buildFur(g: Geom, state: AnimState): Uint8Array {
 }
 
 function sphereBright(x: number, y: number, cx: number, cy: number, rx: number, ry: number): number {
-  const nx = (x - cx) / rx, ny = (y - cy) / ry
+  // x,y are device pixels; cx,cy,rx,ry are authored 44-unit geometry.
+  const nx = (x / SS - cx) / rx, ny = (y / SS - cy) / ry
   const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny))
   return nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]
 }
@@ -167,66 +188,69 @@ function shadeLevel(b: number): number {
 }
 
 export function applyMarking(region: Uint8Array, fur: Uint8Array, g: Geom, kind: string): void {
-  const forEachFur = (fn: SetFn): void => {
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (fur[idx(x, y)]) fn(x, y)
+  // fn receives authored 44-unit coords (x,y) plus the device index i to write to.
+  const forEachFur = (fn: (x: number, y: number, i: number) => void): void => {
+    for (let dy = 0; dy < H; dy++) for (let dx = 0; dx < W; dx++) { const i = idx(dx, dy); if (fur[i]) fn(dx / SS, dy / SS, i) }
   }
   const inEllipse = (x: number, y: number, cx: number, cy: number, rx: number, ry: number): boolean => {
     const dx = (x - cx) / rx, dy = (y - cy) / ry
     return dx * dx + dy * dy <= 1
   }
+  // Paint an authored 44-unit pixel as an SS×SS device block, over fur only.
+  const paintU = (ux: number, uy: number, val: number): void => {
+    const bx = Math.round(ux * SS), by = Math.round(uy * SS), b = blk()
+    for (let dy = 0; dy < b; dy++) for (let dx = 0; dx < b; dx++) { const px = bx + dx, py = by + dy; if (inB(px, py) && fur[idx(px, py)]) region[idx(px, py)] = val }
+  }
   switch (kind) {
     case 'tabby': {
-      forEachFur((x, y) => {
+      forEachFur((x, y, i) => {
         if (inEllipse(x, y, g.bodyCx, g.bodyCy, g.bodyRx, g.bodyRy)) {
           const v = (x - g.bodyCx) + Math.sin((y - g.bodyCy) * 0.45) * 2.6
-          if (((Math.round(v) % 5) + 5) % 5 === 0) region[idx(x, y)] = S
+          if (((Math.round(v) % 5) + 5) % 5 === 0) region[i] = S
         } else if (inEllipse(x, y, g.headCx, g.headCy, g.headRx, g.headRy)) {
-          if (y < g.headCy - 1 && Math.abs(x - g.headCx) > 3 && (((y - g.headCy) % 2) + 2) % 2 === 0) region[idx(x, y)] = S
+          if (y < g.headCy - 1 && Math.abs(x - g.headCx) > 3 && (((Math.round(y - g.headCy)) % 2) + 2) % 2 === 0) region[i] = S
         } else if (((Math.round(y) % 3) + 3) % 3 === 0) {
-          region[idx(x, y)] = S
+          region[i] = S
         }
       })
       for (let yy = Math.round(g.headCy - 6); yy <= Math.round(g.headCy - 2); yy++)
-        for (const xx of [g.headCx - 2, g.headCx, g.headCx + 2]) {
-          const rx = Math.round(xx)
-          if (inB(rx, yy) && fur[idx(rx, yy)]) region[idx(rx, yy)] = S
-        }
+        for (const xx of [g.headCx - 2, g.headCx, g.headCx + 2]) paintU(Math.round(xx), yy, S)
       break
     }
     case 'tuxedo':
-      forEachFur((x, y) => {
-        if (inEllipse(x, y, g.bodyCx, g.bodyCy + 2, 6, 9)) region[idx(x, y)] = WHITE
-        if (inEllipse(x, y, g.headCx, g.noseY + 1, 4.5, 4)) region[idx(x, y)] = WHITE
-        if (y > g.bodyCy + g.bodyRy * 0.55 && Math.abs(Math.abs(x - g.bodyCx) - g.bodyRx * 0.42) < 3.4) region[idx(x, y)] = WHITE
+      forEachFur((x, y, i) => {
+        if (inEllipse(x, y, g.bodyCx, g.bodyCy + 2, 6, 9)) region[i] = WHITE
+        if (inEllipse(x, y, g.headCx, g.noseY + 1, 4.5, 4)) region[i] = WHITE
+        if (y > g.bodyCy + g.bodyRy * 0.55 && Math.abs(Math.abs(x - g.bodyCx) - g.bodyRx * 0.42) < 3.4) region[i] = WHITE
       })
       break
     case 'socks':
-      forEachFur((x, y) => {
-        if (y > g.bodyCy + g.bodyRy * 0.5 && Math.abs(Math.abs(x - g.bodyCx) - g.bodyRx * 0.42) < 3.6) region[idx(x, y)] = WHITE
+      forEachFur((x, y, i) => {
+        if (y > g.bodyCy + g.bodyRy * 0.5 && Math.abs(Math.abs(x - g.bodyCx) - g.bodyRx * 0.42) < 3.6) region[i] = WHITE
       })
       break
     case 'points':
-      forEachFur((x, y) => {
-        if (y < g.headCy - g.headRy * 0.5) region[idx(x, y)] = S
-        if (inEllipse(x, y, g.headCx, g.noseY, 5.5, 5)) region[idx(x, y)] = S
-        if (y > g.bodyCy + g.bodyRy * 0.55) region[idx(x, y)] = S
+      forEachFur((x, y, i) => {
+        if (y < g.headCy - g.headRy * 0.5) region[i] = S
+        if (inEllipse(x, y, g.headCx, g.noseY, 5.5, 5)) region[i] = S
+        if (y > g.bodyCy + g.bodyRy * 0.55) region[i] = S
         if (!inEllipse(x, y, g.headCx, g.headCy, g.headRx + 1, g.headRy + 1) &&
-            !inEllipse(x, y, g.bodyCx, g.bodyCy, g.bodyRx + 1, g.bodyRy + 1)) region[idx(x, y)] = S
+            !inEllipse(x, y, g.bodyCx, g.bodyCy, g.bodyRx + 1, g.bodyRy + 1)) region[i] = S
       })
       break
     case 'calico':
-      forEachFur((x, y) => {
-        if (inEllipse(x, y, g.headCx - 4, g.headCy - 2, 6, 6)) region[idx(x, y)] = S
-        if (inEllipse(x, y, g.bodyCx + 5, g.bodyCy + 1, 7, 7)) region[idx(x, y)] = T
-        if (inEllipse(x, y, g.bodyCx - 6, g.bodyCy + 4, 5, 6)) region[idx(x, y)] = S
-        if (inEllipse(x, y, g.headCx + 5, g.headCy + 3, 4, 4)) region[idx(x, y)] = T
+      forEachFur((x, y, i) => {
+        if (inEllipse(x, y, g.headCx - 4, g.headCy - 2, 6, 6)) region[i] = S
+        if (inEllipse(x, y, g.bodyCx + 5, g.bodyCy + 1, 7, 7)) region[i] = T
+        if (inEllipse(x, y, g.bodyCx - 6, g.bodyCy + 4, 5, 6)) region[i] = S
+        if (inEllipse(x, y, g.headCx + 5, g.headCy + 3, 4, 4)) region[i] = T
       })
       break
     case 'bicolor':
-      forEachFur((x, y) => {
-        if (inEllipse(x, y, g.bodyCx, g.bodyCy + 3, 7, 9)) region[idx(x, y)] = WHITE
-        if (inEllipse(x, y, g.headCx, g.noseY + 2, 5, 4)) region[idx(x, y)] = WHITE
-        if (y > g.bodyCy + g.bodyRy * 0.55) region[idx(x, y)] = WHITE
+      forEachFur((x, y, i) => {
+        if (inEllipse(x, y, g.bodyCx, g.bodyCy + 3, 7, 9)) region[i] = WHITE
+        if (inEllipse(x, y, g.headCx, g.noseY + 2, 5, 4)) region[i] = WHITE
+        if (y > g.bodyCy + g.bodyRy * 0.55) region[i] = WHITE
       })
       break
     default:
@@ -250,8 +274,9 @@ export interface SideGeom {
  * pose. Colours: S = secondary, T = tertiary, WHITE = white belly/socks.
  */
 export function sideMarking(region: Uint8Array, fur: Uint8Array, s: SideGeom, kind: string): void {
-  const forEachFur = (fn: SetFn): void => {
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (fur[idx(x, y)]) fn(x, y)
+  // fn receives authored 44-unit coords (x,y) plus the device index i to write to.
+  const forEachFur = (fn: (x: number, y: number, i: number) => void): void => {
+    for (let dy = 0; dy < H; dy++) for (let dx = 0; dx < W; dx++) { const i = idx(dx, dy); if (fur[i]) fn(dx / SS, dy / SS, i) }
   }
   const inEllipse = (x: number, y: number, cx: number, cy: number, rx: number, ry: number): boolean => {
     const dx = (x - cx) / rx, dy = (y - cy) / ry
@@ -264,54 +289,54 @@ export function sideMarking(region: Uint8Array, fur: Uint8Array, s: SideGeom, ki
     case 'tabby': {
       // Mackerel stripes: vertical bands running down the spine, wrapping legs
       // and tail. A sine warp keeps them from looking like a picket fence.
-      forEachFur((x, y) => {
+      forEachFur((x, y, i) => {
         const v = (x - s.bcx) + Math.sin((y - s.bcy) * 0.5) * 2.6
-        if (((Math.round(v) % 5) + 5) % 5 === 0) region[idx(x, y)] = S
+        if (((Math.round(v) % 5) + 5) % 5 === 0) region[i] = S
       })
       // Forehead "M" hint: a couple of short bars between the ears.
-      forEachFur((x, y) => {
-        if (y < s.hcy - 1 && inHead(x, y) && (((Math.round(x - s.hcx) % 2) + 2) % 2 === 0)) region[idx(x, y)] = S
+      forEachFur((x, y, i) => {
+        if (y < s.hcy - 1 && inHead(x, y) && (((Math.round(x - s.hcx) % 2) + 2) % 2 === 0)) region[i] = S
       })
       break
     }
     case 'points':
       // Dark extremities (face, ears, legs, tail); the barrel stays light.
-      forEachFur((x, y) => {
-        if (inHead(x, y)) { region[idx(x, y)] = S; return }
-        if (!inBody(x, y)) region[idx(x, y)] = S // legs + tail + neck reach past the body
-        else if (y > s.groundY - 6) region[idx(x, y)] = S // lower legs
+      forEachFur((x, y, i) => {
+        if (inHead(x, y)) { region[i] = S; return }
+        if (!inBody(x, y)) region[i] = S // legs + tail + neck reach past the body
+        else if (y > s.groundY - 6) region[i] = S // lower legs
       })
       break
     case 'tuxedo':
       // Black suit, white shirt: dark back/head dominate; white only on the
       // lower-front chest bib, belly underside, paws and chin.
-      forEachFur((x, y) => {
-        if (y > s.bcy + s.bry * 0.35 && inBody(x, y)) region[idx(x, y)] = WHITE // belly underside
-        if (inEllipse(x, y, s.bcx + fx * s.brx * 0.55, s.bcy + s.bry * 0.5, s.brx * 0.42, s.bry * 0.7)) region[idx(x, y)] = WHITE // chest bib
-        if (y > s.groundY - 4) region[idx(x, y)] = WHITE // socks
-        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.5, s.hcy + s.hr * 0.55, s.hr * 0.5, s.hr * 0.42)) region[idx(x, y)] = WHITE // chin blaze
+      forEachFur((x, y, i) => {
+        if (y > s.bcy + s.bry * 0.35 && inBody(x, y)) region[i] = WHITE // belly underside
+        if (inEllipse(x, y, s.bcx + fx * s.brx * 0.55, s.bcy + s.bry * 0.5, s.brx * 0.42, s.bry * 0.7)) region[i] = WHITE // chest bib
+        if (y > s.groundY - 4) region[i] = WHITE // socks
+        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.5, s.hcy + s.hr * 0.55, s.hr * 0.5, s.hr * 0.42)) region[i] = WHITE // chin blaze
       })
       break
     case 'bicolor':
-      forEachFur((x, y) => {
-        if (y > s.bcy - s.bry * 0.35 && inBody(x, y)) region[idx(x, y)] = WHITE // most of the body white
-        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.35, s.hcy + s.hr * 0.35, s.hr * 0.75, s.hr * 0.7)) region[idx(x, y)] = WHITE // white face/muzzle
-        if (y > s.groundY - 6) region[idx(x, y)] = WHITE
+      forEachFur((x, y, i) => {
+        if (y > s.bcy - s.bry * 0.35 && inBody(x, y)) region[i] = WHITE // most of the body white
+        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.35, s.hcy + s.hr * 0.35, s.hr * 0.75, s.hr * 0.7)) region[i] = WHITE // white face/muzzle
+        if (y > s.groundY - 6) region[i] = WHITE
       })
       break
     case 'socks':
-      forEachFur((x, y) => {
-        if (y > s.groundY - 5 || (y > s.bcy + s.bry * 0.6 && !inBody(x, y))) region[idx(x, y)] = WHITE
+      forEachFur((x, y, i) => {
+        if (y > s.groundY - 5 || (y > s.bcy + s.bry * 0.6 && !inBody(x, y))) region[i] = WHITE
       })
       break
     case 'calico':
       // Irregular tortoiseshell patches of secondary (dark) + tertiary (ginger)
       // over the white base.
-      forEachFur((x, y) => {
-        if (inEllipse(x, y, s.bcx - s.brx * 0.35, s.bcy - s.bry * 0.15, s.brx * 0.5, s.bry * 0.8)) region[idx(x, y)] = S
-        if (inEllipse(x, y, s.bcx + s.brx * 0.4, s.bcy + s.bry * 0.1, s.brx * 0.5, s.bry * 0.7)) region[idx(x, y)] = T
-        if (inEllipse(x, y, s.hcx - fx * s.hr * 0.3, s.hcy - s.hr * 0.15, s.hr * 0.75, s.hr * 0.8)) region[idx(x, y)] = S
-        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.45, s.hcy + s.hr * 0.2, s.hr * 0.55, s.hr * 0.55)) region[idx(x, y)] = T
+      forEachFur((x, y, i) => {
+        if (inEllipse(x, y, s.bcx - s.brx * 0.35, s.bcy - s.bry * 0.15, s.brx * 0.5, s.bry * 0.8)) region[i] = S
+        if (inEllipse(x, y, s.bcx + s.brx * 0.4, s.bcy + s.bry * 0.1, s.brx * 0.5, s.bry * 0.7)) region[i] = T
+        if (inEllipse(x, y, s.hcx - fx * s.hr * 0.3, s.hcy - s.hr * 0.15, s.hr * 0.75, s.hr * 0.8)) region[i] = S
+        if (inEllipse(x, y, s.hcx + fx * s.hr * 0.45, s.hcy + s.hr * 0.2, s.hr * 0.55, s.hr * 0.55)) region[i] = T
       })
       break
     default:
@@ -332,7 +357,7 @@ let frontViewScale = DEFAULT_FRONT_SCALE
 /** User setting: how big the facing-you view renders (1.0 = "coming at you"). */
 export function setFrontScale(k: number): void { frontViewScale = k }
 export function frontScaled(g: Geom, k = frontViewScale): Geom {
-  const sx = (x: number): number => W / 2 + (x - W / 2) * k
+  const sx = (x: number): number => BASE_W / 2 + (x - BASE_W / 2) * k // authored 44-unit space
   const sy = (y: number): number => FEET_ANCHOR_Y - (FEET_ANCHOR_Y - y) * k
   return {
     ...g,
@@ -363,11 +388,11 @@ export function generateGrid(preset: Pet, state: AnimState = {}): Parts {
     }
 
   const inHead = (x: number, y: number): boolean => {
-    const dx = (x - g.headCx) / (g.headRx + 0.5), dy = (y - g.headCy) / (g.headRy + 0.5)
+    const dx = (x / SS - g.headCx) / (g.headRx + 0.5), dy = (y / SS - g.headCy) / (g.headRy + 0.5)
     return dx * dx + dy * dy <= 1.05
   }
   const inBody = (x: number, y: number): boolean => {
-    const dx = (x - g.bodyCx) / (g.bodyRx + 0.5), dy = (y - g.bodyCy) / (g.bodyRy + 0.5)
+    const dx = (x / SS - g.bodyCx) / (g.bodyRx + 0.5), dy = (y / SS - g.bodyCy) / (g.bodyRy + 0.5)
     return dx * dx + dy * dy <= 1.05
   }
   for (let y = 0; y < H; y++)
@@ -384,7 +409,7 @@ export function generateGrid(preset: Pet, state: AnimState = {}): Parts {
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (!fur[idx(x, y)]) continue
-      const dx = (x - g.bodyCx) / 5.5, dy = (y - (g.bodyCy + 2)) / 7.5
+      const dx = (x / SS - g.bodyCx) / 5.5, dy = (y / SS - (g.bodyCy + 2)) / 7.5
       if (dx * dx + dy * dy <= 1 && shade[idx(x, y)] > HI) shade[idx(x, y)] -= 1
     }
 
@@ -392,15 +417,15 @@ export function generateGrid(preset: Pet, state: AnimState = {}): Parts {
   // front legs, and toe ticks hint at paws.
   {
     const legDX = g.bodyRx * 0.3
-    const legTop = Math.round(g.bodyCy + g.bodyRy * 0.42)
-    const pawY = Math.round(g.bodyCy + g.bodyRy * 0.98)
-    const cxp = Math.round(g.bodyCx)
+    const legTop = Math.round((g.bodyCy + g.bodyRy * 0.42) * SS)
+    const pawY = Math.round((g.bodyCy + g.bodyRy * 0.98) * SS)
+    const cxp = Math.round(g.bodyCx * SS)
     for (let y = legTop; y <= pawY; y++) {
       if (inB(cxp, y) && fur[idx(cxp, y)]) shade[idx(cxp, y)] = DEEP
       if (inB(cxp - 1, y) && fur[idx(cxp - 1, y)] && shade[idx(cxp - 1, y)] < SHADOW) shade[idx(cxp - 1, y)] = SHADOW
     }
     for (const s of [-1, 1]) {
-      const px = Math.round(g.bodyCx + s * legDX)
+      const px = Math.round((g.bodyCx + s * legDX) * SS)
       if (inB(px, pawY) && fur[idx(px, pawY)]) shade[idx(px, pawY)] = DEEP
       if (inB(px, pawY - 1) && fur[idx(px, pawY - 1)] && shade[idx(px, pawY - 1)] < SHADOW) shade[idx(px, pawY - 1)] = SHADOW
     }
@@ -411,7 +436,18 @@ export function generateGrid(preset: Pet, state: AnimState = {}): Parts {
   return { shade, region, overlay, geom: g, fur }
 }
 
+/** Plot one DEVICE pixel (used by primitive callbacks, which already work in device space). */
 function put(overlay: Uint8Array, x: number, y: number, role: number): void { if (inB(x, y)) overlay[idx(x, y)] = role }
+/** Plot one authored 44-unit point as an SS×SS device block (for hand-placed detail: eyes, nose, glints…). */
+function putU(overlay: Uint8Array, ux: number, uy: number, role: number): void {
+  const bx = Math.round(ux * SS), by = Math.round(uy * SS), b = blk()
+  for (let dy = 0; dy < b; dy++) for (let dx = 0; dx < b; dx++) put(overlay, bx + dx, by + dy, role)
+}
+/** Like putU, but only over fur pixels (for a nose/detail that must sit on the body). */
+function putUFur(overlay: Uint8Array, fur: Uint8Array, ux: number, uy: number, role: number): void {
+  const bx = Math.round(ux * SS), by = Math.round(uy * SS), b = blk()
+  for (let dy = 0; dy < b; dy++) for (let dx = 0; dx < b; dx++) { const px = bx + dx, py = by + dy; if (inB(px, py) && fur[idx(px, py)]) put(overlay, px, py, role) }
+}
 
 /** Corner points of one front-view floppy ear (s = -1 left, +1 right). Shared by the
  * silhouette (buildFur) and the crease (drawFace) so they always line up. */
@@ -427,12 +463,14 @@ function floppyEarPts(g: Geom, s: number): { topI: number[]; topO: number[]; bot
   }
 }
 
-/** Stamp an OUTLINE stroke along a segment, but only over fur pixels. */
+/** Stamp an OUTLINE stroke along an authored 44-unit segment, but only over fur pixels. */
 function lineOutline(overlay: Uint8Array, fur: Uint8Array, x1: number, y1: number, x2: number, y2: number): void {
+  x1 *= SS; y1 *= SS; x2 *= SS; y2 *= SS
   const n = Math.ceil(Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))) * 2 || 1
+  const b = blk()
   for (let i = 0; i <= n; i++) {
     const x = Math.round(x1 + (x2 - x1) * (i / n)), y = Math.round(y1 + (y2 - y1) * (i / n))
-    if (fur[idx(x, y)]) put(overlay, x, y, O.OUTLINE)
+    for (let dy = 0; dy < b; dy++) for (let dx = 0; dx < b; dx++) if (fur[idx(x + dx, y + dy)]) put(overlay, x + dx, y + dy, O.OUTLINE)
   }
 }
 
@@ -456,7 +494,7 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
   for (const s of [-1, 1]) {
     const ex = g.headCx + s * g.eyeDX, ey = g.eyeY
     if (!eyeOpen) {
-      for (let x = Math.round(ex - g.eyeRx); x <= Math.round(ex + g.eyeRx); x++) put(overlay, x, ey, O.OUTLINE)
+      for (let x = Math.round(ex - g.eyeRx); x <= Math.round(ex + g.eyeRx); x++) putU(overlay, x, ey, O.OUTLINE)
       continue
     }
     // Eye shape by style: round = big & open; almond = sleeker/wider with a slit
@@ -466,8 +504,8 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
     ellipse((x, y) => put(overlay, x, y, O.IRIS), ex, ey, erx, ery)
     if (g.eyeStyle === 'sleepy') // a heavy droopy lid across the top
       for (let x = Math.round(ex - erx - 1); x <= Math.round(ex + erx + 1); x++) {
-        put(overlay, x, Math.round(ey - ery), O.OUTLINE)
-        put(overlay, x, Math.round(ey - ery) - 1, O.OUTLINE)
+        putU(overlay, x, ey - ery, O.OUTLINE)
+        putU(overlay, x, ey - ery - 1, O.OUTLINE)
       }
     const look = (state.look || 0) * (g.eyeRx * 0.5)
     // Pupil: round style = a rounder pupil; almond/sleepy = a narrower slit.
@@ -481,13 +519,13 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
       pRy = ery * (0.96 - 0.24 * d)
     }
     ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex + look, ey + 0.3, pupRx, pRy)
-    put(overlay, Math.round(ex + look - g.eyeRx * 0.35), Math.round(ey - ery * 0.4), O.GLINT)
+    putU(overlay, ex + look - g.eyeRx * 0.35, ey - ery * 0.4, O.GLINT)
   }
 
   const nx = g.headCx, ny = g.noseY
   triangle((x, y) => put(overlay, x, y, O.NOSE), nx - 1.6, ny - 1, nx + 1.6, ny - 1, nx, ny + 1.2)
-  put(overlay, nx, ny + 2, O.MOUTH)
-  for (const dx of [-2, -1, 1, 2]) put(overlay, nx + dx, ny + 3, O.MOUTH)
+  putU(overlay, nx, ny + 2, O.MOUTH)
+  for (const dx of [-2, -1, 1, 2]) putU(overlay, nx + dx, ny + 3, O.MOUTH)
 
   // Whiskers: a short fan sprouting FROM the cheek. Scan outward per row to find
   // the fur edge, then draw starting immediately adjacent to it (i from 1) so the
@@ -495,10 +533,10 @@ function drawFace(overlay: Uint8Array, fur: Uint8Array, g: Geom, state: AnimStat
   // The middle whisker is longest, so the cluster reads as a whisker fan.
   for (const s of [-1, 1]) {
     for (let k = 0; k < 3; k++) {
-      const y = Math.round(g.noseY - 1 + k + (k - 1) * 0.6)
-      let edge = Math.round(g.headCx)
-      for (let x = Math.round(g.headCx); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
-      const len = k === 1 ? 4 : 3
+      const y = Math.round((g.noseY - 1 + k + (k - 1) * 0.6) * SS) // device row
+      let edge = Math.round(g.headCx * SS)
+      for (let x = Math.round(g.headCx * SS); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
+      const len = Math.round((k === 1 ? 4 : 3) * SS)
       for (let i = 1; i <= len; i++) {
         const x = edge + s * i
         if (inB(x, y) && overlay[idx(x, y)] === O.NONE && !fur[idx(x, y)]) put(overlay, x, y, O.WHISK)
@@ -645,8 +683,8 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
       if (near) overlay[idx(x, y)] = O.OUTLINE
     }
 
-  const inHead = (x: number, y: number): boolean => ((x - headCx) / (headR + 0.5)) ** 2 + ((y - headCy) / (headR + 0.5)) ** 2 <= 1.05
-  const inBody = (x: number, y: number): boolean => ((x - bodyCx) / (bodyRx + 0.5)) ** 2 + ((y - bodyCy) / (bodyRy + 0.5)) ** 2 <= 1.05
+  const inHead = (x: number, y: number): boolean => ((x / SS - headCx) / (headR + 0.5)) ** 2 + ((y / SS - headCy) / (headR + 0.5)) ** 2 <= 1.05
+  const inBody = (x: number, y: number): boolean => ((x / SS - bodyCx) / (bodyRx + 0.5)) ** 2 + ((y / SS - bodyCy) / (bodyRy + 0.5)) ** 2 <= 1.05
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (!fur[idx(x, y)]) continue
@@ -669,15 +707,14 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   const wiry = wes === 'almond' ? 1.5 : wes === 'sleepy' ? 1.15 : 2
   ellipse((x, y) => put(overlay, x, y, O.IRIS), headCx + 1.6, headCy - 0.5, 1.7, wiry)
   ellipse((x, y) => put(overlay, x, y, O.PUPIL), headCx + 2, headCy - 0.3, wes === 'round' ? 0.9 : 0.66, Math.min(1.4, wiry * 0.95))
-  put(overlay, Math.round(headCx + 1.2), Math.round(headCy - 1.3), O.GLINT)
-  if (wes === 'sleepy') for (const dx of [-1, 0, 1, 2]) put(overlay, Math.round(headCx + 1 + dx), Math.round(headCy - 0.5 - wiry), O.OUTLINE)
+  putU(overlay, headCx + 1.2, headCy - 1.3, O.GLINT)
+  if (wes === 'sleepy') for (const dx of [-1, 0, 1, 2]) putU(overlay, headCx + 1 + dx, headCy - 0.5 - wiry, O.OUTLINE)
   // Just a tiny nose at the front of the face (no mouth line — a dark trail on
   // a white profile reads as a smudge, ref cats keep it to the nose).
   if (g.snout > 0) { // dog nose on the muzzle tip
     ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, headCx + headR * 0.82 + g.snout * 0.85, headCy + headR * 0.32, 1.3, 1.1)
   } else {
-    const nfx = headCx + headR - 1, nfy = headCy + 0.8
-    if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+    putUFur(overlay, fur, headCx + headR - 1, headCy + 0.8, O.NOSE)
   }
 
   return { shade, region, overlay, geom: defaultGeom(), fur }
@@ -744,7 +781,7 @@ export function generateCurlGrid(_preset: Pet, breath = 0): Parts {
       else if (tail[i]) { const d = y - tailTop[x]; shade[i] = d <= 1 ? BASE : SHADOW } // soft curl, same fur
       else if (paw[i]) shade[i] = BASE
       else shade[i] = shadeLevel(sphereBright(x, y, bcx, bcy, brx, bry))
-      if (!head[i] && y >= g - 1) shade[i] = SHADOW // grounded base
+      if (!head[i] && y >= (g - 1) * SS) shade[i] = SHADOW // grounded base
     }
 
   // Soft creases only where forms overlap — a light touch keeps it from looking busy.
@@ -764,12 +801,12 @@ export function generateCurlGrid(_preset: Pet, breath = 0): Parts {
   }
   crease(tail, true)  // shade the body just above the wrapping tail
   crease(paw, true)   // shade above the tucked paws
-  put(overlay, 20, g - 3, O.OUTLINE) // hint of a gap between the two paws
+  putU(overlay, 20, g - 3, O.OUTLINE) // hint of a gap between the two paws
 
   // Closed eye (a short down-curved line), pink nose at the muzzle tip, inner near-ear.
-  put(overlay, hx - 4, hy, O.OUTLINE); put(overlay, hx - 3, hy + 1, O.OUTLINE)
-  put(overlay, hx - 2, hy + 1, O.OUTLINE); put(overlay, hx - 1, hy + 1, O.OUTLINE)
-  put(overlay, hx - 7, hy + 3, O.NOSE); put(overlay, hx - 6, hy + 3, O.NOSE); put(overlay, hx - 6, hy + 4, O.NOSE)
+  putU(overlay, hx - 4, hy, O.OUTLINE); putU(overlay, hx - 3, hy + 1, O.OUTLINE)
+  putU(overlay, hx - 2, hy + 1, O.OUTLINE); putU(overlay, hx - 1, hy + 1, O.OUTLINE)
+  putU(overlay, hx - 7, hy + 3, O.NOSE); putU(overlay, hx - 6, hy + 3, O.NOSE); putU(overlay, hx - 6, hy + 4, O.NOSE)
   triangle((x, y) => { if (head[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) put(overlay, x, y, O.INEAR) },
     hx - 4.2, hy - hr + 2.5, hx - 2.8, hy - hr + 2.5, hx - 3.6, hy - hr)
 
@@ -844,4 +881,4 @@ export function renderCat(pet: Pet, state: AnimState = {}): { w: number; h: numb
  * Internal drawing primitives, shared with the pose/rig generators (rigcat,
  * turn34) so the raster helpers exist in exactly one place.
  */
-export const internals = { ellipse, triangle, idx, inB, put, lineOutline, sphereBright, shadeLevel, O, HI, BASE, SHADOW, DEEP }
+export const internals = { ellipse, triangle, idx, inB, put, putU, putUFur, lineOutline, sphereBright, shadeLevel, ss: () => SS, O, HI, BASE, SHADOW, DEEP }

@@ -9,7 +9,7 @@
 
 import { W, H, internals, sideMarking, type Pet, type Parts, defaultGeom } from './catgen'
 
-const { ellipse, triangle, idx, inB, put, lineOutline, sphereBright, shadeLevel, O, BASE, SHADOW } = internals
+const { ellipse, triangle, idx, inB, put, putU, putUFur, lineOutline, sphereBright, shadeLevel, ss, O, BASE, SHADOW } = internals
 
 export interface RigLeg { hip: number[]; mid: number[]; foot: number[]; near: boolean }
 export interface RigPose {
@@ -156,10 +156,11 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
           if (inB(x + dx, y + dy) && fur[idx(x + dx, y + dy)]) { near = true; break }
       if (near) overlay[idx(x, y)] = O.OUTLINE
     }
-  const inHead = (x: number, y: number): boolean => ((x - hcx) / (hr + 0.5)) ** 2 + ((y - hcy) / (hr + 0.5)) ** 2 <= 1.05
-  const inBody = (x: number, y: number): boolean => ((x - bcx) / (brx + 0.5)) ** 2 + ((y - bcy) / (bry + 0.5)) ** 2 <= 1.05
+  const S = ss() // detail factor: shading tests take device pixels, geometry is 44-unit
+  const inHead = (x: number, y: number): boolean => ((x / S - hcx) / (hr + 0.5)) ** 2 + ((y / S - hcy) / (hr + 0.5)) ** 2 <= 1.05
+  const inBody = (x: number, y: number): boolean => ((x / S - bcx) / (brx + 0.5)) ** 2 + ((y / S - bcy) / (bry + 0.5)) ** 2 <= 1.05
   const b2 = pose.body2
-  const inBody2 = (x: number, y: number): boolean => !!b2 && ((x - b2[0]) / (b2[2] + 0.5)) ** 2 + ((y - b2[1]) / (b2[3] + 0.5)) ** 2 <= 1.05
+  const inBody2 = (x: number, y: number): boolean => !!b2 && ((x / S - b2[0]) / (b2[2] + 0.5)) ** 2 + ((y / S - b2[1]) / (b2[3] + 0.5)) ** 2 <= 1.05
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (!fur[idx(x, y)]) continue
@@ -190,9 +191,9 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
       if (pose.eye > 0.5) {
         ellipse((x, y) => put(overlay, x, y, O.IRIS), ex, ey, 1.45 * kEye, 1.75 * kEye)
         ellipse((x, y) => put(overlay, x, y, O.PUPIL), ex, ey + 0.2, 0.8 * kEye, 1.2 * kEye)
-        put(overlay, Math.round(ex - 0.5), Math.round(ey - 0.9), O.GLINT)
+        putU(overlay, ex - 0.5, ey - 0.9, O.GLINT)
       } else {
-        for (const dx of [-1, 0, 1]) put(overlay, Math.round(ex + dx), Math.round(ey), O.OUTLINE)
+        for (const dx of [-1, 0, 1]) putU(overlay, ex + dx, ey, O.OUTLINE)
       }
     }
     triangle((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, hcx - 1.2 * kh, hcy + 1.6 * kh, hcx + 1.2 * kh, hcy + 1.6 * kh, hcx, hcy + 3 * kh)
@@ -201,9 +202,9 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
     inear(hcx + 2 * eW, hcx + 3.6 * eW, hcx + 3.2 * eW)
     for (const s of [-1, 1]) {
       const ex = hcx + s * 2.6 * kh
-      for (const dx of [-1, 0, 1]) put(overlay, Math.round(ex + dx), Math.round(hcy - 0.4), O.OUTLINE)
+      for (const dx of [-1, 0, 1]) putU(overlay, ex + dx, hcy - 0.4, O.OUTLINE)
     }
-    put(overlay, Math.round(hcx + 2 * kh), Math.round(hcy + 1.6 * kh), O.NOSE)
+    putU(overlay, hcx + 2 * kh, hcy + 1.6 * kh, O.NOSE)
   } else {
     // Side profile (matches the walk pose exactly).
     inear(hcx + 2 * eW, hcx + 3.6 * eW, hcx + 3.2 * eW)
@@ -215,18 +216,17 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
       ellipse((x, y) => put(overlay, x, y, O.IRIS), hcx + 1.6 * kh, hcy - 0.5, 1.7 * kEye, iry)
       const prx = (es === 'round' ? 0.9 : 0.66) * kEye
       ellipse((x, y) => put(overlay, x, y, O.PUPIL), hcx + 2 * kh, hcy - 0.3, prx, Math.min(1.4 * kEye, iry * 0.95))
-      put(overlay, Math.round(hcx + 1.2 * kh), Math.round(hcy - 1.3), O.GLINT)
+      putU(overlay, hcx + 1.2 * kh, hcy - 1.3, O.GLINT)
       if (es === 'sleepy') // droopy lid across the top
-        for (const dx of [-1, 0, 1, 2]) put(overlay, Math.round(hcx + 1 * kh + dx), Math.round(hcy - 0.5 - iry), O.OUTLINE)
+        for (const dx of [-1, 0, 1, 2]) putU(overlay, hcx + 1 * kh + dx, hcy - 0.5 - iry, O.OUTLINE)
     } else {
-      for (const dx of [0, 1, 2]) put(overlay, Math.round(hcx + 1 * kh + dx), Math.round(hcy - 0.3), O.OUTLINE)
+      for (const dx of [0, 1, 2]) putU(overlay, hcx + 1 * kh + dx, hcy - 0.3, O.OUTLINE)
     }
     if (g.snout > 0) { // dog nose sits on the tip of the muzzle
       const nfx = hcx + faceSign * (hr * 0.82 + g.snout * 0.85), nfy = hcy + hr * 0.32
       ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, nfx, nfy, 1.3, 1.1)
     } else {
-      const nfx = hcx + hr - 1, nfy = hcy + 0.8
-      if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
+      putUFur(overlay, fur, hcx + hr - 1, hcy + 0.8, O.NOSE)
     }
   }
 
@@ -238,14 +238,18 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
     // with two funnel edges running back to the neck. Drawn with a dark outer
     // edge + light rim so it reads on any coat.
     const ccx = hcx + hr * 0.4, ccy = hcy + 0.5, crx = hr * 1.05, cry = hr * 1.75
-    const putc = (x: number, y: number, role: number): void => { const rx = Math.round(x), ry = Math.round(y); if (inB(rx, ry)) overlay[idx(rx, ry)] = role }
+    // putc/linec take authored 44-unit coords and stamp SS×SS device blocks.
+    const putc = (x: number, y: number, role: number): void => {
+      const bx = Math.round(x * S), by = Math.round(y * S), b = Math.max(1, Math.round(S))
+      for (let dy = 0; dy < b; dy++) for (let dx = 0; dx < b; dx++) { const rx = bx + dx, ry = by + dy; if (inB(rx, ry)) overlay[idx(rx, ry)] = role }
+    }
     const linec = (a: number[], b: number[], role: number): void => {
-      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])))
+      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) * S))
       for (let i = 0; i <= n; i++) putc(a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n, role)
     }
     linec([hcx - hr * 0.9, hcy - hr * 0.4], [ccx - crx, ccy - cry * 0.65], O.CONE)
     linec([hcx - hr * 0.9, hcy + hr * 0.65], [ccx - crx, ccy + cry * 0.65], O.CONE)
-    for (let a = 0; a < Math.PI * 2; a += 0.035) {
+    for (let a = 0; a < Math.PI * 2; a += 0.035 / S) {
       const c = Math.cos(a), s = Math.sin(a)
       putc(ccx + c * (crx + 1), ccy + s * (cry + 1), O.OUTLINE) // dark outer lip
       putc(ccx + c * crx, ccy + s * cry, c >= 0 ? O.CONE_HI : O.CONE) // bright rim

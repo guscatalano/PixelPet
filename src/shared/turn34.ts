@@ -11,7 +11,7 @@
 
 import { W, H, internals, applyMarking, defaultGeom, frontScaled, type Pet, type Parts } from './catgen'
 
-const { ellipse, triangle, idx, inB, put, lineOutline, sphereBright, shadeLevel, O, HI, BASE, SHADOW, DEEP } = internals
+const { ellipse, triangle, idx, inB, put, putU, lineOutline, sphereBright, shadeLevel, ss, O, HI, BASE, SHADOW, DEEP } = internals
 
 export interface State34 {
   eyeOpen?: boolean
@@ -127,8 +127,9 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     lineOutline(overlay, fur, earL, earBaseY - 0.5, hx - g.headRx * 0.6, g.headCy + g.headRy * 0.95)
     lineOutline(overlay, fur, earR, earBaseY - 0.5, hx + g.headRx * 0.48, g.headCy + g.headRy * 0.9)
   }
+  const S = ss() // detail factor: shading/geometry tests take device pixels, geometry is 44-unit
   const inHead = (x: number, y: number): boolean => {
-    const dx = (x - hx) / (g.headRx + 0.5), dy = (y - g.headCy) / (g.headRy + 0.5)
+    const dx = (x / S - hx) / (g.headRx + 0.5), dy = (y / S - g.headCy) / (g.headRy + 0.5)
     return dx * dx + dy * dy <= 1.05
   }
   for (let y = 0; y < H; y++)
@@ -144,19 +145,19 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (!fur[idx(x, y)]) continue
-      const dx = (x - bx) / 5.5, dy = (y - (g.bodyCy + 2)) / 7.5
+      const dx = (x / S - bx) / 5.5, dy = (y / S - (g.bodyCy + 2)) / 7.5
       if (dx * dx + dy * dy <= 1 && shade[idx(x, y)] > HI) shade[idx(x, y)] -= 1
     }
   { // front-leg crease + toes, anchored to the planted legs
-    const legDX = g.bodyRx * 0.3, cxp = Math.round(bxBase + 0.9 * t)
-    const legTop = Math.round(g.bodyCy + g.bodyRy * 0.42), pawY = Math.round(g.bodyCy + g.bodyRy * 0.98)
+    const legDX = g.bodyRx * 0.3, cxp = Math.round((bxBase + 0.9 * t) * S)
+    const legTop = Math.round((g.bodyCy + g.bodyRy * 0.42) * S), pawY = Math.round((g.bodyCy + g.bodyRy * 0.98) * S)
     for (let y = legTop; y <= pawY; y++) {
       if (inB(cxp, y) && fur[idx(cxp, y)]) shade[idx(cxp, y)] = DEEP
       if (inB(cxp - 1, y) && fur[idx(cxp - 1, y)] && shade[idx(cxp - 1, y)] < SHADOW) shade[idx(cxp - 1, y)] = SHADOW
     }
     for (const s of [-1, 1]) {
       if (s === 1 && pawAmt > 0.05) continue // that leg is up in the air
-      const px = Math.round(bxBase + 0.9 * t + s * legDX)
+      const px = Math.round((bxBase + 0.9 * t + s * legDX) * S)
       if (inB(px, pawY) && fur[idx(px, pawY)]) shade[idx(px, pawY)] = DEEP
     }
   }
@@ -179,8 +180,11 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     // toes arcing across the pad's top, one bigger pad bean below.
     if (pawAmt > 0.6) {
       const bean = (x: number, y: number): void => {
-        const rx2 = Math.round(x), ry2 = Math.round(y)
-        if (inB(rx2, ry2) && pawMask[idx(rx2, ry2)] && overlay[idx(rx2, ry2)] === O.NONE) put(overlay, rx2, ry2, O.NOSE)
+        const bxx = Math.round(x * S), byy = Math.round(y * S), b = Math.max(1, Math.round(S))
+        for (let dy = 0; dy < b; dy++) for (let dx = 0; dx < b; dx++) {
+          const rx2 = bxx + dx, ry2 = byy + dy
+          if (inB(rx2, ry2) && pawMask[idx(rx2, ry2)] && overlay[idx(rx2, ry2)] === O.NONE) put(overlay, rx2, ry2, O.NOSE)
+        }
       }
       bean(pawPx - 1.8 * pawReach, pawPy - 1.2 * pawReach)
       bean(pawPx, pawPy - 1.8 * pawReach)
@@ -200,7 +204,7 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
   ]
   for (const e of eyes) {
     if (!eyeOpen) {
-      for (let x = Math.round(e.ex - e.rx); x <= Math.round(e.ex + e.rx); x++) put(overlay, x, Math.round(eyeY), O.OUTLINE)
+      for (let x = Math.round(e.ex - e.rx); x <= Math.round(e.ex + e.rx); x++) putU(overlay, x, eyeY, O.OUTLINE)
       continue
     }
     ellipse((x, y) => put(overlay, x, y, O.IRIS), e.ex, eyeY, e.rx, e.ry)
@@ -209,7 +213,7 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     let pupRx = Math.max(0.85, e.rx * 0.45), pupRy = e.ry * 0.72
     if (state.dilation !== undefined) { const d = state.dilation; pupRx = Math.max(0.6, e.rx * (0.28 + 0.46 * d)); pupRy = e.ry * (0.96 - 0.24 * d) }
     ellipse((x, y) => put(overlay, x, y, O.PUPIL), e.ex + look, eyeY + 0.3, pupRx, pupRy)
-    put(overlay, Math.round(e.ex + look - e.rx * 0.35), Math.round(eyeY - e.ry * 0.4), O.GLINT)
+    putU(overlay, e.ex + look - e.rx * 0.35, eyeY - e.ry * 0.4, O.GLINT)
   }
   triangle((x, y) => put(overlay, x, y, O.NOSE), noseX - 1.6, noseY - 1, noseX + 1.6, noseY - 1, noseX, noseY + 1.2)
   if (yawn > 0.05) {
@@ -220,8 +224,8 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.MOUTH) }, noseX, mcy, mrx, mry)
     if (yawn > 0.5) ellipse((x, y) => { if (fur[idx(x, y)]) put(overlay, x, y, O.NOSE) }, noseX, mcy + mry * 0.4, mrx * 0.5, Math.max(0.6, mry * 0.28))
   } else {
-    put(overlay, Math.round(noseX), Math.round(noseY) + 2, O.MOUTH)
-    for (const dx of [-2, -1, 1, 2]) put(overlay, Math.round(noseX) + dx, Math.round(noseY) + 3, O.MOUTH)
+    putU(overlay, noseX, noseY + 2, O.MOUTH)
+    for (const dx of [-2, -1, 1, 2]) putU(overlay, noseX + dx, noseY + 3, O.MOUTH)
   }
   if (g.earStyle !== 'floppy') { // inner ears (white-rimmed, like the front pose); floppy dogs show none
     const iw = g.earW * 0.26
@@ -234,11 +238,11 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
   // Whiskers: a short fan sprouting FROM the cheek (i from 1 = attached, not
   // floating); far side shortened as the head turns away.
   for (const s of [-1, 1]) {
-    const len = s < 0 ? 4 : Math.max(1, Math.round(4 * (1 - 0.6 * t)))
+    const len = Math.round((s < 0 ? 4 : Math.max(1, Math.round(4 * (1 - 0.6 * t)))) * S)
     for (let k = 0; k < 3; k++) {
-      const y = Math.round(noseY - 1 + k + (k - 1) * 0.6)
-      let edge = Math.round(hx)
-      for (let x = Math.round(hx); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
+      const y = Math.round((noseY - 1 + k + (k - 1) * 0.6) * S) // device row
+      let edge = Math.round(hx * S)
+      for (let x = Math.round(hx * S); inB(x, y); x += s) if (fur[idx(x, y)]) edge = x
       for (let i = 1; i <= len; i++) {
         const x = edge + s * i
         if (inB(x, y) && overlay[idx(x, y)] === O.NONE && !fur[idx(x, y)]) put(overlay, x, y, O.WHISK)

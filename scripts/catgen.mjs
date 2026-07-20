@@ -1,5 +1,10 @@
 // Parametric pixel-cat generator.
 //
+// NOTE: the runtime "detail"/supersample factor (setDetail, ×SS in the primitives,
+// putU) lives only in the TypeScript source (src/shared/*.ts). This offline mirror
+// always renders at detail 1 — identical to the app's default — which is all the
+// PNG-preview/gallery tooling needs. Geometry/pose logic is otherwise kept in sync.
+//
 // Pure JS (no Node/DOM APIs) so it runs both in Node (preview PNGs) and the browser
 // (inlined into the gallery artifact). Produces an RGBA buffer for a cat from a
 // preset (geometry + coat) and an animation state (blink / tail / ear phase).
