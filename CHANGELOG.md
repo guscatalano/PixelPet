@@ -3,6 +3,31 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.5.0 — pick your pixels
+
+### New
+- **Detail control.** A new *Settings → Pet → Detail* toggle (**Chunky · Normal · Fine**)
+  changes how pixelated your pet is — Fine renders the same cat at higher resolution
+  (smoother curves, finer whiskers), Chunky at chunkier blocks. Independent of Size, and
+  it applies live. Normal is the default and looks exactly as before.
+- **An XXS size**, below XS — a tiny 1:1 pet. The size row is now XXS · XS · S · M · L · XL · XXL.
+- **Trot, Stalk, and Hop are now animations too.** Any pet can play them (like Prance),
+  and they have tiles in the Settings animation gallery — not just creatures whose DNA
+  fixes them to that gait.
+- **Preview any animation in the creature builder.** A dropdown under the live preview
+  lets you watch your creature in Move, Idle, Sit, Loaf, Sphinx, Sleep, Groom, Stretch,
+  or Pounce before you Create it.
+
+### Fixed
+- **Floppy ears now look like real dog ears** — drooping flaps that hang beside the face
+  with a crease, instead of tiny nubs tucked into the head, consistent across the front,
+  side, rig, and ¾-turn views.
+- **Kitten build rebalanced** — its head was bigger than an adult cat's on a smaller body
+  (a bobblehead); now it's a proportionally-big-but-not-giant head with the big kitten eyes.
+- **Coat patterns stay put during the stretch** (and other arched poses) instead of sliding
+  across the body, and the earlier gait fix (patterns no longer slide during Hop/Trot) ships too.
+- Clicking and hovering work at every Detail level, including Chunky.
+
 ## v0.4.1 — more gaits, fuller species
 
 ### New
