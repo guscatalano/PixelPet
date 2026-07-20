@@ -10,7 +10,7 @@ import { initAutoUpdate, onUpdateStateChange, isUpdateReady, pendingVersion, che
 import { PetEngine } from './behavior/engine'
 import {
   loadSettings, saveSettings, effectivePersonality, findPet, AI_PROVIDERS,
-  MIN_TURN_MS, MAX_TURN_MS, MIN_FRONT_SCALE, MAX_FRONT_SCALE
+  MIN_TURN_MS, MAX_TURN_MS, MIN_FRONT_SCALE, MAX_FRONT_SCALE, DETAIL_LEVELS
 } from './settings'
 import { setSelfWindow } from './desktop/windows'
 import { testConnection, DEFAULT_MODEL, DEFAULT_ENDPOINT, type VisionConfig } from './ai/providers'
@@ -97,7 +97,7 @@ function createPetWindow(): BrowserWindow {
     // — absent from the built-in PETS the renderer imports — render too) and
     // push the live-tunable animation config.
     win.webContents.send('pet:set-pet', findPet(settings, settings.activePetId))
-    win.webContents.send('pet:set-config', { turnMs: settings.turnMs, frontScale: settings.frontScale, pupilsByTime: settings.pupilsByTime })
+    win.webContents.send('pet:set-config', { turnMs: settings.turnMs, frontScale: settings.frontScale, pupilsByTime: settings.pupilsByTime, detail: settings.detail })
   })
 
   win.on('closed', () => {
@@ -583,6 +583,12 @@ function registerIpc(): void {
     settings.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, k))
     saveSettings(settings)
     petWindow?.webContents.send('pet:set-config', { frontScale: settings.frontScale })
+  })
+  ipcMain.on('settings:set-detail', (_e, v: number) => {
+    if (!(DETAIL_LEVELS as readonly number[]).includes(v)) return
+    settings.detail = v
+    saveSettings(settings)
+    petWindow?.webContents.send('pet:set-config', { detail: settings.detail })
   })
   ipcMain.on('settings:set-pupils', (_e, v: boolean) => {
     settings.pupilsByTime = !!v

@@ -19,6 +19,7 @@ interface SettingsApi {
   setTurnMs: (ms: number) => void
   setStayPut: (v: boolean) => void
   setFrontScale: (k: number) => void
+  setDetail: (v: number) => void
   setPupilsByTime: (v: boolean) => void
   setDreamMode: (v: boolean) => void
   setDreamChance: (v: number) => void
@@ -57,7 +58,7 @@ declare global {
 const SIZE_LABELS: Record<number, string> = { 1: 'XXS', 2: 'XS', 3: 'S', 4: 'M', 5: 'L', 6: 'XL', 7: 'XXL' }
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T
-const grid = $('grid'), sizes = $('sizes'), rows = $('rows'), who = $('who'), resetBtn = $<HTMLButtonElement>('reset')
+const grid = $('grid'), sizes = $('sizes'), detail = $('detail'), rows = $('rows'), who = $('who'), resetBtn = $<HTMLButtonElement>('reset')
 const posesEl = $('poses'), poseWho = $('poseWho'), petid = $('petid'), mod = $('mod')
 
 let state: AppSettings
@@ -487,6 +488,26 @@ function buildSizes(): void {
       for (const child of sizes.children) child.classList.toggle('on', child === b)
     })
     sizes.append(b)
+  }
+}
+
+// Pixel detail / supersample factor: how many raster pixels per 44-unit sprite.
+const DETAIL_OPTIONS: Array<{ v: number; label: string }> = [
+  { v: 0.5, label: 'Chunky' }, { v: 1, label: 'Normal' }, { v: 2, label: 'Fine' }
+]
+function buildDetail(): void {
+  detail.innerHTML = ''
+  const cur = state.detail ?? 1
+  for (const o of DETAIL_OPTIONS) {
+    const b = document.createElement('button')
+    b.textContent = o.label
+    b.className = o.v === cur ? 'on' : ''
+    b.addEventListener('click', () => {
+      state.detail = o.v
+      window.settings.setDetail(o.v)
+      for (const child of detail.children) child.classList.toggle('on', child === b)
+    })
+    detail.append(b)
   }
 }
 
@@ -972,6 +993,7 @@ async function init(): Promise<void> {
   buildGrid()
   buildPoses()
   buildSizes()
+  buildDetail()
   buildAnimation()
   buildCare()
   buildBuilder()

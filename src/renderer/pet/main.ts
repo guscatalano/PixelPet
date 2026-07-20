@@ -1,5 +1,5 @@
 import { SPRITE_H, SPRITE_TOP, SPRITE_W } from '../../shared/constants'
-import { generateGrid, generateWalkGrid, render as renderPet, setFrontScale, type AnimState, type Pet } from '../../shared/catgen'
+import { generateGrid, generateWalkGrid, render as renderPet, setFrontScale, setDetail, W as RW, H as RH, type AnimState, type Pet } from '../../shared/catgen'
 import { generateRigGrid, lerpPose, POSES, type RigPose } from '../../shared/rigcat'
 import { generate34Grid } from '../../shared/turn34'
 import { DEFAULT_PET } from '../../shared/pets'
@@ -31,10 +31,11 @@ const DRAG_THRESHOLD = 4 // px of movement before a press becomes a drag
 // ---- Frame bitmaps (generated from the active pet) --------------------------
 function rgbaToCanvas(rgba: Uint8ClampedArray): HTMLCanvasElement {
   const c = document.createElement('canvas')
-  c.width = SPRITE_W
-  c.height = SPRITE_H
+  // The rendered buffer is RW×RH device pixels (RW/RH scale with the detail factor).
+  c.width = RW
+  c.height = RH
   const cx = c.getContext('2d')!
-  const img = cx.createImageData(SPRITE_W, SPRITE_H)
+  const img = cx.createImageData(RW, RH)
   img.data.set(rgba)
   cx.putImageData(img, 0, 0)
   return c
@@ -185,6 +186,17 @@ window.pet.onConfig((cfg) => {
     setFrontScale(cfg.frontScale)
     // Everything derived from the front view re-renders at the new size.
     frontCache.clear()
+    seqCache.clear()
+    hitMask = buildHitMask()
+  }
+  if (typeof cfg.detail === 'number') {
+    // Changing the raster resolution invalidates every cached frame.
+    setDetail(cfg.detail)
+    frontCache.clear()
+    walkCache.clear()
+    pranceCache.clear()
+    for (const c of Object.values(gaitCaches)) c.clear()
+    rigCache.clear()
     seqCache.clear()
     hitMask = buildHitMask()
   }
@@ -586,9 +598,17 @@ window.pet.onPlay((cmd: PlayCommand) => {
 // cat is fronting, sitting, loafing, or curled) ---------------------------------
 let hitMask: boolean[] = buildHitMask()
 function buildHitMask(): boolean[] {
+  // Kept at LOGICAL 44×44 resolution (hit-testing works in sprite units), so a
+  // device rgba (RW×RH) is downsampled: mark a logical cell if any device pixel
+  // maps into it.
   const mask = new Array<boolean>(SPRITE_W * SPRITE_H).fill(false)
   const add = (rgba: Uint8ClampedArray): void => {
-    for (let i = 0; i < SPRITE_W * SPRITE_H; i++) if (rgba[i * 4 + 3] > 0) mask[i] = true
+    for (let dy = 0; dy < RH; dy++) for (let dx = 0; dx < RW; dx++) {
+      if (rgba[(dy * RW + dx) * 4 + 3] > 0) {
+        const lx = Math.floor((dx / RW) * SPRITE_W), ly = Math.floor((dy / RH) * SPRITE_H)
+        mask[ly * SPRITE_W + lx] = true
+      }
+    }
   }
   add(frontRGBA({ eyeOpen: true, tailPhase: 0 }))
   add(renderPet(generateRigGrid(activePet, POSES.sit), activePet.coat))
@@ -719,7 +739,8 @@ function drawSprite(frame: HTMLCanvasElement, fc: Facing, ox = 0, oy = 0): void 
   ctx.save()
   ctx.translate(FEET_X, FEET_Y)
   ctx.scale(fc === 'left' ? -1 : 1, 1) // integer flip only — no fractional scaling
-  ctx.drawImage(frame, 0, 0, SPRITE_W, SPRITE_H, (-SPRITE_W / 2 + ox) * scale, (-SPRITE_H + oy) * scale, SPRITE_W * scale, SPRITE_H * scale)
+  // Source = the frame's own device pixels (RW×RH); dest = logical sprite size × scale.
+  ctx.drawImage(frame, 0, 0, frame.width, frame.height, (-SPRITE_W / 2 + ox) * scale, (-SPRITE_H + oy) * scale, SPRITE_W * scale, SPRITE_H * scale)
   ctx.restore()
 }
 
