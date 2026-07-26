@@ -84,8 +84,10 @@ function makeProbe() {
   const GetWindowThreadProcessId = user32.func('uint32 __stdcall GetWindowThreadProcessId(void* hWnd, _Out_ uint32* pid)')
   const PROC = koffi.proto('bool __stdcall PROC(void* hwnd, intptr lParam)')
 
+  // Returns every visible window owned by the pid, so callers can pick out the
+  // pet overlay or the transient knocked-object strip by shape.
   return (wantPid) => {
-    let found = null
+    const all = []
     const cb = koffi.register((hwnd) => {
       try {
         const out = [0]
@@ -93,19 +95,33 @@ function makeProbe() {
         if (out[0] !== wantPid || !IsWindowVisible(hwnd)) return true
         const r = { left: 0, top: 0, right: 0, bottom: 0 }
         if (!GetWindowRect(hwnd, r)) return true
-        const w = r.right - r.left, h = r.bottom - r.top
-        // The pet overlay is the package's only small window.
-        if (w > 20 && w < 400 && h > 20 && h < 400) found = { x: r.left, y: r.top, w, h }
+        all.push({ x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top })
       } catch { /* a window can vanish mid-enum */ }
       return true
     }, koffi.pointer(PROC))
     EnumWindows(cb, 0)
     koffi.unregister(cb)
-    return found
+    return all
   }
 }
 
+/** The pet overlay: the package's only small roughly-square window. */
+const petOf = (wins) => wins.find((w) => w.w > 20 && w.w < 400 && w.h > 20 && w.h < 400 && w.h < w.w * 3) ?? null
+/** The knocked object: a narrow vertical strip spanning ledge to floor. Matched
+ *  by aspect, not width — GetWindowRect includes invisible borders, so the 40px
+ *  strip measures wider than it was asked to be. */
+const knockedOf = (wins) => wins.find((w) => w.h > w.w * 2.5 && w.h > 100) ?? null
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+/** Bin the throwaway profile. The just-killed pet may still hold GPU cache
+ *  handles for a moment, and a leaked temp dir must never fail the run. */
+function cleanup(dir) {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 })
+  } catch {
+    console.log(`   (left ${dir} behind — the pet still had it open)`)
+  }
+}
 const decoy = (spec) => {
   const w = new BrowserWindow({
     x: spec.x, y: spec.y, width: spec.w, height: spec.h,
@@ -127,10 +143,12 @@ async function phaseLive() {
   await sleep(1500)
 
   // process.execPath is the electron binary we're already running under.
-  const pet = spawn(process.execPath, ['.', `--user-data-dir=${profile}`], { cwd: root, stdio: 'ignore' })
+  // inherit: the pet's own main-process logs land in the harness output, which is
+  // the only way to see them (Electron does not write to stdout on Windows).
+  const pet = spawn(process.execPath, ['.', `--user-data-dir=${profile}`], { cwd: root, stdio: 'inherit' })
   await sleep(8000)
 
-  const start = probe(pet.pid)
+  const start = petOf(probe(pet.pid))
   if (!start) {
     check(false, 'pet window found')
     pet.kill(); ledge.destroy(); rmSync(profile, { recursive: true, force: true })
@@ -145,7 +163,7 @@ async function phaseLive() {
   let settled = 0, best = Infinity
   for (let i = 0; i < 90 && settled < 4; i++) {
     await sleep(500)
-    const r = probe(pet.pid)
+    const r = petOf(probe(pet.pid))
     if (!r) continue
     const bottom = r.y + r.h
     best = Math.min(best, bottom)
@@ -154,12 +172,45 @@ async function phaseLive() {
   check(settled >= 4, 'climbed onto the ledge and stayed', `ledge y=${LEDGE.y}, best bottom edge y=${best}`)
 
   if (settled >= 4) {
+    // Knock something off. There is nothing to drop unless the pet is genuinely
+    // up on the ledge at the moment of the swipe, and it may well have wandered
+    // back down while the previous check was settling — so put it back first,
+    // and give it a couple of goes.
+    let obj = null
+    for (let attempt = 0; attempt < 3 && !obj; attempt++) {
+      const up = () => { const p = petOf(probe(pet.pid)); return p && Math.abs(p.y + p.h - LEDGE.y) <= 30 }
+      if (!up()) {
+        spawnSync(process.execPath, ['.', `--user-data-dir=${profile}`, `--goto-window=${LEDGE.title}`], { cwd: root, stdio: 'ignore' })
+        for (let i = 0; i < 30 && !up(); i++) await sleep(500)
+      }
+      if (!up()) continue
+      spawnSync(process.execPath, ['.', `--user-data-dir=${profile}`, '--play-clip=knock'], { cwd: root, stdio: 'ignore' })
+      // The swipe lands ~1.3s in and the object lives ~1.15s after that.
+      for (let i = 0; i < 26 && !obj; i++) {
+        await sleep(150)
+        obj = knockedOf(probe(pet.pid))
+      }
+    }
+    check(
+      !!obj,
+      'something went over the edge',
+      obj ? `strip ${obj.w}x${obj.h} at ${obj.x},${obj.y} — falls to y=${obj.y + obj.h}` : 'no falling object appeared'
+    )
+    if (obj) {
+      // And it must clean itself up rather than sitting on the desktop forever.
+      let gone = false
+      for (let i = 0; i < 20 && !gone; i++) { await sleep(200); gone = !knockedOf(probe(pet.pid)) }
+      check(gone, 'the object cleaned itself up')
+    }
+  }
+
+  if (settled >= 4) {
     const cover = decoy(COVER)
     cover.moveTop()
     let fell = false, last = 0
     for (let i = 0; i < 30 && !fell; i++) {
       await sleep(500)
-      const r = probe(pet.pid)
+      const r = petOf(probe(pet.pid))
       if (!r) continue
       last = r.y + r.h
       if (last > LEDGE.y + 120) fell = true
@@ -170,7 +221,7 @@ async function phaseLive() {
 
   pet.kill()
   ledge.destroy()
-  rmSync(profile, { recursive: true, force: true })
+  cleanup(profile)
 }
 
 app.on('window-all-closed', () => {})

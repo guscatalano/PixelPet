@@ -351,12 +351,36 @@ function kneadFrames(both: boolean): Frame[] {
   })
 }
 
+/**
+ * Knocking something off a ledge. The comedy is entirely in the timing: two
+ * exploratory pats that do nothing, then a long hold looking straight at you,
+ * and only then the swipe. Swipe it immediately and it's just an animation.
+ *
+ * The engine drops the object at KNOCK_SWIPE_MS, so the beats before the swipe
+ * must keep adding to that — see the running total below.
+ */
+function knockFrames(): Frame[] {
+  return seqFrames('knock', () => {
+    const f = (paw: number, pawX: number, ms: number): Frame => ({
+      img: rgbaToCanvas(renderPet(generate34Grid(activePet, 0, { paw, pawX }), activePet.coat)), ms
+    })
+    return [
+      f(0.30, 0, 110), f(0.55, 0, 110), f(0.70, 0, 130), //  350 — reach out over the edge
+      f(0.70, 0.80, 85), f(0.70, 0.15, 130), //             565 — pat, nothing happens
+      f(0.70, 0.80, 85), f(0.70, 0.15, 130), //             780 — pat again
+      f(0.70, 0, 520), //                                  1300 — the hold. looks at you.
+      f(0.95, 1, 70), //                                        THE SWIPE
+      f(0.70, 0.50, 110), f(0.40, 0.15, 110), f(0, 0, 130) //   and utterly unbothered
+    ]
+  })
+}
+
 const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = {
-  yawn: 'front', stretch: 'stand', react: 'front', paw: 'front', knead: 'front', kneadboth: 'front'
+  yawn: 'front', stretch: 'stand', react: 'front', paw: 'front', knead: 'front', kneadboth: 'front', knock: 'front'
 }
 const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = {
   yawn: yawnFrames, stretch: stretchFrames, react: reactFrames, paw: pawFrames,
-  knead: () => kneadFrames(false), kneadboth: () => kneadFrames(true)
+  knead: () => kneadFrames(false), kneadboth: () => kneadFrames(true), knock: knockFrames
 }
 
 // ---- Graph runtime state ------------------------------------------------------

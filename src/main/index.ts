@@ -114,6 +114,7 @@ function createPetWindow(): BrowserWindow {
     engine.setStayPut(settings.stayPut)
     engine.setDisabled(settings.disabledAnims)
     engine.setEmoter((kind) => petWindow?.webContents.send('pet:emote', kind))
+    engine.setKnocker((x, y) => dropKnockedObject(x, y))
     engine.start()
     applyCare()
     // Tell the renderer which pet to draw (the full spec, so user-generated pets
@@ -325,6 +326,47 @@ function createItemWindow(): BrowserWindow {
   else win.loadFile(join(__dirname, '../renderer/item.html'))
   win.on('closed', () => { itemWindow = null; stopItemDrag() })
   return win
+}
+
+// ---- knocked-off objects ------------------------------------------------------
+// Deliberately NOT the care-item window: that one is draggable and feeds the cat
+// on contact. This is scenery — click-through, no interaction, gone in a second.
+
+const KNOCKED_MS = 1150 // must outlast the CSS drop + puff in knocked.html
+let knockedWindow: BrowserWindow | null = null
+let knockedTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Something goes over the edge at (x, ledgeY) and tumbles to the floor. */
+function dropKnockedObject(x: number, ledgeY: number): void {
+  const disp = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(ledgeY) })
+  const floor = disp.workArea.y + disp.workArea.height
+  const height = Math.round(floor - ledgeY)
+  if (height < 40) return // already on the floor; nothing to fall
+
+  if (knockedTimer) { clearTimeout(knockedTimer); knockedTimer = null }
+  if (knockedWindow && !knockedWindow.isDestroyed()) knockedWindow.destroy()
+
+  const width = 40
+  const win = new BrowserWindow({
+    width, height,
+    x: Math.round(x - width / 2), y: Math.round(ledgeY),
+    transparent: true, frame: false, resizable: false, show: false,
+    skipTaskbar: true, hasShadow: false, focusable: false, alwaysOnTop: true,
+    maximizable: false, fullscreenable: false,
+    webPreferences: { sandbox: true }
+  })
+  win.setAlwaysOnTop(true, 'screen-saver')
+  win.setIgnoreMouseEvents(true)
+  win.once('ready-to-show', () => { if (!win.isDestroyed()) win.showInactive() })
+  win.on('closed', () => { if (knockedWindow === win) knockedWindow = null })
+  if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/knocked.html`)
+  else win.loadFile(join(__dirname, '../renderer/knocked.html'))
+  knockedWindow = win
+
+  knockedTimer = setTimeout(() => {
+    knockedTimer = null
+    if (!win.isDestroyed()) win.destroy()
+  }, KNOCKED_MS)
 }
 
 /** Summon a draggable care item next to the cat (right-click → Bring…). */
@@ -989,6 +1031,8 @@ if (!gotLock) {
     if (topmostTimer) clearInterval(topmostTimer)
     if (sonarTimer) clearTimeout(sonarTimer)
     sonarWindow?.destroy()
+    if (knockedTimer) clearTimeout(knockedTimer)
+    knockedWindow?.destroy()
     if (dreamTimer) clearInterval(dreamTimer)
     dreamWindow?.destroy()
     engine?.dispose()

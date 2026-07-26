@@ -37,6 +37,9 @@ const MAX_JUMP_VX = 5.5 // cap the horizontal drift; beyond this it reads as fly
 const EDGE_LOOKAHEAD = 9 // px ahead of the feet to probe for a drop while walking
 const EDGE_DROP = 40 // a support drop bigger than this counts as "an edge"
 const TEETER_MS = 1900 // how long the cat wobbles at an edge before deciding
+// Time from the start of the knock clip to the swipe frame. Must match the sum
+// of the frames before the swipe in knockFrames() (src/renderer/pet/main.ts).
+const KNOCK_SWIPE_MS = 1300
 const POOF_MS = 1100 // how long the scared poof holds
 const BIG_FALL = 90 // falls taller than this spook the cat on landing
 const CARE_TICK_MS = 60_000 // needs decay + self-care cadence (Care Mode)
@@ -72,6 +75,9 @@ export class PetEngine {
   private climbGoal: { x: number; y: number } | null = null
   /** Sprints left in the current zoomies fit (0 = not having one). */
   private zoomiesLeft = 0
+  private knockTimer: ReturnType<typeof setTimeout> | null = null
+  /** Set by main: show something tumbling off the ledge at (x, y). */
+  private knocker: ((x: number, y: number) => void) | null = null
   private fallStartY = 0 // where the current fall began (poof on big landings)
   private walkAskedAt = 0 // when we requested the walk visual (stall safety)
   private afterShot: (() => void) | null = null // continuation after a one-shot ends
@@ -290,6 +296,11 @@ export class PetEngine {
   }
 
   /** Set the callback that floats emote particles over the cat. */
+  /** Wire up the "something just went over the edge" visual (main owns the window). */
+  setKnocker(cb: (x: number, y: number) => void): void {
+    this.knocker = cb
+  }
+
   setEmoter(fn: (kind: string) => void): void {
     this.emoter = fn
   }
@@ -304,6 +315,7 @@ export class PetEngine {
     this.airMode = 'none'; this.vx = 0; this.vy = 0
     switch (clip) {
       case 'yawn': case 'stretch': case 'react': case 'paw': case 'knead': case 'kneadboth': this.playOneShot(clip); break
+      case 'knock': this.startKnock(); break // needs the timed drop, not just the clip
       case 'pounce': this.startPounce(); break
       case 'walk': case 'prance': case 'stalk': case 'trot': case 'hop': this.startWander(clip); break
       case 'zoomies': this.startZoomies(); break
@@ -485,6 +497,12 @@ export class PetEngine {
     this.actionTimer = setTimeout(() => {
       if (this.dragging || this.clip !== 'teeter') return
       const p = this.personality
+      // A real ledge, and a cat looking over it. Mischief decides whether it
+      // backs off, hops down — or does the obvious thing.
+      if (this.allowed('knock') && Math.random() < 0.12 + p.mischief * 0.45) {
+        this.startKnock()
+        return
+      }
       // Bold cats sometimes just hop down; most back away from the edge.
       if (Math.random() < 0.2 + p.curiosity * 0.25 + p.mischief * 0.2) {
         const dir = this.facing === 'right' ? 1 : -1
@@ -499,6 +517,36 @@ export class PetEngine {
         this.scheduleAmbient(900)
       }
     }, TEETER_MS)
+  }
+
+  // ---- knocking things off ledges --------------------------------------------
+
+  /**
+   * Reach over the edge, pat at nothing twice, hold, then swipe something off.
+   * The drop is fired on a timer rather than at the end of the clip, because it
+   * has to land on the swipe frame — see KNOCK_SWIPE_MS and the frame list in
+   * the renderer, which are two halves of the same number.
+   */
+  private startKnock(): void {
+    this.cancelWander()
+    const b = this.win.getBounds()
+    const dir = this.facing === 'right' ? 1 : -1
+    // Just past the paw, over the drop the pet is teetering on.
+    const edgeX = this.curX + b.width / 2 + dir * (b.width * 0.30)
+    const ledgeY = this.curY + this.feetOffset(b.height)
+
+    this.playOneShot('knock')
+    // Afterwards, turn away from the edge so it doesn't immediately teeter again.
+    this.afterShot = () => {
+      this.facing = this.facing === 'right' ? 'left' : 'right'
+      this.setClip('idle', this.facing)
+      this.scheduleAmbient(900)
+    }
+    if (this.knockTimer) clearTimeout(this.knockTimer)
+    this.knockTimer = setTimeout(() => {
+      this.knockTimer = null
+      if (this.clip === 'knock' && !this.dragging) this.knocker?.(edgeX, ledgeY)
+    }, KNOCK_SWIPE_MS)
   }
 
   // ---- the pounce ------------------------------------------------------------------

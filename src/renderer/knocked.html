@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <title>PixelPet Knocked</title>
+    <style>
+      /* The thing the cat just knocked off a ledge. The window is a tall, narrow
+         strip spanning from the ledge down to the floor, so the fall is just CSS
+         inside it — no per-tick window moving, and no preload. Main creates it,
+         positions it, and destroys it once the animation is done. */
+      html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+      .obj {
+        position: absolute; left: 50%; top: 0; width: 14px; height: 14px; margin-left: -7px;
+        border-radius: 4px; background: #d8dcea;
+        box-shadow: inset -3px -3px 0 rgba(0, 0, 0, 0.22), inset 2px 2px 0 rgba(255, 255, 255, 0.55),
+                    0 2px 5px rgba(0, 0, 0, 0.45);
+        image-rendering: pixelated;
+        animation: drop 0.62s cubic-bezier(0.42, 0, 0.95, 1) forwards;
+      }
+      /* Falls the height of the strip, tumbling on the way down. */
+      @keyframes drop {
+        from { transform: translateY(0) rotate(0deg); }
+        to { transform: translateY(calc(100vh - 18px)) rotate(560deg); }
+      }
+      /* A small puff where it lands, timed to arrive as the object does. */
+      .puff {
+        position: absolute; left: 50%; bottom: 0; width: 26px; height: 26px; margin-left: -13px;
+        border-radius: 50%; border: 2px solid rgba(226, 231, 245, 0.85);
+        opacity: 0; transform: scale(0.3);
+        animation: puff 0.34s ease-out 0.6s forwards;
+      }
+      @keyframes puff {
+        0% { opacity: 0.9; transform: scale(0.3); }
+        100% { opacity: 0; transform: scale(1.5); }
+      }
+      /* Landing is a small event, not a scene — hold it still under reduced motion. */
+      @media (prefers-reduced-motion: reduce) {
+        .obj { animation-duration: 0.9s; }
+        .puff { animation: none; opacity: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="obj"></div>
+    <div class="puff"></div>
+  </body>
+</html>

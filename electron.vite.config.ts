@@ -35,7 +35,8 @@ export default defineConfig({
           settings: resolve(__dirname, 'src/renderer/settings.html'),
           item: resolve(__dirname, 'src/renderer/item.html'),
           dream: resolve(__dirname, 'src/renderer/dream.html'),
-          sonar: resolve(__dirname, 'src/renderer/sonar.html')
+          sonar: resolve(__dirname, 'src/renderer/sonar.html'),
+          knocked: resolve(__dirname, 'src/renderer/knocked.html')
         }
       }
     }
