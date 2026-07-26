@@ -4,7 +4,7 @@ import type { Needs, Difficulty, CareAction, CareStatus } from '../../shared/car
 import { SPRITE_H, BOB_AMPLITUDE } from '../../shared/constants'
 import { weightedPick } from './personality'
 import { decay, apply as applyCare, nudge, careState, freshNeeds } from '../care/needs'
-import { refreshPlatforms, supportY } from '../desktop/world'
+import { refreshPlatforms, supportY, ledgesAbove } from '../desktop/world'
 
 const MOVE_TICK_MS = 16
 const WALK_SPEED = 0.35 // px per tick (~22 px/s) — a calm walking pace, not a scramble
@@ -19,6 +19,15 @@ const GRAVITY = 0.45 // px/tick² — vertical acceleration while airborne
 const MAX_FALL = 9 // terminal velocity, px/tick
 const FALL_CLIP_GAP = 10 // only show the flailing fall clip when dropping more than this
 const REFRESH_EVERY = 15 // physics ticks between window-list refreshes (~240ms)
+// ---- Climbing ----------------------------------------------------------------
+// A pounce leaves the ground at vy = -5.2 against GRAVITY 0.45, so it peaks about
+// 30px up — nowhere near the top of a real window. With nothing able to carry the
+// pet upward it could only ever fall downhill, which is why it ended up living on
+// the taskbar. A targeted jump gives it a way back up onto your windows.
+const JUMP_CLEAR = 16 // px of clearance over the ledge at the top of the arc
+const MAX_JUMP_RISE = 300 // the tallest step it will attempt (px)
+const MAX_JUMP_REACH = 260 // the widest sideways gap it will attempt (px)
+const MAX_JUMP_VX = 5.5 // cap the horizontal drift; beyond this it reads as flying
 const EDGE_LOOKAHEAD = 9 // px ahead of the feet to probe for a drop while walking
 const EDGE_DROP = 40 // a support drop bigger than this counts as "an edge"
 const TEETER_MS = 1900 // how long the cat wobbles at an edge before deciding
@@ -51,6 +60,10 @@ export class PetEngine {
   private vx = 0 // ballistic horizontal velocity (leaps)
   private vy = 0 // vertical velocity (gravity / leap impulse)
   private airMode: 'none' | 'fall' | 'leap' = 'none'
+  /** Solved impulse for a climb, applied when the renderer reports the leap. */
+  private pendingJump: { vx: number; vy: number } | null = null
+  /** Debug: a ledge the pet has been told to get onto (see climbToward). */
+  private climbGoal: { x: number; y: number } | null = null
   private fallStartY = 0 // where the current fall began (poof on big landings)
   private walkAskedAt = 0 // when we requested the walk visual (stall safety)
   private afterShot: (() => void) | null = null // continuation after a one-shot ends
@@ -304,7 +317,7 @@ export class PetEngine {
 
   // ---- wandering + physics -------------------------------------------------------
 
-  private startWander(force?: ClipName): void {
+  private startWander(force?: ClipName, toX?: number): void {
     if (this.dragging || this.win.isDestroyed()) return
     const wa = screen.getDisplayMatching(this.win.getBounds()).workArea
     const minX = wa.x
@@ -313,10 +326,16 @@ export class PetEngine {
       this.finishWander()
       return
     }
-    let target = Math.round(minX + Math.random() * (maxX - minX))
-    if (Math.abs(target - this.curX) < MIN_WANDER) {
-      target = this.curX + (target >= this.curX ? 1 : -1) * (MIN_WANDER + Math.random() * 140)
-      target = Math.round(Math.max(minX, Math.min(maxX, target)))
+    let target: number
+    if (toX !== undefined) {
+      // A directed walk (currently only the debug climb goal) — go where asked.
+      target = Math.round(Math.max(minX, Math.min(maxX, toX)))
+    } else {
+      target = Math.round(minX + Math.random() * (maxX - minX))
+      if (Math.abs(target - this.curX) < MIN_WANDER) {
+        target = this.curX + (target >= this.curX ? 1 : -1) * (MIN_WANDER + Math.random() * 140)
+        target = Math.round(Math.max(minX, Math.min(maxX, target)))
+      }
     }
     this.wanderTarget = target
     this.walkDist = 0
@@ -496,16 +515,111 @@ export class PetEngine {
     if (this.actionTimer) { clearTimeout(this.actionTimer); this.actionTimer = null }
     this.airMode = 'leap'
     this.fallStartY = 0
-    this.vx = (this.facing === 'right' ? 1 : -1) * 2.1
-    this.vy = -5.2
+    if (this.pendingJump) {
+      // A climb: the impulse was solved for a specific ledge.
+      this.vx = this.pendingJump.vx
+      this.vy = this.pendingJump.vy
+      this.pendingJump = null
+    } else {
+      this.vx = (this.facing === 'right' ? 1 : -1) * 2.1
+      this.vy = -5.2
+    }
+  }
+
+  // ---- climbing onto windows -----------------------------------------------
+
+  /**
+   * Try to jump onto a window top above the pet. Returns false if there's nothing
+   * in range, so the caller can fall through to an ordinary ambient choice.
+   *
+   * The arc is solved rather than guessed: pick vy so the apex clears the ledge by
+   * JUMP_CLEAR, then read off how long until the descent crosses the ledge height
+   * and set vx to cover the horizontal gap in exactly that time. Landing itself
+   * needs no new code — once the pet is above a window top, supportY() starts
+   * seeing it as a platform and the existing gravity/landAt path takes over.
+   */
+  private tryJumpUp(): boolean {
+    if (this.stayPut || this.dragging || this.airMode !== 'none') return false
+    const b = this.win.getBounds()
+    const feetX = this.curX + b.width / 2
+    const feetY = this.curY + this.feetOffset(b.height)
+
+    const options = ledgesAbove(feetX, feetY, MAX_JUMP_RISE, MAX_JUMP_REACH)
+    if (!options.length) return false
+    const target = options[Math.floor(Math.random() * options.length)]
+    return this.launchTo(target.x, target.y)
+  }
+
+  /** Solve and start the arc onto one specific point. False if it's out of range. */
+  private launchTo(targetX: number, targetY: number): boolean {
+    if (this.stayPut || this.dragging || this.airMode !== 'none') return false
+    const b = this.win.getBounds()
+    const feetX = this.curX + b.width / 2
+    const feetY = this.curY + this.feetOffset(b.height)
+    const rise = feetY - targetY
+    if (rise <= 0) return false
+
+    const vy = -Math.sqrt(2 * GRAVITY * (rise + JUMP_CLEAR))
+    // Descending crossing of the ledge height: 0.5*g*t^2 + vy*t + rise = 0.
+    const disc = vy * vy - 2 * GRAVITY * rise
+    if (disc < 0) return false // unreachable; shouldn't happen given vy above
+    const t = (-vy + Math.sqrt(disc)) / GRAVITY
+    const vx = (targetX - feetX) / t
+    if (!Number.isFinite(vx) || Math.abs(vx) > MAX_JUMP_VX) return false
+
+    this.cancelWander()
+    this.pendingJump = { vx, vy }
+    this.facing = vx >= 0 ? 'right' : 'left'
+    this.setClip('pounce', this.facing) // the crouch-and-wiggle reads as a wind-up
+    if (this.actionTimer) clearTimeout(this.actionTimer)
+    this.actionTimer = setTimeout(() => {
+      if (this.clip === 'pounce' && this.airMode === 'none') {
+        this.pendingJump = null
+        this.setClip('idle')
+        this.scheduleAmbient()
+      }
+    }, SHOT_SAFETY_MS)
+    return true
+  }
+
+  /**
+   * Debug/testing: send the pet onto one specific ledge. Waiting for a climb to
+   * happen by itself means waiting on a ~20% roll of an ambient tick that fires
+   * every 3-8s, which makes any test flaky; this makes it deterministic.
+   *
+   * If the ledge is further away than a single jump can carry, the pet walks
+   * under it first and the climb resumes when the walk ends.
+   */
+  climbToward(x: number, y: number): void {
+    this.climbGoal = { x, y }
+    this.pursueClimbGoal()
+  }
+
+  private pursueClimbGoal(): void {
+    const g = this.climbGoal
+    if (!g || this.dragging) return
+    const b = this.win.getBounds()
+    const feetX = this.curX + b.width / 2
+    const feetY = this.curY + this.feetOffset(b.height)
+    if (feetY <= g.y + 6) { this.climbGoal = null; return } // already up there
+    if (Math.abs(g.x - feetX) <= MAX_JUMP_REACH && this.launchTo(g.x, g.y)) {
+      this.climbGoal = null
+      return
+    }
+    this.startWander(undefined, g.x - b.width / 2) // get under it, then try again
   }
 
   private finishWander(): void {
     this.wanderTarget = null
-    if (!this.dragging) {
-      this.setClip('idle')
-      this.scheduleAmbient()
+    if (this.dragging) return
+    this.setClip('idle')
+    // Arrived under a debug climb target? Take the jump now rather than waiting
+    // for the next ambient roll.
+    if (this.climbGoal) {
+      this.pursueClimbGoal()
+      if (this.climbGoal === null || this.clip === 'pounce') return
     }
+    this.scheduleAmbient()
   }
 
   private cancelWander(): void {
@@ -555,6 +669,15 @@ export class PetEngine {
     const bored = n ? 1 - n.fun : 0
     const dirty = n ? 1 - n.hygiene : 0
     const sick = n && n.health < 0.5 ? 1 - n.health : 0
+
+    // Climbing gets first refusal, before the ordinary ambient choice. Gravity is
+    // the only vertical force otherwise, so the pet drifts downhill and parks on
+    // the taskbar; a periodic look upward keeps it living on your actual windows.
+    // tryJumpUp() returns false when nothing is in range, so this is a no-op on a
+    // bare desktop.
+    const climbUrge = (0.06 + p.curiosity * 0.18 + p.energy * 0.12 + p.mischief * 0.08) * (1 - tired * 0.7) * (1 - sick)
+    if (!wasAsleep && Math.random() < climbUrge && this.tryJumpUp()) return
+
     const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick' | 'sulk'>([
       // When genuinely unwell, lying down with the cone dominates everything.
       { item: 'sick', weight: n && n.health < 0.35 ? 4 + (0.35 - n.health) * 12 : 0 },

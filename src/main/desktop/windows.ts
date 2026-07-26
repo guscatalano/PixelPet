@@ -11,10 +11,16 @@ import { screen } from 'electron'
 /** A window's on-screen rectangle in DIP (Electron) coordinates, z-order topmost-first. */
 export interface WinRect { x: number; y: number; w: number; h: number }
 
+/** A window plus its caption — only collected on demand (see enumWindowsTitled). */
+export interface TitledRect extends WinRect { title: string }
+
 let selfHandle = 0n
 let acc: WinRect[] = []
 let run: (() => WinRect[]) | null = null
 let initTried = false
+// Reading captions costs a call per window, so the physics enumeration skips it;
+// the debug "go to this window" lookup flips this on for one pass.
+let wantTitles = false
 
 /** Build the Win32/koffi bindings on first use. Returns false (fail-soft) if the
  *  FFI isn't available (any non-Windows platform, or a load error). */
@@ -33,6 +39,7 @@ function init(): boolean {
     const IsWindowVisible = user32.func('bool __stdcall IsWindowVisible(void* hWnd)')
     const IsIconic = user32.func('bool __stdcall IsIconic(void* hWnd)')
     const GetWindowLongPtrW = user32.func('intptr __stdcall GetWindowLongPtrW(void* hWnd, int nIndex)')
+    const GetWindowTextW = user32.func('int __stdcall GetWindowTextW(void* hWnd, _Out_ uint16_t* lpString, int nMaxCount)')
     const DwmGetWindowAttribute = dwmapi.func('int __stdcall DwmGetWindowAttribute(void* hWnd, uint32 dwAttribute, _Out_ void* pvAttribute, uint32 cbAttribute)')
     const WNDENUMPROC = koffi.proto('bool __stdcall WNDENUMPROC(void* hwnd, intptr lParam)')
     const GWL_EXSTYLE = -20, WS_EX_TOOLWINDOW = 0x80, DWMWA_CLOAKED = 14
@@ -51,7 +58,14 @@ function init(): boolean {
         const w = r.right - r.left, h = r.bottom - r.top
         if (w < 120 || h < 60) return true // ignore slivers
         const dip = screen.screenToDipRect(null, { x: r.left, y: r.top, width: w, height: h })
-        acc.push({ x: dip.x, y: dip.y, w: dip.width, h: dip.height })
+        if (wantTitles) {
+          const buf = new Uint16Array(256)
+          const n = GetWindowTextW(hwnd, buf, buf.length)
+          const title = n > 0 ? Buffer.from(buf.buffer, 0, n * 2).toString('utf16le') : ''
+          acc.push({ x: dip.x, y: dip.y, w: dip.width, h: dip.height, title } as TitledRect)
+        } else {
+          acc.push({ x: dip.x, y: dip.y, w: dip.width, h: dip.height })
+        }
       } catch { /* a window can vanish mid-enum; ignore it */ }
       return true
     }, koffi.pointer(WNDENUMPROC))
@@ -72,4 +86,15 @@ export function setSelfWindow(handleBuf: Buffer): void {
 /** Snapshot of visible top-level windows, topmost-first, in DIP coords (empty off-Windows). */
 export function enumWindows(): WinRect[] {
   return init() ? run!() : []
+}
+
+/** Same list, with window captions — for the debug "send the pet here" lookup. */
+export function enumWindowsTitled(): TitledRect[] {
+  if (!init()) return []
+  wantTitles = true
+  try {
+    return run!() as TitledRect[]
+  } finally {
+    wantTitles = false
+  }
 }

@@ -12,7 +12,7 @@ import {
   loadSettings, saveSettings, effectivePersonality, findPet, AI_PROVIDERS,
   MIN_TURN_MS, MAX_TURN_MS, MIN_FRONT_SCALE, MAX_FRONT_SCALE, DETAIL_LEVELS
 } from './settings'
-import { setSelfWindow } from './desktop/windows'
+import { setSelfWindow, enumWindowsTitled } from './desktop/windows'
 import { testConnection, DEFAULT_MODEL, DEFAULT_ENDPOINT, type VisionConfig } from './ai/providers'
 import { generatePetFromPhotos, dataUrlToImage } from './ai/petGenerator'
 import { saveApiKey, loadApiKey, hasApiKey, clearApiKey, encryptionAvailable } from './ai/secrets'
@@ -881,12 +881,39 @@ function registerIpc(): void {
   })
 }
 
+/**
+ * Debug hook for testing the climb. Run a SECOND instance with
+ *   electron . --goto-window="<title substring>"
+ * and the already-running pet walks under that window and jumps onto it. The
+ * single-instance lock already forwards argv to the live instance, so this needs
+ * no extra plumbing — and it turns "wait for a ~20% ambient roll" into something
+ * a test can actually assert on.
+ *
+ * Must be the `--flag=value` form: Chromium rewrites the forwarded command line
+ * and interleaves its own switches, so a space-separated value does not survive
+ * as argv[i + 1] (you get something like --allow-file-access-from-files instead).
+ */
+function handleDebugArgs(argv: string[]): void {
+  const arg = argv.find((a) => a.startsWith('--goto-window='))
+  const value = arg?.slice('--goto-window='.length).trim()
+  if (!value) return
+  const needle = value.toLowerCase()
+  const match = enumWindowsTitled().find((w) => w.title.toLowerCase().includes(needle))
+  if (!match) {
+    console.warn(`[debug] no visible window matching "${needle}"`)
+    return
+  }
+  console.log(`[debug] sending the pet onto "${match.title}" @ ${match.x},${match.y} ${match.w}x${match.h}`)
+  engine?.climbToward(match.x + match.w / 2, match.y)
+}
+
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_e, argv) => {
     if (!petWindow) petWindow = createPetWindow()
+    handleDebugArgs(argv)
   })
 
   app.whenReady().then(() => {
