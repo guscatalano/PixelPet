@@ -3,6 +3,31 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.7.0 — up on the furniture
+
+### New
+- **Your pet climbs onto your windows.** Until now it could only ever fall *downhill*,
+  so it drifted to the bottom of the screen and stayed on the taskbar. It now sizes up a
+  window top above it, winds up, and jumps — and once it's up there it walks along the
+  edge like any self-respecting cat on a bookshelf.
+- **It knocks things off ledges.** Standing on a window edge, a mischievous pet will reach
+  over, pat at nothing a couple of times, look you dead in the eye, and then send something
+  tumbling into the void. The pause before the swipe is the whole point.
+- **Kneading — making biscuits.** Both kinds, because cats do both: **Knead** is one paw
+  pushing away in a steady rhythm, **Knead ×2** is the classic two-paw alternation.
+  Affectionate, sleepy pets do it most.
+- **Zoomies.** Every so often your pet loses its mind entirely and tears back and forth
+  across the screen a few times, then stands there as if nothing happened. Deliberately
+  rare — energetic and mischievous pets have a fit every few minutes.
+
+All four are toggleable like every other animation, in *Settings → Behavior*.
+
+### Fixed
+- **Your pet no longer stands on windows you can't see.** It was reading every window's
+  top edge without checking what was in *front* of it, so it would happily stand on an
+  edge buried behind another window and appear to float in mid-air. Now cover the window
+  it's sitting on and its footing genuinely disappears — so it falls, as it should.
+
 ## v0.6.0 — find your cat
 
 ### New
