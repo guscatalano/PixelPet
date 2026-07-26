@@ -375,36 +375,15 @@ function knockFrames(): Frame[] {
   })
 }
 
-/**
- * Batting at a dangling string. pawX offsets the paw vertically, so NEGATIVE
- * values lift it — an upward swipe falls out of the existing rig for free.
- *
- * Two swipes with a beat between them: watch it, miss-ish, watch it again, swipe
- * harder. The engine swings the string at BAT_HITS_MS, which must stay lined up
- * with the two swipe frames below.
- */
-function batFrames(): Frame[] {
-  return seqFrames('bat', () => {
-    const f = (paw: number, pawX: number, ms: number): Frame => ({
-      img: rgbaToCanvas(renderPet(generate34Grid(activePet, 0, { paw, pawX }), activePet.coat)), ms
-    })
-    return [
-      f(0.20, -0.20, 140), f(0.50, -0.50, 120), f(0.70, -0.70, 160), // 420 — track it, wind up
-      f(0.95, -1.00, 70), //                                            SWIPE (hit at 420)
-      f(0.70, -0.60, 130), f(0.60, -0.50, 220), //                   840 — recover, watch it swing
-      f(1.00, -1.00, 70), //                                            SWIPE (hit at 840)
-      f(0.65, -0.55, 140), f(0.35, -0.20, 120), f(0, 0, 150) //     1320 — and done
-    ]
-  })
-}
-
+// 'bat' (the string toy) is deliberately NOT a one-shot here: the engine runs it
+// as a full hunt — stare, stalk, the pounce crouch, a real ballistic leap — all
+// of which are existing states. There is no canned batting clip any more.
 const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = {
-  yawn: 'front', stretch: 'stand', react: 'front', paw: 'front', knead: 'front', kneadboth: 'front', knock: 'front',
-  bat: 'front'
+  yawn: 'front', stretch: 'stand', react: 'front', paw: 'front', knead: 'front', kneadboth: 'front', knock: 'front'
 }
 const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = {
   yawn: yawnFrames, stretch: stretchFrames, react: reactFrames, paw: pawFrames,
-  knead: () => kneadFrames(false), kneadboth: () => kneadFrames(true), knock: knockFrames, bat: batFrames
+  knead: () => kneadFrames(false), kneadboth: () => kneadFrames(true), knock: knockFrames
 }
 
 // ---- Graph runtime state ------------------------------------------------------

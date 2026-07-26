@@ -115,7 +115,14 @@ function createPetWindow(): BrowserWindow {
     engine.setDisabled(settings.disabledAnims)
     engine.setEmoter((kind) => petWindow?.webContents.send('pet:emote', kind))
     engine.setKnocker((x, y) => dropKnockedObject(x, y))
-    engine.setStringToy({ show: showStringToy, hit: hitStringToy, hide: hideStringToy })
+    engine.setStringToy({
+      show: showStringToy,
+      pivot: (x, y) => stringSend('string:pivot', { x, y }),
+      hit: (vx, vy) => stringSend('string:hit', { vx, vy }),
+      grab: (x, y) => stringSend('string:catch', { x, y }),
+      release: () => stringSend('string:release'),
+      hide: hideStringToy
+    })
     engine.start()
     applyCare()
     // Tell the renderer which pet to draw (the full spec, so user-generated pets
@@ -376,13 +383,28 @@ function dropKnockedObject(x: number, ledgeY: number): void {
 // itself — click-through, and it leaves when the animation does.
 
 let stringWindow: BrowserWindow | null = null
+let stringReady = false
+let stringPendingCfg: unknown = null
+let stringPendingPivot: unknown = null
 
-function showStringToy(x: number, topY: number, height: number): void {
+/** Forward a message to the string window, holding cfg + the latest pivot until
+ *  the page is up (the engine starts driving before the renderer exists). */
+function stringSend(ch: string, payload?: unknown): void {
+  const w = stringWindow
+  if (!w || w.isDestroyed()) return
+  if (!stringReady) {
+    if (ch === 'string:cfg') stringPendingCfg = payload
+    else if (ch === 'string:pivot') stringPendingPivot = payload
+    return // a hit/grab this early has nothing to land on; drop it
+  }
+  w.webContents.send(ch, payload)
+}
+
+function showStringToy(x: number, y: number, width: number, height: number, cfg: unknown): void {
   hideStringToy()
-  const width = 44 // wide enough that the swing arc isn't clipped
   const win = new BrowserWindow({
     width, height,
-    x: Math.round(x - width / 2), y: Math.round(topY),
+    x: Math.round(x), y: Math.round(y),
     transparent: true, frame: false, resizable: false, show: false,
     skipTaskbar: true, hasShadow: false, focusable: false, alwaysOnTop: true,
     maximizable: false, fullscreenable: false,
@@ -392,25 +414,27 @@ function showStringToy(x: number, topY: number, height: number): void {
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   win.setIgnoreMouseEvents(true)
   win.once('ready-to-show', () => { if (!win.isDestroyed()) win.showInactive() })
-  win.on('closed', () => { if (stringWindow === win) stringWindow = null })
+  win.on('closed', () => { if (stringWindow === win) { stringWindow = null; stringReady = false } })
+  win.webContents.once('did-finish-load', () => {
+    if (win.isDestroyed() || stringWindow !== win) return
+    stringReady = true
+    if (stringPendingCfg) win.webContents.send('string:cfg', stringPendingCfg)
+    if (stringPendingPivot) win.webContents.send('string:pivot', stringPendingPivot)
+    stringPendingCfg = stringPendingPivot = null
+  })
   if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/string.html`)
   else win.loadFile(join(__dirname, '../renderer/string.html'))
   stringWindow = win
-}
-
-function hitStringToy(): void {
-  const w = stringWindow
-  if (!w || w.isDestroyed()) return
-  // A hit can land before the page is up; deliver it once it is.
-  if (w.webContents.isLoading()) w.webContents.once('did-finish-load', () => {
-    if (!w.isDestroyed()) w.webContents.send('string:hit')
-  })
-  else w.webContents.send('string:hit')
+  stringReady = false
+  stringPendingCfg = cfg
+  stringPendingPivot = null
 }
 
 function hideStringToy(): void {
   if (stringWindow && !stringWindow.isDestroyed()) stringWindow.destroy()
   stringWindow = null
+  stringReady = false
+  stringPendingCfg = stringPendingPivot = null
 }
 
 /** Summon a draggable care item next to the cat (right-click → Bring…). */

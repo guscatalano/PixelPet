@@ -111,9 +111,10 @@ const petOf = (wins) => wins.find((w) => w.w > 20 && w.w < 400 && w.h > 20 && w.
  *  by aspect, not width — GetWindowRect includes invisible borders, so the 40px
  *  strip measures wider than it was asked to be. */
 const knockedOf = (wins) => wins.find((w) => w.h > w.w * 2.5 && w.h > 100) ?? null
-/** The string toy: also a narrow strip, but hung above the pet rather than below
- *  a ledge. Only one of the two is ever on screen, so the same shape test does. */
-const stringOf = knockedOf
+/** The string toy: a taller-than-wide overlay hung above the pet. Matched by
+ *  aspect (outer bounds, so 180x340 measures a touch wider) — distinct from the
+ *  pet, whose window is squarer at every size. */
+const stringOf = (wins) => wins.find((w) => w.h > w.w * 1.4 && w.h > 250 && w.w < 260) ?? null
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 /** Bin the throwaway profile. The just-killed pet may still hold GPU cache
@@ -128,7 +129,12 @@ function cleanup(dir) {
 const decoy = (spec) => {
   const w = new BrowserWindow({
     x: spec.x, y: spec.y, width: spec.w, height: spec.h,
-    title: spec.title, backgroundColor: '#204060', autoHideMenuBar: true
+    title: spec.title, backgroundColor: '#204060', autoHideMenuBar: true,
+    // On top, so a stray desktop window can't bury the ledge mid-test: the pet
+    // now (correctly) refuses to stand on a window edge it can't see, which
+    // otherwise makes this test hostage to whatever else is open. The cover
+    // window is also topmost and shown later, so it still lands above.
+    alwaysOnTop: true
   })
   w.setTitle(spec.title)
   w.loadURL(`data:text/html,<title>${spec.title}</title><body style="background:%23204060">`)
@@ -140,7 +146,9 @@ async function phaseLive() {
   console.log('\n2. live climb onto a window, then lose the footing under it')
   const probe = makeProbe()
   const profile = mkdtempSync(join(tmpdir(), 'pixelpet-climb-'))
-  writeFileSync(join(profile, 'settings.json'), '{"scale":4,"detail":1}')
+  // 'bat' is disabled so an AMBIENT string hunt can't leap the pet off the ledge
+  // mid-assertion — the forced --play-clip=bat below bypasses the toggle.
+  writeFileSync(join(profile, 'settings.json'), '{"scale":4,"detail":1,"disabledAnims":["bat"]}')
 
   const ledge = decoy(LEDGE)
   await sleep(1500)
@@ -163,14 +171,21 @@ async function phaseLive() {
   // the forwarded command line, so a space-separated value does not survive.
   spawnSync(process.execPath, ['.', `--user-data-dir=${profile}`, `--goto-window=${LEDGE.title}`], { cwd: root, stdio: 'ignore' })
 
+  // Two tries: ambient life (a wander off the far side, a bold hop down) can
+  // pull the pet off the ledge before four consecutive samples land — that is
+  // the pet being a cat, not the climb failing. A retry re-issues the goto.
   let settled = 0, best = Infinity
-  for (let i = 0; i < 90 && settled < 4; i++) {
-    await sleep(500)
-    const r = petOf(probe(pet.pid))
-    if (!r) continue
-    const bottom = r.y + r.h
-    best = Math.min(best, bottom)
-    settled = Math.abs(bottom - LEDGE.y) <= 30 ? settled + 1 : 0
+  for (let attempt = 0; attempt < 2 && settled < 4; attempt++) {
+    if (attempt > 0) spawnSync(process.execPath, ['.', `--user-data-dir=${profile}`, `--goto-window=${LEDGE.title}`], { cwd: root, stdio: 'ignore' })
+    settled = 0
+    for (let i = 0; i < 90 && settled < 4; i++) {
+      await sleep(500)
+      const r = petOf(probe(pet.pid))
+      if (!r) continue
+      const bottom = r.y + r.h
+      best = Math.min(best, bottom)
+      settled = Math.abs(bottom - LEDGE.y) <= 30 ? settled + 1 : 0
+    }
   }
   check(settled >= 4, 'climbed onto the ledge and stayed', `ledge y=${LEDGE.y}, best bottom edge y=${best}`)
 
@@ -207,21 +222,36 @@ async function phaseLive() {
     }
   }
 
-  // The string toy needs no ledge — force it and check the overlay turns up and
-  // then leaves. (Its swing is driven over IPC; that part needs eyes, not a probe.)
+  // The string toy needs no ledge — force a hunt and watch it happen: the
+  // overlay appears, the pet leaves the ground at it at least once, and the
+  // whole session cleans itself up. (Whether the rope LOOKS right needs eyes.)
   {
     const before = probe(pet.pid).length
+    const ground = petOf(probe(pet.pid))
     spawnSync(process.execPath, ['.', `--user-data-dir=${profile}`, '--play-clip=bat'], { cwd: root, stdio: 'ignore' })
     let str = null
-    for (let i = 0; i < 24 && !str; i++) {
+    for (let i = 0; i < 30 && !str; i++) {
       await sleep(150)
       str = stringOf(probe(pet.pid))
     }
-    check(!!str, 'the string toy appeared', str ? `strip ${str.w}x${str.h} at ${str.x},${str.y}` : `no new overlay (had ${before} windows)`)
-    if (str) {
+    check(!!str, 'the string toy appeared', str ? `overlay ${str.w}x${str.h} at ${str.x},${str.y}` : `no new overlay (had ${before} windows)`)
+    if (str && ground) {
+      // A session is stare→stalk→crouch→LEAP — the pet must leave the ground.
+      // A session is up to two rounds, each possibly with a stalk — allow 40s.
+      let jumped = false, highest = ground.y + ground.h
       let gone = false
-      for (let i = 0; i < 25 && !gone; i++) { await sleep(200); gone = !stringOf(probe(pet.pid)) }
-      check(gone, 'the string toy went away again')
+      for (let i = 0; i < 160 && !gone; i++) {
+        await sleep(250)
+        const p = petOf(probe(pet.pid))
+        if (p) {
+          const bottom = p.y + p.h
+          highest = Math.min(highest, bottom)
+          if (ground.y + ground.h - bottom > 25) jumped = true
+        }
+        gone = !stringOf(probe(pet.pid))
+      }
+      check(jumped, 'the pet leapt at the string', `rose ${ground.y + ground.h - highest}px off the ground`)
+      check(gone, 'the session ended and the string left')
     }
   }
 

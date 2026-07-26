@@ -8,55 +8,16 @@
     />
     <title>PixelPet String</title>
     <style>
-      /* A string dangling in front of the cat. The window is a narrow strip hung
-         above it; the string pivots from the top of that strip, so swinging is
-         just a rotation. Click-through — this is scenery, not a control. */
+      /* The string toy. All the motion lives in the canvas: the string is a
+         simulated rope (see string/main.ts), not a rotating line — a rigid line
+         swinging from a pivot reads as a windshield wiper, and everyone knows
+         what string looks like. Click-through scenery; main owns the window. */
       html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
-      .pivot {
-        position: absolute; left: 50%; top: 0; width: 0; height: 100%;
-        transform-origin: 50% 0;
-        animation: sway 2.6s ease-in-out infinite;
-      }
-      /* Idle: a slow drift, as if hung from an unsteady hand. */
-      @keyframes sway {
-        0%, 100% { transform: rotate(-3.5deg); }
-        50% { transform: rotate(3.5deg); }
-      }
-      /* Struck: a hard swing that damps back out. Restarting this animation is
-         the whole reason the window has a preload. */
-      .pivot.hit { animation: swing 1.05s cubic-bezier(0.25, 0.9, 0.35, 1) 1; }
-      @keyframes swing {
-        0% { transform: rotate(0deg); }
-        14% { transform: rotate(21deg); }
-        38% { transform: rotate(-14deg); }
-        60% { transform: rotate(8deg); }
-        80% { transform: rotate(-4deg); }
-        100% { transform: rotate(0deg); }
-      }
-      .cord {
-        position: absolute; left: -1px; top: 0; width: 2px; height: calc(100% - 9px);
-        background: repeating-linear-gradient(
-          180deg, #e9edf7 0 3px, #c7cee0 3px 6px
-        );
-        box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
-      }
-      /* A little knot on the end — gives the eye something to track. */
-      .knot {
-        position: absolute; left: -5px; bottom: 0; width: 10px; height: 10px;
-        border-radius: 50%; background: #f3c73e;
-        box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.5);
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .pivot { animation: none; }
-        .pivot.hit { animation: none; }
-      }
+      canvas { display: block; width: 100vw; height: 100vh; }
     </style>
   </head>
   <body>
-    <div class="pivot" id="p">
-      <div class="cord"></div>
-      <div class="knot"></div>
-    </div>
+    <canvas id="c"></canvas>
     <script type="module" src="./string/main.ts"></script>
   </body>
 </html>

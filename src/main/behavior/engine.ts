@@ -40,18 +40,36 @@ const TEETER_MS = 1900 // how long the cat wobbles at an edge before deciding
 // Time from the start of the knock clip to the swipe frame. Must match the sum
 // of the frames before the swipe in knockFrames() (src/renderer/pet/main.ts).
 const KNOCK_SWIPE_MS = 1300
-// The string toy. Hit offsets must match the two swipe frames in batFrames()
-// (src/renderer/pet/main.ts); the string is swung from here, not by the clip.
-const BAT_HITS_MS = [420, 840]
-const BAT_TOTAL_MS = 1320
-const STRING_ABOVE = 130 // px of string hanging above the pet's window
+// ---- The string toy -----------------------------------------------------------
+// A play session follows the real feline prey sequence — stare, stalk, crouch &
+// wiggle, pounce, sometimes a proper catch — because a cat that stands flat and
+// pats at the air reads as nothing. The ENGINE owns the string: where it hangs,
+// how it drifts (like prey: wander, twitch, occasionally bolt), and whether a
+// leap actually connects. The overlay window just simulates a rope around the
+// pivot it is handed.
+const STRING_W = 180 // overlay size — room for the rope to whip without clipping
+const STRING_H = 340
+const ROPE_LEN = 150
+const STRING_PIVOT_REST = 60 // window-relative resting pivot height
+const STRING_KNOT_ABOVE = 55 // knot hangs this far above the pet's window top
+const STRING_DART_CHANCE = 0.3 // prey sometimes bolts as the cat commits → a miss
+const STRING_CATCH_CHANCE = 0.4 // a clean swat sometimes becomes a real catch
+const STRING_MAX_ROUNDS = 2 // attempts per session (a win ends it early) — each
+// round can include a stalk back under the string, so more than two runs long
 
-/** The string-toy overlay, owned by main and driven from here. */
+/** The string-toy overlay, owned by main and driven from here.
+ *  All coordinates are window-relative except show()'s screen origin. */
 export interface StringToy {
-  show: (x: number, topY: number, height: number) => void
-  hit: () => void
+  show: (x: number, y: number, width: number, height: number,
+    cfg: { pivotX: number; pivotY: number; ropeLen: number }) => void
+  pivot: (x: number, y: number) => void
+  hit: (vx: number, vy: number) => void
+  grab: (x: number, y: number) => void
+  release: () => void
   hide: () => void
 }
+
+type StringPhase = 'drop' | 'stare' | 'stalk' | 'crouch' | 'air' | 'hold' | 'settle' | 'retract'
 const POOF_MS = 1100 // how long the scared poof holds
 const BIG_FALL = 90 // falls taller than this spook the cat on landing
 const CARE_TICK_MS = 60_000 // needs decay + self-care cadence (Care Mode)
@@ -92,7 +110,17 @@ export class PetEngine {
   private knocker: ((x: number, y: number) => void) | null = null
   /** Set by main: the dangling string toy. */
   private stringToy: StringToy | null = null
-  private batTimers: Array<ReturnType<typeof setTimeout>> = []
+  // ---- string-play session state (see stringTick) ----
+  private strPhase: StringPhase | null = null
+  private strTicks = 0 // ticks in the current phase
+  private strClock = 0 // ticks since the session began (drives the prey drift)
+  private strOrigin = { x: 0, y: 0 } // string window origin on screen
+  private strBaseX = 0 // window-relative resting pivot x
+  private strPivot = { x: 0, y: 0 } // window-relative pivot, engine-driven
+  private strDart = 0 // ticks of "prey bolted upward" remaining
+  private strRounds = 0
+  private strSwatted = false // this round's mid-air swat has been resolved
+  private strCaught = false // the session's win happened
   private fallStartY = 0 // where the current fall began (poof on big landings)
   private walkAskedAt = 0 // when we requested the walk visual (stall safety)
   private afterShot: (() => void) | null = null // continuation after a one-shot ends
@@ -130,8 +158,7 @@ export class PetEngine {
 
   dispose(): void {
     if (this.careMode) this.persistNeeds()
-    this.clearBatTimers()
-    this.stringToy?.hide()
+    this.abortStringPlay()
     if (this.knockTimer) clearTimeout(this.knockTimer)
     if (this.physicsTimer) clearInterval(this.physicsTimer)
     if (this.ambientTimer) clearTimeout(this.ambientTimer)
@@ -274,8 +301,7 @@ export class PetEngine {
 
   onDragStart(): void {
     this.dragging = true
-    this.clearBatTimers()
-    this.stringToy?.hide() // picked up mid-play: the string goes with it
+    this.abortStringPlay() // picked up mid-play: the string goes with it
     this.cancelWander()
     this.airMode = 'none'
     this.vy = 0
@@ -341,7 +367,7 @@ export class PetEngine {
     switch (clip) {
       case 'yawn': case 'stretch': case 'react': case 'paw': case 'knead': case 'kneadboth': this.playOneShot(clip); break
       case 'knock': this.startKnock(); break
-      case 'bat': this.startBat(); break // needs the timed drop, not just the clip
+      case 'bat': this.startStringPlay(); break // the full hunt, not a one-shot clip
       case 'pounce': this.startPounce(); break
       case 'walk': case 'prance': case 'stalk': case 'trot': case 'hop': this.startWander(clip); break
       case 'zoomies': this.startZoomies(); break
@@ -489,6 +515,8 @@ export class PetEngine {
     if (this.isWalking() && this.airMode === 'none' && this.visualReady) {
       this.win.webContents.send('pet:walk-step', (this.walkDist / STRIDE) % 1)
     }
+    // String play rides the physics tick: prey drift, phase changes, the swat.
+    if (this.strPhase !== null) this.stringTick()
   }
 
   private landAt(T: number, feetOff: number): void {
@@ -517,6 +545,7 @@ export class PetEngine {
   // ---- edge teetering ------------------------------------------------------------
 
   private startTeeter(): void {
+    this.abortStringPlay() // stalked right up to an edge: the ledge wins
     this.cancelWander()
     this.setClip('teeter', this.facing)
     if (this.actionTimer) clearTimeout(this.actionTimer)
@@ -547,47 +576,215 @@ export class PetEngine {
 
   // ---- the string toy --------------------------------------------------------
 
-  private clearBatTimers(): void {
-    for (const t of this.batTimers) clearTimeout(t)
-    this.batTimers = []
+  /** A string drops in and the pet hunts it: stare → stalk → crouch → pounce. */
+  private startStringPlay(): void {
+    const toy = this.stringToy
+    if (!toy || this.dragging || this.stayPut || this.airMode !== 'none') return
+    this.abortStringPlay()
+    this.cancelWander()
+    if (this.ambientTimer) clearTimeout(this.ambientTimer)
+
+    const b = this.win.getBounds()
+    const wa = screen.getDisplayMatching(b).workArea
+    const dir = this.facing === 'right' ? 1 : -1
+    // Hang the knot a bit ahead of the pet and above head height — the only way
+    // to reach it is to jump, which is the point.
+    const knotX = this.curX + b.width / 2 + dir * Math.round(b.width * 0.55)
+    const knotY = this.curY - STRING_KNOT_ABOVE
+    this.strOrigin = {
+      x: Math.round(Math.max(wa.x, Math.min(wa.x + wa.width - STRING_W, knotX - STRING_W / 2))),
+      y: Math.round(Math.max(wa.y - 20, knotY - ROPE_LEN - STRING_PIVOT_REST))
+    }
+    this.strBaseX = STRING_W / 2
+    // The pivot is born above the window top, so the rope descends into view.
+    this.strPivot = { x: this.strBaseX, y: -(ROPE_LEN + 20) }
+    toy.show(this.strOrigin.x, this.strOrigin.y, STRING_W, STRING_H, {
+      pivotX: this.strPivot.x, pivotY: this.strPivot.y, ropeLen: ROPE_LEN
+    })
+
+    this.strClock = 0
+    this.strRounds = 0
+    this.strCaught = false
+    this.strDart = 0
+    this.setStringPhase('drop')
+    this.faceKnot()
+    this.setClip('idle', this.facing)
+  }
+
+  private abortStringPlay(): void {
+    if (this.strPhase === null) return
+    this.strPhase = null
+    this.stringToy?.hide()
+  }
+
+  private setStringPhase(p: StringPhase): void {
+    this.strPhase = p
+    this.strTicks = 0
   }
 
   /**
-   * A string drops in front of the pet and it has a go at it. Main owns the
-   * string window; the engine only says where to hang it and when a paw landed,
-   * so the swing is driven by the actual animation rather than a parallel
-   * timeline that has to be kept in step.
+   * The engine's model of where the knot is: hanging at rest below the pivot.
+   * The renderer's rope lags this during fast moves, but at pixel-pet scale
+   * aiming at the rest point is indistinguishable — and it means one owner of
+   * the truth instead of streaming rope positions back over IPC.
    */
-  private startBat(): void {
-    const toy = this.stringToy
-    if (!toy || this.dragging) return
-    this.cancelWander()
-    this.clearBatTimers()
+  private knotScreen(): { x: number; y: number } {
+    return { x: this.strOrigin.x + this.strPivot.x, y: this.strOrigin.y + this.strPivot.y + ROPE_LEN }
+  }
 
+  private faceKnot(): void {
     const b = this.win.getBounds()
-    // The raised paw is on whichever side the pet faces, so hang it there.
-    const dir = this.facing === 'right' ? 1 : -1
-    const x = Math.round(this.curX + b.width / 2 + dir * (b.width * 0.22))
-    const topY = Math.round(this.curY - STRING_ABOVE)
-    const height = STRING_ABOVE + Math.round(b.height * 0.45) // ends about chest high
-    toy.show(x, topY, height)
+    this.facing = this.knotScreen().x >= this.curX + b.width / 2 ? 'right' : 'left'
+  }
 
-    this.playOneShot('bat')
-    this.afterShot = () => {
-      this.clearBatTimers()
-      toy.hide()
-      this.setClip('idle')
-      this.scheduleAmbient()
+  /** Crouch under the knot; the renderer wiggles, then onLeap() fires the jump. */
+  private beginStringCrouch(): void {
+    this.faceKnot()
+    this.strSwatted = false
+    this.setStringPhase('crouch')
+    this.setClip('pounce', this.facing)
+  }
+
+  /** Solve the leap so the APEX lands on the knot (a climb wants the descent on
+   *  a ledge; jumping AT something overhead wants the top of the arc on it). */
+  private solveStringLeap(): { vx: number; vy: number } {
+    const b = this.win.getBounds()
+    const feetX = this.curX + b.width / 2
+    const feetY = this.curY + this.feetOffset(b.height)
+    const k = this.knotScreen()
+    const reach = b.height * 0.5 // forepaws at full stretch, above the feet
+    const rise = Math.max(24, feetY - (k.y + reach))
+    const vy = -Math.sqrt(2 * GRAVITY * rise)
+    const tApex = -vy / GRAVITY
+    // Cap rather than decline: an undershot jump is a miss, and misses are cat.
+    const vx = Math.max(-MAX_JUMP_VX, Math.min(MAX_JUMP_VX, (k.x - feetX) / tApex))
+    return { vx, vy }
+  }
+
+  /** At the top of the arc: did the paw actually reach the knot? */
+  private resolveStringSwat(): void {
+    this.strSwatted = true
+    const toy = this.stringToy
+    if (!toy) return
+    const b = this.win.getBounds()
+    const dir = this.facing === 'right' ? 1 : -1
+    const pawX = this.curX + b.width / 2 + dir * b.width * 0.16
+    const pawY = this.curY + b.height * 0.2 // the reaching forepaws, mid-leap
+    const k = this.knotScreen()
+    const radius = Math.max(20, b.width * 0.2)
+    if (Math.hypot(k.x - pawX, k.y - pawY) > radius) return // sailed past — prey 1, cat 0
+    if (Math.random() < STRING_CATCH_CHANCE) {
+      // Caught it! Pin the knot to the paws; the hold phase drags it down.
+      this.strCaught = true
+      this.setStringPhase('hold')
+    } else {
+      // A clean swat: throw the rope with the cat's own momentum. Kept modest —
+      // the first cut launched the rope clean out of its window.
+      toy.hit(this.vx * 1.2 + dir * 1.2, -(1.6 + Math.random() * 1.2))
     }
-    for (const at of BAT_HITS_MS) {
-      this.batTimers.push(setTimeout(() => {
-        if (this.clip === 'bat' && !this.dragging) toy.hit()
-      }, at))
+  }
+
+  /**
+   * One engine tick of string play. The drift is the prey act: a slow wander on
+   * two incommensurate sines (so it never visibly repeats), plus the occasional
+   * upward bolt — which is where misses come from.
+   */
+  private stringTick(): void {
+    const toy = this.stringToy
+    if (!toy || this.strPhase === null) return
+    this.strClock++
+    this.strTicks++
+    const t = this.strClock
+    const b = this.win.getBounds()
+
+    let px = this.strBaseX + 14 * Math.sin(t * 0.024) + 7 * Math.sin(t * 0.057)
+    let py = STRING_PIVOT_REST + 5 * Math.sin(t * 0.031)
+    if (this.strDart > 0) {
+      this.strDart--
+      py -= 85 // bolted upward, right out from under the swat
     }
-    // Belt and braces: if the clip never reports back, the string still goes away.
-    this.batTimers.push(setTimeout(() => {
-      if (this.clip !== 'bat') toy.hide()
-    }, BAT_TOTAL_MS + 1200))
+
+    switch (this.strPhase) {
+      case 'drop': {
+        const k = Math.min(1, this.strTicks / 45)
+        const ease = 1 - (1 - k) * (1 - k)
+        py = -(ROPE_LEN + 20) + (py + ROPE_LEN + 20) * ease
+        if (k >= 1) this.setStringPhase('stare')
+        break
+      }
+      case 'stare': {
+        // Locked on. If it's hanging too far away, stalk into range first.
+        if (this.strTicks > 50) {
+          const feetX = this.curX + b.width / 2
+          const kx = this.knotScreen().x
+          if (Math.abs(kx - feetX) > b.width * 0.7) {
+            this.setStringPhase('stalk')
+            const dir = kx >= feetX ? 1 : -1
+            this.startWander('stalk', kx - dir * b.width * 0.35 - b.width / 2)
+          } else {
+            this.beginStringCrouch()
+          }
+        }
+        break
+      }
+      case 'stalk':
+        if (this.wanderTarget === null || this.strTicks > 300) {
+          this.cancelWander()
+          this.beginStringCrouch()
+        }
+        break
+      case 'crouch':
+        // The renderer is doing the butt-wiggle; onLeap() takes it from here.
+        if (this.strTicks > 280) this.setStringPhase('settle') // never left the ground
+        break
+      case 'air':
+        // Apex: rising has just turned to falling — the swat moment.
+        if (!this.strSwatted && this.airMode === 'leap' && this.vy >= 0) this.resolveStringSwat()
+        if (this.strSwatted && this.airMode === 'none') this.setStringPhase('settle')
+        break
+      case 'hold': {
+        // The knot is in its paws: keep it pinned there while the cat comes
+        // down, hold a beat, then the prey squirms free.
+        const gx = this.curX + b.width / 2 - this.strOrigin.x
+        const gy = Math.min(this.curY + b.height * 0.42 - this.strOrigin.y, STRING_H - 10)
+        toy.grab(gx, gy)
+        if (this.airMode === 'none' && this.strTicks > 46) {
+          toy.release()
+          this.setStringPhase('settle')
+        }
+        break
+      }
+      case 'settle':
+        if (this.airMode === 'none' && this.strTicks > 35) {
+          this.strRounds++
+          if (this.strRounds >= STRING_MAX_ROUNDS || this.strCaught) {
+            this.setStringPhase('retract')
+          } else {
+            // Cats cycle back along the prey sequence after a miss.
+            this.setStringPhase('stare')
+            this.faceKnot()
+            this.setClip('idle', this.facing)
+          }
+        }
+        break
+      case 'retract': {
+        // The string leaves — up and away, fast, like something getting out.
+        const k = Math.min(1, this.strTicks / 30)
+        py = STRING_PIVOT_REST - (ROPE_LEN + STRING_PIVOT_REST + 60) * k * k
+        if (this.strTicks > 45) {
+          this.strPhase = null
+          toy.hide()
+          // Compose itself, as if none of that happened.
+          this.setClip('sit')
+          this.scheduleAmbient(2600)
+          return
+        }
+        break
+      }
+    }
+
+    this.strPivot = { x: px, y: py }
+    if ((t & 1) === 0) toy.pivot(px, py) // every other tick ≈ 30/s is plenty
   }
 
   // ---- knocking things off ledges --------------------------------------------
@@ -644,6 +841,16 @@ export class PetEngine {
     if (this.actionTimer) { clearTimeout(this.actionTimer); this.actionTimer = null }
     this.airMode = 'leap'
     this.fallStartY = 0
+    if (this.strPhase === 'crouch') {
+      // Aim is taken at the moment of launch — the cat watched the string all
+      // through the wiggle. Misses come from the string bolting mid-flight.
+      const imp = this.solveStringLeap()
+      this.vx = imp.vx
+      this.vy = imp.vy
+      this.setStringPhase('air')
+      if (Math.random() < STRING_DART_CHANCE) this.strDart = 20
+      return
+    }
     if (this.pendingJump) {
       // A climb: the impulse was solved for a specific ledge.
       this.vx = this.pendingJump.vx
@@ -830,7 +1037,7 @@ export class PetEngine {
   }
 
   private ambientTick(): void {
-    if (this.dragging || this.busy || this.airMode !== 'none' || this.clip === 'teeter' || this.clip === 'pounce') {
+    if (this.dragging || this.busy || this.airMode !== 'none' || this.clip === 'teeter' || this.clip === 'pounce' || this.strPhase !== null) {
       this.scheduleAmbient(2000)
       return
     }
@@ -871,7 +1078,7 @@ export class PetEngine {
       // sleepiness rather than energy. The two-paw version is the showier one.
       // A string turns up and the pet has a go at it — playful, so it leans on
       // mischief and curiosity, and a tired or unwell cat can't be bothered.
-      { item: 'bat', weight: this.allowed('bat') ? (0.05 + p.mischief * 0.24 + p.curiosity * 0.18 + bored * 0.4) * (1 - tired * 0.8) * (1 - sick) : 0 },
+      { item: 'bat', weight: this.stayPut || !this.allowed('bat') ? 0 : (0.05 + p.mischief * 0.24 + p.curiosity * 0.18 + bored * 0.4) * (1 - tired * 0.8) * (1 - sick) },
       { item: 'knead', weight: this.allowed('knead') ? (0.08 + p.affection * 0.30 + p.sleepiness * 0.16) * (1 - sick * 0.8) : 0 },
       { item: 'kneadboth', weight: this.allowed('kneadboth') ? (0.06 + p.affection * 0.26 + p.sleepiness * 0.14) * (1 - sick * 0.8) : 0 },
       // Deliberately tiny: at these weights an energetic cat has a fit every few
@@ -893,7 +1100,7 @@ export class PetEngine {
           this.playOneShot(action)
           break
         case 'bat':
-          this.startBat()
+          this.startStringPlay()
           break
         case 'sleep':
           this.setClip('sleep')
