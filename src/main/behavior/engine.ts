@@ -15,11 +15,18 @@ const PRANCE_SPEED = 0.47 // an excited prance covers ground a bit faster than t
 // A zoomies fit: several short sprints with hard turns, not one long walk. Rare
 // by design — it should feel like the cat briefly lost its mind, and a pet that
 // does it often is just annoying.
-const ZOOMIES_SPEED = 1.15 // px/tick (~72 px/s) — a genuine tear, ~3x a walk
+const ZOOMIES_SPEED = 4.2 // px/tick (~260 px/s nominal) — an actual flat-out tear
+const ZOOMIES_ACCEL_PX = 46 // explode out of each turn over this distance…
+const ZOOMIES_BRAKE_PX = 56 // …and skid into the next one over this. Constant
+// velocity read as gliding; the ramps are what make it look unhinged.
 const ZOOMIES_DASHES = [4, 7] as const // inclusive range of sprints per fit
-const ZOOMIES_LEG = [110, 320] as const // px per sprint
+const ZOOMIES_LEG = [140, 420] as const // px per sprint
 const WALK_CLIPS = new Set<ClipName>(['walk', 'prance', 'stalk', 'trot', 'hop', 'zoomies'])
-const GAIT_SPEED: Partial<Record<ClipName, number>> = { prance: PRANCE_SPEED, trot: PRANCE_SPEED, stalk: 0.22, hop: 0.42, zoomies: ZOOMIES_SPEED }
+// Trot is deliberately quicker than prance: the two share bounce machinery in
+// the sprite generator (trot ≈ a 70% prance), so pace is what tells them apart —
+// prance is a showy bounce on the spot-ish, trot is briskly going somewhere.
+const TROT_SPEED = 0.62
+const GAIT_SPEED: Partial<Record<ClipName, number>> = { prance: PRANCE_SPEED, trot: TROT_SPEED, stalk: 0.22, hop: 0.42, zoomies: ZOOMIES_SPEED }
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
 const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never reports it
@@ -471,7 +478,14 @@ export class PetEngine {
           return
         }
         const dx = this.wanderTarget - this.curX
-        const spd = GAIT_SPEED[this.clip] ?? WALK_SPEED
+        let spd = GAIT_SPEED[this.clip] ?? WALK_SPEED
+        if (this.clip === 'zoomies') {
+          // Launch hard, brake hard: speed ramps with distance out of the turn
+          // and back down approaching the target (walkDist resets each dash).
+          const accel = Math.min(1, (this.walkDist + 8) / ZOOMIES_ACCEL_PX)
+          const brake = Math.min(1, Math.abs(dx) / ZOOMIES_BRAKE_PX + 0.25)
+          spd *= Math.min(accel, brake)
+        }
         if (Math.abs(dx) <= spd) {
           this.curX = this.wanderTarget
           this.finishWander()
