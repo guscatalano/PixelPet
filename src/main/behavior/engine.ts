@@ -15,7 +15,8 @@ const PRANCE_SPEED = 0.47 // an excited prance covers ground a bit faster than t
 // A zoomies fit: several short sprints with hard turns, not one long walk. Rare
 // by design — it should feel like the cat briefly lost its mind, and a pet that
 // does it often is just annoying.
-const ZOOMIES_SPEED = 4.2 // px/tick (~260 px/s nominal) — an actual flat-out tear
+const ZOOMIES_SPEED = 3.4 // px/tick (~210 px/s nominal) — a flat-out tear that
+// the 4Hz bounding cycle can still sell; see strideFor()
 const ZOOMIES_ACCEL_PX = 46 // explode out of each turn over this distance…
 const ZOOMIES_BRAKE_PX = 56 // …and skid into the next one over this. Constant
 // velocity read as gliding; the ramps are what make it look unhinged.
@@ -29,6 +30,18 @@ const TROT_SPEED = 0.62
 const GAIT_SPEED: Partial<Record<ClipName, number>> = { prance: PRANCE_SPEED, trot: TROT_SPEED, stalk: 0.22, hop: 0.42, zoomies: ZOOMIES_SPEED }
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
+// Cats do not sprint by pedalling faster — stride LENGTH grows roughly linearly
+// with velocity, and stride frequency stays in a narrow band (a galloping cat
+// runs ~3-4 strides/sec, a walk ~1.5-2). With a fixed 12px stride, zoomies at
+// 262px/s worked out to 22 leg cycles a second: a blur, and the thing that made
+// it read as "walking unrealistically fast" rather than running.
+const MAX_GAIT_HZ = 4
+/** Stride length for a given speed: lengthen the stride rather than let the
+ *  cycle rate run away. A no-op for walk/prance/trot, which are already under
+ *  the cap at 12px — only the fast gaits stretch. */
+function strideFor(pxPerTick: number): number {
+  return Math.max(STRIDE, (pxPerTick * (1000 / MOVE_TICK_MS)) / MAX_GAIT_HZ)
+}
 const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never reports it
 const GRAVITY = 0.45 // px/tick² — vertical acceleration while airborne
 const MAX_FALL = 9 // terminal velocity, px/tick
@@ -557,7 +570,7 @@ export class PetEngine {
       this.lastY = ry
     }
     if (this.isWalking() && this.airMode === 'none' && this.visualReady) {
-      this.win.webContents.send('pet:walk-step', (this.walkDist / STRIDE) % 1)
+      this.win.webContents.send('pet:walk-step', (this.walkDist / strideFor(GAIT_SPEED[this.clip] ?? WALK_SPEED)) % 1)
     }
     // String play rides the physics tick: prey drift, phase changes, the swat.
     if (this.strPhase !== null) this.stringTick()
