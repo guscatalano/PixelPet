@@ -45,6 +45,11 @@ const GAIT_SPEED: Partial<Record<ClipName, number>> = { prance: PRANCE_SPEED, tr
 /** Gaits whose stride is a fixed physical distance rather than derived from
  *  speed — a bound covers a bound's worth of ground, whatever the pace. */
 const GAIT_STRIDE: Partial<Record<ClipName, number>> = { hop: HOP_STRIDE, trot: TROT_STRIDE }
+// Stalking is not a continuous slink: a hunting cat creeps a short way, FREEZES
+// stock-still to watch, then creeps again. The freeze is most of what makes it
+// read as hunting rather than as walking slowly.
+const STALK_CREEP = [24, 78] as const // px covered between freezes
+const STALK_FREEZE_MS = [520, 1700] as const // how long it holds, watching
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
 // Cats do not sprint by pedalling faster — stride LENGTH grows roughly linearly
@@ -141,6 +146,8 @@ export class PetEngine {
   private lastX = 0 // last integer position sent (avoid redundant setPosition calls)
   private lastY = 0
   private walkDist = 0 // px travelled this wander, drives the gait phase
+  private stalkHoldUntil = 0 // frozen mid-creep until this timestamp
+  private stalkNextPauseAt = 0 // walkDist at which the next freeze begins
   private vx = 0 // ballistic horizontal velocity (leaps)
   private vy = 0 // vertical velocity (gravity / leap impulse)
   private airMode: 'none' | 'fall' | 'leap' = 'none'
@@ -499,6 +506,9 @@ export class PetEngine {
     }
     this.wanderTarget = target
     this.walkDist = 0
+    // Creep a little before the first freeze, so a stalk starts by moving.
+    this.stalkHoldUntil = 0
+    this.stalkNextPauseAt = STALK_CREEP[0] + Math.random() * (STALK_CREEP[1] - STALK_CREEP[0])
     this.facing = target < this.curX ? 'left' : 'right'
     this.walkAskedAt = Date.now()
     this.setClip(clip, this.facing)
@@ -543,7 +553,24 @@ export class PetEngine {
           return
         }
         const dx = this.wanderTarget - this.curX
-        let spd = GAIT_SPEED[this.clip] ?? WALK_SPEED
+        // Mid-stalk freeze. Holding curX still also holds walkDist, so the gait
+        // phase stops and the cat freezes MID-STEP — paw up, weight committed —
+        // which is exactly the pose a stalking cat holds. Only the advance is
+        // skipped: gravity and the rest of the tick below must still run.
+        let frozen = false
+        if (this.clip === 'stalk') {
+          const nowMs = Date.now()
+          if (nowMs < this.stalkHoldUntil) {
+            frozen = true
+          } else if (this.walkDist >= this.stalkNextPauseAt) {
+            const [flo, fhi] = STALK_FREEZE_MS
+            this.stalkHoldUntil = nowMs + flo + Math.random() * (fhi - flo)
+            const [clo, chi] = STALK_CREEP
+            this.stalkNextPauseAt = this.walkDist + clo + Math.random() * (chi - clo)
+            frozen = true
+          }
+        }
+        let spd = frozen ? 0 : GAIT_SPEED[this.clip] ?? WALK_SPEED
         if (this.clip === 'zoomies') {
           // Launch hard, brake hard: speed ramps with distance out of the turn
           // and back down approaching the target (walkDist resets each dash).
@@ -841,7 +868,9 @@ export class PetEngine {
         break
       }
       case 'stalk':
-        if (this.wanderTarget === null || this.strTicks > 300) {
+        // 500 ticks ≈ 8s: a stalk approach now includes freezes, and the old
+        // 4.8s ceiling would cut it short and crouch early.
+        if (this.wanderTarget === null || this.strTicks > 500) {
           this.cancelWander()
           this.beginStringCrouch()
         }
