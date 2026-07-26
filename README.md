@@ -62,8 +62,9 @@ show/hide, and updates.
   through little photo bubbles of the pictures you love — pulled live from an album on your own
   self-hosted Immich server, and/or the photos you created the pet from. Double-click a bubble
   to open the photo full-size. **[Setup ↓](#dream-mode--immich)**
-- **Make it yours** — seven sizes (XXS to XXL), a Detail control (Chunky · Normal · Fine) that
-  re-renders the same pet at a different pixel resolution, turn speed, per-pet personality
+- **Make it yours** — ten sizes from 44 to 308 pixels wide, with quarter-steps at the small
+  end where each whole step would otherwise double the pet; a Detail control (½× to 4×) that
+  re-renders the same pet at a different pixel resolution; turn speed, per-pet personality
   sliders, per-animation toggles, and renaming.
 - **No web engine dependency** — built on Electron, which bundles its own Chromium, so it
   works even if Edge/WebView2 is removed.

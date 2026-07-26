@@ -61,7 +61,7 @@ export interface AppSettings {
   stayPut: boolean
   /** Facing-you view scale (0.65 small .. 1.0 = big, "coming at you"). */
   frontScale: number
-  /** Pixel detail / supersample factor (0.5 chunky · 1 default · 2 fine). */
+  /** Pixel detail / supersample factor (0.5 chunkiest · 1 default · 4 smoothest). */
   detail: number
   /** Pupils dilate/contract with the time of day (round at night, slits at midday). */
   pupilsByTime: boolean
@@ -132,6 +132,6 @@ export interface PetConfig {
   turnMs?: number
   frontScale?: number
   pupilsByTime?: boolean
-  /** Pixel detail / supersample factor (0.5 chunky · 1 default · 2 fine). */
+  /** Pixel detail / supersample factor (0.5 chunkiest · 1 default · 4 smoothest). */
   detail?: number
 }

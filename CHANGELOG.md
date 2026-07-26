@@ -3,6 +3,38 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.6.0 — find your cat
+
+### New
+- **“Find Cat” in the tray.** Lost track of your pet behind a pile of windows? Find Cat pings
+  a sonar around it — expanding rings and a soft glow — and gives it a little perk-up so you
+  can spot it. Unlike *Reset Position* it doesn't move your pet, it just shows you where it is.
+- **Seven levels of Detail** instead of three: **½× · ¾× · 1× · 1½× · 2× · 3× · 4×**. The top
+  end is much smoother than the old *Fine*, and there's a step either side of the default now.
+- **Ten sizes, with finer steps for small pets.** The old jump from the smallest size to the
+  next one doubled your pet; there are now quarter-steps down there — **44 · 55 · 66 · 77 · 88**
+  — before the bigger sizes carry on as before.
+
+### Changed
+- **Size and Detail are labelled by number now.** Sizes read as their pixel width (44 … 308)
+  instead of XXS … XXL, and Detail reads as a multiplier. With ten sizes and seven detail
+  levels, letters and adjectives had stopped telling you which way was bigger. Your current
+  size is unchanged — it's the same setting, relabelled.
+- **Settings has been reorganised** into **Pet · Look · Behavior · Care · Dreams**. Dream
+  settings all live on the Dreams tab now instead of being split across two, the Pet tab opens
+  straight onto your pets, and the creature builder and photo generator are folded behind a
+  **New pet** button so they stay out of the way until you want them.
+
+### Fixed
+- **Updating no longer looks like a crash.** Windows asks an app to close before it can replace
+  it, and PixelPet never answered — so every automatic update killed the app after a 30-second
+  wait and logged it as a hang. It now shuts down cleanly when Windows (or a sign-out, or a
+  restart) asks it to.
+- **Your pet no longer gets stuck behind your windows.** Windows silently drops a window's
+  always-on-top flag in a few situations — another app going fullscreen, the lock screen, a
+  UAC prompt — and there was no way to get the pet back. It now re-asserts itself.
+- Slider readouts (`80ms`, `100%`) no longer spill outside their panel in Settings.
+
 ## v0.5.0 — pick your pixels
 
 ### New

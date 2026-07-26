@@ -633,9 +633,14 @@ let FEET_X = 0
 let FEET_Y = 0
 
 function applyScale(): void {
-  scale = Math.max(1, Math.round(window.innerWidth / SPRITE_W))
-  petW = SPRITE_W * scale
-  petH = (SPRITE_H + SPRITE_TOP * 2) * scale
+  // Main sizes the window to a whole number of pixels from petWindowSize(), and
+  // 44 divides by 4, so the width recovers the scale exactly — including the
+  // quarter-steps at the small end. Don't round it back to an integer here.
+  scale = Math.max(0.25, window.innerWidth / SPRITE_W)
+  // Take the canvas straight from the window so it fills it exactly, rather than
+  // recomputing a size that can disagree by the height's rounded half pixel.
+  petW = window.innerWidth
+  petH = window.innerHeight
   canvas.style.width = `${petW}px`
   canvas.style.height = `${petH}px`
   canvas.width = Math.round(petW * dpr)

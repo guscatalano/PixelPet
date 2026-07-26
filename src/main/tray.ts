@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 export interface TrayCallbacks {
   onToggleVisible: () => void
+  onFindCat: () => void
   onResetPosition: () => void
   onOpenSettings: () => void
   onCheckUpdates: () => void
@@ -40,6 +41,9 @@ export function applyTrayMenu(tray: Tray, cb: TrayCallbacks, state: { updateRead
     { label: 'PixelPet', enabled: false },
     { type: 'separator' },
     { label: 'Show / Hide Pet', click: () => cb.onToggleVisible() },
+    // Sonar-ping where the pet is, without moving it. Reset Position is the
+    // heavier hammer right below, for when you'd rather it just came home.
+    { label: 'Find Cat', click: () => cb.onFindCat() },
     { label: 'Reset Position', click: () => cb.onResetPosition() },
     { label: 'Settings…', click: () => cb.onOpenSettings() },
     { type: 'separator' },

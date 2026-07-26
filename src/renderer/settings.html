@@ -63,6 +63,31 @@
       .sec { margin-top: 26px; }
       .sec:first-of-type { margin-top: 4px; }
 
+      /* Disclosure: making a pet is rare and the panels are tall, so they stay
+         folded away behind one button instead of owning the Pet tab. */
+      .disc {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: var(--panel); border: 1px solid var(--hair); border-radius: 10px;
+        color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 600;
+        padding: 10px 16px; cursor: pointer;
+      }
+      .disc:hover { border-color: var(--accent); }
+      .disc .chev { font-family: var(--mono); color: var(--faint); transition: transform 0.15s ease; }
+      .disc[aria-expanded='true'] .chev { transform: rotate(90deg); }
+      .discbody { display: none; }
+      .discbody.open { display: block; }
+      /* Sub-panels inside the disclosure read as sections without being .sec
+         (which the tab/search code owns). */
+      .subsec { margin-top: 22px; }
+
+      /* Two related rows (Size, Detail) share one card — they're one idea. */
+      .stack { display: flex; flex-direction: column; gap: 18px; }
+      .stack .sublabel {
+        font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+        text-transform: uppercase; color: var(--faint); margin-bottom: 8px;
+      }
+      .stack .sublabel .note { text-transform: none; letter-spacing: 0; }
+
       /* Pet grid — scrolls within itself so the controls below stay in view */
       .grid {
         display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
@@ -100,6 +125,9 @@
       .trow { display: grid; grid-template-columns: 92px 1fr 34px; align-items: center; gap: 12px; padding: 5px 0; }
       .trow .tn { font-size: 13px; color: var(--dim); text-transform: capitalize; }
       .trow .tv { font-family: var(--mono); font-size: 12px; color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; }
+      /* Personality readouts are two digits and fit the 34px track; rows showing a
+         unit ("80ms", "100%") need a roomier one or the value escapes the card. */
+      .trow.wide { grid-template-columns: 92px 1fr 56px; }
       input[type='range'] { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 3px; background: var(--hair); outline: none; }
       input[type='range']::-webkit-slider-thumb {
         -webkit-appearance: none; appearance: none; width: 15px; height: 15px; border-radius: 50%;
@@ -261,7 +289,8 @@
       <div class="navbar">
         <div class="tabs" id="tabs">
           <button data-tab="pet" class="on">Pet</button>
-          <button data-tab="anim">Animations</button>
+          <button data-tab="look">Look</button>
+          <button data-tab="behavior">Behavior</button>
           <button data-tab="care">Care</button>
           <button data-tab="dreams">Dreams</button>
         </div>
@@ -277,11 +306,17 @@
           <button data-f="user">Yours</button>
         </div>
         <div class="grid" id="grid"></div>
-        <div class="gridempty" id="gridempty" style="display: none">No generated cats yet — make one below.</div>
+        <div class="gridempty" id="gridempty" style="display: none">No pets of your own yet — use “New pet” below to make one.</div>
         <div class="petid" id="petid"></div>
       </section>
 
       <section class="sec" data-tab="pet">
+        <div class="label">Add a pet</div>
+        <button class="disc" id="createtoggle" aria-expanded="false" aria-controls="createbody">
+          <span class="chev">&#9656;</span> New pet &mdash; build one, or make it from a photo
+        </button>
+        <div class="discbody" id="createbody">
+        <div class="subsec">
         <div class="label">Build a creature</div>
         <div class="builder">
           <div class="bpreviewcol">
@@ -319,9 +354,9 @@
             <div class="status" id="bstatus"></div>
           </div>
         </div>
-      </section>
+        </div>
 
-      <section class="sec" data-tab="pet">
+        <div class="subsec">
         <div class="label">Create from a photo</div>
         <div class="ai">
           <div class="field">
@@ -365,62 +400,71 @@
             that provider.
           </div>
         </div>
+        </div>
+
+        </div>
       </section>
 
-      <section class="sec" data-tab="anim">
-        <div class="label">Animations &middot; <span id="poseWho">Ash</span> &middot; <span style="text-transform: none; letter-spacing: 0">click a tile to play it on your cat &middot; corner dot turns it on/off</span></div>
-        <div class="poses" id="poses"></div>
-      </section>
-
-      <section class="sec" data-tab="pet">
-        <div class="label">Size</div>
-        <div class="seg" id="sizes"></div>
-      </section>
-
-      <section class="sec" data-tab="pet">
-        <div class="label">Detail</div>
-        <div class="seg" id="detail"></div>
-      </section>
-
-      <section class="sec" data-tab="anim">
-        <div class="label">Animation &amp; behavior</div>
-        <div class="traits">
-          <div class="trow">
-            <div class="tn">Turn speed</div>
-            <input type="range" id="turnms" min="50" max="600" step="10" />
-            <div class="tv" id="turnmsv" style="width: 74px">80ms</div>
+      <section class="sec" data-tab="look">
+        <div class="label">Appearance</div>
+        <div class="traits stack">
+          <div>
+            <div class="sublabel">Size <span class="note">&middot; how many pixels wide your pet is on screen</span></div>
+            <div class="seg" id="sizes"></div>
           </div>
-          <div class="trow">
+          <div>
+            <div class="sublabel">Detail <span class="note">&middot; pixels per sprite unit &mdash; ½&times; is chunky, 4&times; is smooth</span></div>
+            <div class="seg" id="detail"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec" data-tab="look">
+        <div class="label">Drawing</div>
+        <div class="traits">
+          <div class="trow wide">
             <div class="tn">Facing-you size</div>
             <input type="range" id="frontscale" min="65" max="100" step="5" />
-            <div class="tv" id="frontscalev" style="width: 74px">80%</div>
-          </div>
-          <div class="trow" style="margin-top: 6px">
-            <div class="tn">Stay here</div>
-            <button class="toggle" id="stayput" aria-pressed="false">Off — free to roam</button>
-            <div class="tv"></div>
+            <div class="tv" id="frontscalev">80%</div>
           </div>
           <div class="trow" style="margin-top: 6px">
             <div class="tn">Eyes by time</div>
             <button class="toggle" id="pupils" aria-pressed="false">Off — fixed pupils</button>
             <div class="tv"></div>
           </div>
+        </div>
+      </section>
+
+      <section class="sec" data-tab="behavior">
+        <div class="label">Personality</div>
+        <div class="traits">
+          <div class="traits-head">
+            <div class="who">Tuning <b id="who">Ash</b><span class="mod" id="mod"></span></div>
+            <button class="link" id="reset">Reset to defaults</button>
+          </div>
+          <div id="rows"></div>
+        </div>
+      </section>
+
+      <section class="sec" data-tab="behavior">
+        <div class="label">Movement</div>
+        <div class="traits">
+          <div class="trow wide">
+            <div class="tn">Turn speed</div>
+            <input type="range" id="turnms" min="50" max="600" step="10" />
+            <div class="tv" id="turnmsv">80ms</div>
+          </div>
           <div class="trow" style="margin-top: 6px">
-            <div class="tn">Dream bubbles</div>
-            <button class="toggle" id="dream" aria-pressed="false">Off — no dreams</button>
+            <div class="tn">Stay here</div>
+            <button class="toggle" id="stayput" aria-pressed="false">Off — free to roam</button>
             <div class="tv"></div>
           </div>
-          <div class="trow">
-            <div class="tn">Dream chance</div>
-            <input type="range" id="dreamchance" min="0" max="100" step="5" />
-            <div class="tv" id="dreamchancev" style="width: 74px">55%</div>
-          </div>
-          <div class="trow">
-            <div class="tn">Bubble size</div>
-            <input type="range" id="dreambubblescale" min="60" max="200" step="5" />
-            <div class="tv" id="dreambubblescalev" style="width: 74px">100%</div>
-          </div>
         </div>
+      </section>
+
+      <section class="sec" data-tab="behavior">
+        <div class="label">Animations &middot; <span id="poseWho">Ash</span> &middot; <span style="text-transform: none; letter-spacing: 0">click a tile to play it on your cat &middot; corner dot turns it on/off</span></div>
+        <div class="poses" id="poses"></div>
       </section>
 
       <section class="sec" data-tab="care">
@@ -450,6 +494,27 @@
       </section>
 
       <section class="sec" data-tab="dreams">
+        <div class="label">Dream bubbles</div>
+        <div class="traits">
+          <div class="trow">
+            <div class="tn">Dream bubbles</div>
+            <button class="toggle" id="dream" aria-pressed="false">Off — no dreams</button>
+            <div class="tv"></div>
+          </div>
+          <div class="trow wide">
+            <div class="tn">Dream chance</div>
+            <input type="range" id="dreamchance" min="0" max="100" step="5" />
+            <div class="tv" id="dreamchancev">55%</div>
+          </div>
+          <div class="trow wide">
+            <div class="tn">Bubble size</div>
+            <input type="range" id="dreambubblescale" min="60" max="200" step="5" />
+            <div class="tv" id="dreambubblescalev">100%</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec" data-tab="dreams">
         <div class="label">Dream photos &middot; Immich album</div>
         <div class="ai">
           <div class="field">
@@ -471,20 +536,10 @@
           <div class="keystate" id="imkeystate"></div>
           <div class="status" id="imstatus"></div>
           <div class="hint">
-            Turn on “Dream bubbles” (under Animation &amp; behavior) — a sleeping cat then dreams of its own source
-            photos plus random photos pulled from this Immich album. The key is stored encrypted on this PC.
+            With “Dream bubbles” on (above), a sleeping cat dreams of its own source photos plus photos pulled
+            from this Immich album. Paste the whole album URL if you like — the id is picked out of it. The key
+            is stored encrypted on this PC.
           </div>
-        </div>
-      </section>
-
-      <section class="sec" data-tab="pet">
-        <div class="label">Personality</div>
-        <div class="traits">
-          <div class="traits-head">
-            <div class="who">Tuning <b id="who">Ash</b><span class="mod" id="mod"></span></div>
-            <button class="link" id="reset">Reset to defaults</button>
-          </div>
-          <div id="rows"></div>
         </div>
       </section>
 

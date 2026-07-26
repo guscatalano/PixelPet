@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AppSettings, Personality, AiConfig, AiProviderId } from '../shared/types'
 import { TRAIT_KEYS, TOGGLEABLE_ANIMS } from '../shared/types'
-import { DEFAULT_SCALE, MIN_SCALE, MAX_SCALE } from '../shared/constants'
+import { DEFAULT_SCALE, snapScale } from '../shared/constants'
 import { DEFAULT_FRONT_SCALE } from '../shared/catgen'
 import { DEFAULT_PET, PETS, type AppPet } from '../shared/pets'
 import { MARKING_NAMES, naturalWhisker } from '../shared/petdna'
@@ -25,8 +25,12 @@ export const MAX_TURN_MS = 600 // all the way to a really slow, deliberate turn
 export const MIN_FRONT_SCALE = 0.65
 export const MAX_FRONT_SCALE = 1.0
 
-/** Pixel detail / supersample factor: how many raster pixels per 44-unit sprite. */
-export const DETAIL_LEVELS = [0.5, 1, 2] as const
+/**
+ * Pixel detail / supersample factor: how many raster pixels per 44-unit sprite.
+ * 0.5 (22x22) is the coarsest that still reads as a cat — below that the
+ * silhouette collapses, so don't extend the low end without looking at it.
+ */
+export const DETAIL_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3, 4] as const
 export const DEFAULT_DETAIL = 1
 
 export const AI_PROVIDERS: AiProviderId[] = ['openai', 'anthropic']
@@ -98,7 +102,7 @@ function sanitize(raw: unknown): AppSettings {
   const known = (id: string): boolean => PETS.some((p) => p.id === id) || s.userPets.some((p) => p.id === id)
   if (typeof r.activePetId === 'string' && known(r.activePetId)) s.activePetId = r.activePetId
   if (typeof r.scale === 'number' && Number.isFinite(r.scale)) {
-    s.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.round(r.scale)))
+    s.scale = snapScale(r.scale)
   }
   if (typeof r.turnMs === 'number' && Number.isFinite(r.turnMs)) {
     s.turnMs = Math.max(MIN_TURN_MS, Math.min(MAX_TURN_MS, Math.round(r.turnMs)))

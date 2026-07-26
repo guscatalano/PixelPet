@@ -34,7 +34,8 @@ export default defineConfig({
           pet: resolve(__dirname, 'src/renderer/pet.html'),
           settings: resolve(__dirname, 'src/renderer/settings.html'),
           item: resolve(__dirname, 'src/renderer/item.html'),
-          dream: resolve(__dirname, 'src/renderer/dream.html')
+          dream: resolve(__dirname, 'src/renderer/dream.html'),
+          sonar: resolve(__dirname, 'src/renderer/sonar.html')
         }
       }
     }

@@ -8,14 +8,16 @@
 
 // Logical sprite is 44×44 units. The raster grid (W×H) can be supersampled by a
 // "detail" factor SS so the same geometry is drawn into more (or fewer) pixels:
-// SS=1 is the classic chunky look (default), 2 = finer/higher-res, 0.5 = chunkier.
+// SS=1 is the classic chunky look (default), up to 4 = smooth/high-res, down to
+// 0.5 = chunkier. Below 0.5 the 44-unit features collide and the cat stops
+// reading as a cat, which is why the UI ladder stops there.
 // All geometry is authored in the 44-unit space; only the rasterizer scales.
 export const BASE_W = 44
 export const BASE_H = 44
 export let W = 44
 export let H = 44
 let SS = 1
-/** Set the supersample/detail factor (0.5 chunky · 1 default · 2 fine). */
+/** Set the supersample/detail factor (0.5 chunkiest · 1 default · 4 smoothest). */
 export function setDetail(mult: number): void {
   SS = mult > 0 ? mult : 1
   W = Math.max(1, Math.round(BASE_W * SS))

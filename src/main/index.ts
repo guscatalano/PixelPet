@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { loadCreature } from '../shared/creature'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Personality, TriggerEvent } from '../shared/types'
-import { MIN_SCALE, MAX_SCALE, petWindowSize } from '../shared/constants'
+import { snapScale, petWindowSize } from '../shared/constants'
 import { createTray, applyTrayMenu, assetPath, type TrayCallbacks } from './tray'
 import { initAutoUpdate, onUpdateStateChange, isUpdateReady, pendingVersion, checkForUpdatesManual, restartToUpdate } from './updater'
 import { PetEngine } from './behavior/engine'
@@ -169,12 +169,90 @@ function defaultPetPosition(): [number, number] {
   return [workArea.x + workArea.width - width - 48, workArea.y + workArea.height - height - 48]
 }
 
+// ---- "Find Cat": ping a sonar so you can spot where your pet went -----------
+
+/** How long the sonar overlay lives — must outlast the CSS animation. */
+const SONAR_MS = 2900
+
+let sonarWindow: BrowserWindow | null = null
+let sonarTimer: ReturnType<typeof setTimeout> | null = null
+
+/** A few expanding rings centered on the pet, then it tears itself down. */
+function pingSonar(): void {
+  if (!petWindow || petWindow.isDestroyed()) return
+  // Restart cleanly if the menu item gets clicked repeatedly.
+  if (sonarTimer) { clearTimeout(sonarTimer); sonarTimer = null }
+  if (sonarWindow && !sonarWindow.isDestroyed()) sonarWindow.destroy()
+
+  const b = petWindow.getBounds()
+  // Big enough for the rings to expand well clear of the pet at any size.
+  const size = Math.max(320, Math.round(Math.max(b.width, b.height) * 3.4))
+  const win = new BrowserWindow({
+    width: size, height: size,
+    x: Math.round(b.x + b.width / 2 - size / 2),
+    y: Math.round(b.y + b.height / 2 - size / 2),
+    transparent: true, frame: false, resizable: false, show: false,
+    skipTaskbar: true, hasShadow: false, focusable: false, alwaysOnTop: true,
+    maximizable: false, fullscreenable: false,
+    webPreferences: { sandbox: true }
+  })
+  win.setAlwaysOnTop(true, 'screen-saver')
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  win.setIgnoreMouseEvents(true) // purely decorative — never eat a click
+  win.once('ready-to-show', () => { if (!win.isDestroyed()) win.showInactive() })
+  win.on('closed', () => { if (sonarWindow === win) sonarWindow = null })
+
+  if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/sonar.html`)
+  else win.loadFile(join(__dirname, '../renderer/sonar.html'))
+  sonarWindow = win
+
+  sonarTimer = setTimeout(() => {
+    sonarTimer = null
+    if (!win.isDestroyed()) win.destroy()
+  }, SONAR_MS)
+}
+
+/**
+ * Tray "Find Cat" — the escape hatch for "where did it go?". Unlike Reset
+ * Position it doesn't move the pet: it just makes sure the pet is showing, fully
+ * on-screen and back on top, then pings the sonar so your eye can find it.
+ */
+function findCat(): void {
+  if (!petWindow || petWindow.isDestroyed()) {
+    petWindow = createPetWindow() // gone entirely — a fresh one lands somewhere obvious
+    return
+  }
+  if (!petWindow.isVisible()) petWindow.show()
+  clampPetOnScreen()
+  ensureOnTop()
+  engine?.forcePlay('react') // a little perk-up, so it's obvious which pixels are the cat
+  pingSonar()
+}
+
 /** Send the pet back to a known-good on-screen spot (tray "Reset Position"). */
 function resetPetPosition(): void {
   if (!petWindow) return
   const [x, y] = defaultPetPosition()
   petWindow.setPosition(x, y)
   if (!petWindow.isVisible()) petWindow.show()
+}
+
+// ---- staying on top ---------------------------------------------------------
+// Windows quietly strips WS_EX_TOPMOST from our overlays in situations we get no
+// event for: another app going exclusive-fullscreen, explorer.exe restarting, the
+// secure desktop (UAC prompt, lock screen) coming and going. The pet then ends up
+// stuck *behind* every window with no way for the user to get it back. Re-assert
+// the flag on a slow timer, and immediately after the events most likely to have
+// clobbered it. Cheap: a no-op SetWindowPos when we're already on top.
+
+const TOPMOST_TICK_MS = 4000
+let topmostTimer: ReturnType<typeof setInterval> | null = null
+
+/** Re-assert always-on-top for every overlay that's currently showing. */
+function ensureOnTop(): void {
+  for (const w of [petWindow, itemWindow, dreamWindow]) {
+    if (w && !w.isDestroyed() && w.isVisible()) w.setAlwaysOnTop(true, 'screen-saver')
+  }
 }
 
 /** Nudge the pet fully back on-screen (e.g. after a monitor is unplugged). */
@@ -592,7 +670,7 @@ function registerIpc(): void {
     applyActivePet()
   })
   ipcMain.on('settings:set-scale', (_e, scale: number) => {
-    settings.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.round(scale)))
+    settings.scale = snapScale(scale)
     saveSettings(settings)
     applyScale()
   })
@@ -823,6 +901,7 @@ if (!gotLock) {
         if (petWindow.isVisible()) petWindow.hide()
         else petWindow.show()
       },
+      onFindCat: () => findCat(),
       onResetPosition: () => resetPetPosition(),
       onOpenSettings: () => openSettings(),
       onCheckUpdates: () => { void checkForUpdatesManual() },
@@ -846,9 +925,15 @@ if (!gotLock) {
     // macOS/Linux counterpart to the pet window's win32 'session-end'.
     powerMonitor.on('shutdown', () => quitForOs('system shutdown'))
 
+    // Keep the pet on top (see the note by ensureOnTop): a slow heartbeat, plus
+    // the moments Windows is most likely to have dropped the topmost flag.
+    topmostTimer = setInterval(ensureOnTop, TOPMOST_TICK_MS)
+    powerMonitor.on('resume', ensureOnTop)
+    powerMonitor.on('unlock-screen', ensureOnTop)
+
     // Keep the pet reachable when the monitor layout changes.
-    screen.on('display-removed', clampPetOnScreen)
-    screen.on('display-metrics-changed', clampPetOnScreen)
+    screen.on('display-removed', () => { clampPetOnScreen(); ensureOnTop() })
+    screen.on('display-metrics-changed', () => { clampPetOnScreen(); ensureOnTop() })
   })
 
   app.on('window-all-closed', () => {
@@ -865,6 +950,9 @@ if (!gotLock) {
     stopDrag()
     stopItemDrag()
     itemWindow?.destroy()
+    if (topmostTimer) clearInterval(topmostTimer)
+    if (sonarTimer) clearTimeout(sonarTimer)
+    sonarWindow?.destroy()
     if (dreamTimer) clearInterval(dreamTimer)
     dreamWindow?.destroy()
     engine?.dispose()

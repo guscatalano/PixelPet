@@ -5,7 +5,7 @@ import { PETS, type AppPet } from '../../shared/pets'
 import { randomPetDNA, BUILD_NAMES, MARKING_NAMES, EYE_STYLES, type PetDNA } from '../../shared/petdna'
 import { loadCreature, EAR_STYLES, TAIL_STYLES, GAITS, type CreatureDef } from '../../shared/creature'
 import { ashPhoto } from '../ashPhoto'
-import { MIN_SCALE, MAX_SCALE, SPRITE_W, SPRITE_H } from '../../shared/constants'
+import { SIZE_LEVELS, SPRITE_W, SPRITE_H } from '../../shared/constants'
 import { TRAIT_KEYS, TOGGLEABLE_ANIMS, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Personality } from '../../shared/types'
 import { NEED_KEYS, type CareStatus, type CareAction, type Difficulty, type Needs } from '../../shared/care'
 
@@ -55,7 +55,6 @@ declare global {
   interface Window { settings: SettingsApi }
 }
 
-const SIZE_LABELS: Record<number, string> = { 1: 'XXS', 2: 'XS', 3: 'S', 4: 'M', 5: 'L', 6: 'XL', 7: 'XXL' }
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T
 const grid = $('grid'), sizes = $('sizes'), detail = $('detail'), rows = $('rows'), who = $('who'), resetBtn = $<HTMLButtonElement>('reset')
@@ -402,6 +401,9 @@ function buildNav(): void {
   }
   const runSearch = (): void => {
     const q = search.value.trim().toLowerCase()
+    // Searching looks inside collapsed panels too, so open them while a query is
+    // active — otherwise a section "matches" and still shows the user nothing.
+    setDisclosures(q ? true : undefined)
     if (!q) { tabsBar.style.display = ''; showTab(); return }
     tabsBar.style.display = 'none'
     let any = false
@@ -415,6 +417,32 @@ function buildNav(): void {
   search.addEventListener('input', runSearch)
   search.addEventListener('search', runSearch)
   showTab()
+}
+
+// ---- Collapsible panels (currently just "Add a pet") ------------------------
+// Creating a pet is rare and the two panels are tall, so they start folded and
+// the Pet tab opens on the roster instead of on an API-key form.
+const DISCLOSURES: Array<[toggle: string, body: string]> = [['createtoggle', 'createbody']]
+/** open=true/false forces a state; open=undefined restores what the user chose. */
+function setDisclosures(open?: boolean): void {
+  for (const [tid, bid] of DISCLOSURES) {
+    const t = $(tid), b = $(bid)
+    const want = open ?? t.dataset.userOpen === '1'
+    b.classList.toggle('open', want)
+    t.setAttribute('aria-expanded', String(want))
+  }
+}
+function buildDisclosures(): void {
+  for (const [tid, bid] of DISCLOSURES) {
+    const t = $(tid)
+    t.dataset.userOpen = '0'
+    t.addEventListener('click', () => {
+      const next = t.dataset.userOpen !== '1'
+      t.dataset.userOpen = next ? '1' : '0'
+      $(bid).classList.toggle('open', next)
+      t.setAttribute('aria-expanded', String(next))
+    })
+  }
 }
 
 type GridFilter = 'all' | 'builtin' | 'user'
@@ -478,9 +506,12 @@ function buildGrid(): void {
 
 function buildSizes(): void {
   sizes.innerHTML = ''
-  for (let s = MIN_SCALE; s <= MAX_SCALE; s++) {
+  for (const s of SIZE_LEVELS) {
     const b = document.createElement('button')
-    b.textContent = SIZE_LABELS[s] ?? String(s)
+    // Labelled by on-screen pixel width. The old XXS…XXL letters ran out of names
+    // once the small end got quarter-steps, and the pixel count is the thing the
+    // setting actually controls.
+    b.textContent = String(Math.round(SPRITE_W * s))
     b.className = s === state.scale ? 'on' : ''
     b.addEventListener('click', () => {
       state.scale = s
@@ -492,8 +523,12 @@ function buildSizes(): void {
 }
 
 // Pixel detail / supersample factor: how many raster pixels per 44-unit sprite.
+// Labelled by multiplier rather than by adjective — with seven steps, names like
+// "fine / finer / sharp" stop telling you which way is which, and the number is
+// literally what the setting does. Keep in sync with DETAIL_LEVELS in settings.ts.
 const DETAIL_OPTIONS: Array<{ v: number; label: string }> = [
-  { v: 0.5, label: 'Chunky' }, { v: 1, label: 'Normal' }, { v: 2, label: 'Fine' }
+  { v: 0.5, label: '½×' }, { v: 0.75, label: '¾×' }, { v: 1, label: '1×' },
+  { v: 1.5, label: '1½×' }, { v: 2, label: '2×' }, { v: 3, label: '3×' }, { v: 4, label: '4×' }
 ]
 function buildDetail(): void {
   detail.innerHTML = ''
@@ -988,6 +1023,7 @@ async function init(): Promise<void> {
   state = await window.settings.get()
   drawAppIcon()
   void buildAbout()
+  buildDisclosures() // before buildNav, so search can read/restore their state
   buildNav()
   buildGridFilter()
   buildGrid()
