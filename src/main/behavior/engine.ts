@@ -27,7 +27,20 @@ const WALK_CLIPS = new Set<ClipName>(['walk', 'prance', 'stalk', 'trot', 'hop', 
 // the sprite generator (trot ≈ a 70% prance), so pace is what tells them apart —
 // prance is a showy bounce on the spot-ish, trot is briskly going somewhere.
 const TROT_SPEED = 0.62
-const GAIT_SPEED: Partial<Record<ClipName, number>> = { prance: PRANCE_SPEED, trot: TROT_SPEED, stalk: 0.22, hop: 0.42, zoomies: ZOOMIES_SPEED }
+// A bound is a discrete event, not a way of getting about: a cat clears a gap in
+// one or two and then walks. It used to be a full travel gait at a 12px stride,
+// so a 300px wander came out as ~25 consecutive bunny-hops. Each bound now
+// covers real ground and a hop trip is only one or two of them.
+//   NB this constrains the hop CLIP (an override any pet can play). A creature
+//   whose DNA gait is 'hop' still bounds continuously, because that renders
+//   through the plain walk clip with the pet's own geometry — rabbits unaffected.
+const HOP_STRIDE = 52 // px covered by a single bound
+const HOP_SPEED = 1.5 // px/tick (~94px/s) → ~1.8 bounds/sec at that stride
+const HOP_BOUNDS = [1, 2] as const // inclusive range of bounds per hop trip
+const GAIT_SPEED: Partial<Record<ClipName, number>> = { prance: PRANCE_SPEED, trot: TROT_SPEED, stalk: 0.22, hop: HOP_SPEED, zoomies: ZOOMIES_SPEED }
+/** Gaits whose stride is a fixed physical distance rather than derived from
+ *  speed — a bound covers a bound's worth of ground, whatever the pace. */
+const GAIT_STRIDE: Partial<Record<ClipName, number>> = { hop: HOP_STRIDE }
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
 // Cats do not sprint by pedalling faster — stride LENGTH grows roughly linearly
@@ -422,12 +435,35 @@ export class PetEngine {
       this.finishWander()
       return
     }
+    // Pick HOW to travel before how far: a bound is a discrete effort, so the
+    // gait decides what distance is even plausible.
+    let clip: ClipName = 'walk'
+    if (force && WALK_CLIPS.has(force)) clip = force
+    else {
+      const p = this.personality, r = Math.random()
+      if (r < 0.1 + p.energy * 0.25 + p.mischief * 0.2) clip = 'prance'
+      else if (r < 0.16) clip = 'trot'
+      else if (r < 0.2 + p.mischief * 0.08) clip = 'stalk'
+      else if (r < 0.24) clip = 'hop'
+    }
+
     let target: number
     if (toX !== undefined && Number.isFinite(toX)) {
       // A directed walk (the stalk under the string, the debug climb goal).
       // NaN would flow through max/min/round into wanderTarget and from there
       // into curX — checked here because this is the chokepoint.
       target = Math.round(Math.max(minX, Math.min(maxX, toX)))
+      if (clip === 'hop') clip = 'walk' // a fixed destination is a walk, not bounds
+    } else if (clip === 'hop') {
+      // One or two bounds, and no MIN_WANDER floor — that floor is what would
+      // otherwise stretch a hop back into a cross-the-room affair.
+      const [lo, hi] = HOP_BOUNDS
+      const bounds = lo + Math.floor(Math.random() * (hi - lo + 1))
+      const dist = HOP_STRIDE * (bounds + 0.35)
+      let dir = Math.random() < 0.5 ? -1 : 1
+      if (this.curX + dir * dist < minX || this.curX + dir * dist > maxX) dir = -dir
+      target = Math.round(Math.max(minX, Math.min(maxX, this.curX + dir * dist)))
+      if (Math.abs(target - this.curX) < HOP_STRIDE * 0.6) clip = 'walk' // boxed in
     } else {
       target = Math.round(minX + Math.random() * (maxX - minX))
       if (Math.abs(target - this.curX) < MIN_WANDER) {
@@ -439,16 +475,6 @@ export class PetEngine {
     this.walkDist = 0
     this.facing = target < this.curX ? 'left' : 'right'
     this.walkAskedAt = Date.now()
-    // Pick how to travel: usually a plain walk, but sometimes a livelier gait.
-    let clip: ClipName = 'walk'
-    if (force && WALK_CLIPS.has(force)) clip = force
-    else {
-      const p = this.personality, r = Math.random()
-      if (r < 0.1 + p.energy * 0.25 + p.mischief * 0.2) clip = 'prance'
-      else if (r < 0.16) clip = 'trot'
-      else if (r < 0.2 + p.mischief * 0.08) clip = 'stalk'
-      else if (r < 0.24) clip = 'hop'
-    }
     this.setClip(clip, this.facing)
   }
 
@@ -570,7 +596,8 @@ export class PetEngine {
       this.lastY = ry
     }
     if (this.isWalking() && this.airMode === 'none' && this.visualReady) {
-      this.win.webContents.send('pet:walk-step', (this.walkDist / strideFor(GAIT_SPEED[this.clip] ?? WALK_SPEED)) % 1)
+      const stride = GAIT_STRIDE[this.clip] ?? strideFor(GAIT_SPEED[this.clip] ?? WALK_SPEED)
+      this.win.webContents.send('pet:walk-step', (this.walkDist / stride) % 1)
     }
     // String play rides the physics tick: prey drift, phase changes, the swat.
     if (this.strPhase !== null) this.stringTick()
