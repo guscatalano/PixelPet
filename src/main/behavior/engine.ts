@@ -1,4 +1,6 @@
-import { BrowserWindow, screen } from 'electron'
+import { app, BrowserWindow, screen } from 'electron'
+import { appendFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { ClipName, Facing, Personality, PlayCommand, TriggerEvent } from '../../shared/types'
 import type { Needs, Difficulty, CareAction, CareStatus } from '../../shared/care'
 import { SPRITE_H, BOB_AMPLITUDE } from '../../shared/constants'
@@ -401,8 +403,10 @@ export class PetEngine {
       return
     }
     let target: number
-    if (toX !== undefined) {
-      // A directed walk (currently only the debug climb goal) — go where asked.
+    if (toX !== undefined && Number.isFinite(toX)) {
+      // A directed walk (the stalk under the string, the debug climb goal).
+      // NaN would flow through max/min/round into wanderTarget and from there
+      // into curX — checked here because this is the chokepoint.
       target = Math.round(Math.max(minX, Math.min(maxX, toX)))
     } else {
       target = Math.round(minX + Math.random() * (maxX - minX))
@@ -507,6 +511,32 @@ export class PetEngine {
     }
 
     const rx = Math.round(this.curX), ry = Math.round(this.curY)
+    if (!Number.isFinite(rx) || !Number.isFinite(ry)) {
+      // A NaN/Infinity that reaches setPosition throws a native conversion error
+      // from inside the interval and takes the whole app down (seen in the
+      // field). Log enough state to identify the culprit, snap back to the last
+      // position that successfully reached the window, and reset all motion.
+      const dump =
+        `[engine] non-finite position cur=(${this.curX},${this.curY}) v=(${this.vx},${this.vy})` +
+        ` clip=${this.clip} air=${this.airMode} wander=${this.wanderTarget} str=${this.strPhase}` +
+        ` strPivot=(${this.strPivot.x},${this.strPivot.y}) strOrigin=(${this.strOrigin.x},${this.strOrigin.y})` +
+        ` jump=${JSON.stringify(this.pendingJump)} zoomies=${this.zoomiesLeft}`
+      console.error(dump)
+      // Also to disk: a detached app's stderr goes nowhere, and this dump is the
+      // one chance to name the culprit when it happens in the wild.
+      try { appendFileSync(join(app.getPath('userData'), 'engine.log'), `${new Date().toISOString()} ${dump}\n`) } catch { /* diagnostics must not throw */ }
+      this.curX = this.lastX
+      this.curY = this.lastY
+      this.vx = 0
+      this.vy = 0
+      this.airMode = 'none'
+      this.pendingJump = null
+      this.abortStringPlay()
+      this.cancelWander()
+      this.setClip('idle')
+      this.scheduleAmbient(2000)
+      return
+    }
     if (rx !== this.lastX || ry !== this.lastY) {
       this.win.setPosition(rx, ry)
       this.lastX = rx
@@ -653,11 +683,14 @@ export class PetEngine {
     const feetY = this.curY + this.feetOffset(b.height)
     const k = this.knotScreen()
     const reach = b.height * 0.5 // forepaws at full stretch, above the feet
-    const rise = Math.max(24, feetY - (k.y + reach))
+    // NB Math.max(24, NaN) is NaN — the clamp alone is not a guard.
+    const rise0 = feetY - (k.y + reach)
+    const rise = Number.isFinite(rise0) ? Math.max(24, rise0) : 24
     const vy = -Math.sqrt(2 * GRAVITY * rise)
     const tApex = -vy / GRAVITY
     // Cap rather than decline: an undershot jump is a miss, and misses are cat.
-    const vx = Math.max(-MAX_JUMP_VX, Math.min(MAX_JUMP_VX, (k.x - feetX) / tApex))
+    const vx0 = (k.x - feetX) / tApex
+    const vx = Number.isFinite(vx0) ? Math.max(-MAX_JUMP_VX, Math.min(MAX_JUMP_VX, vx0)) : 0
     return { vx, vy }
   }
 
