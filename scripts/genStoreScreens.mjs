@@ -42,15 +42,29 @@ const iconUrl = () => {
   // small branded plate for the faux taskbar
   return front('ash')
 }
-// The dream bubble's photo: a real image if DREAM_PHOTO=<path> is set, else a
-// warm illustrated placeholder (we can't ship a stranger's photo by default).
+/** Pull the embedded photo data URL out of ashPhoto.ts (a .mjs can't import TS). */
+function ashPhotoUrl() {
+  try {
+    const src = readFileSync(resolve(root, 'src/renderer/ashPhoto.ts'), 'utf8')
+    const m = src.match(/'(data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+)'/)
+    return m ? m[1] : null
+  } catch { return null }
+}
+
+// The dream bubble's photo. Dream Mode is about *real photographs*, so the scene
+// should show one: `--photo <path>` (or DREAM_PHOTO=<path>) wins, otherwise fall
+// back to Ash's photo — already embedded in the app for the About dedication, so
+// it ships with the repo and the default scene is reproducible. The illustrated
+// placeholder is only a last resort if that file ever goes away.
 function dreamPhoto() {
-  const p = process.env.DREAM_PHOTO
+  const p = arg('photo', process.env.DREAM_PHOTO)
   if (p && existsSync(p)) {
     const ext = (p.split('.').pop() || '').toLowerCase()
     const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
     return `<img class="dphoto" src="data:${mime};base64,${readFileSync(p).toString('base64')}">`
   }
+  const ash = ashPhotoUrl()
+  if (ash) return `<img class="dphoto" src="${ash}">`
   return `<div class="dphoto"><span class="subj">🐈</span></div>`
 }
 
@@ -84,7 +98,9 @@ const CSS = `
     display: flex; align-items: flex-end; justify-content: center; }
   .subj { font-size: 128px; line-height: 1; margin-bottom: 8px; filter: drop-shadow(0 12px 7px rgba(0,0,0,.3)); }
   .chips { margin-top: 26px; }
-  .chip { display: inline-block; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #e8ecff; font: 600 23px 'Segoe UI', sans-serif; padding: 10px 20px; border-radius: 999px; }
+  .chip { display: inline-block; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #e8ecff; font: 600 23px 'Segoe UI', sans-serif; padding: 10px 20px; border-radius: 999px; margin-right: 12px; }
+  /* The Immich tie-in, in the app's accent so it reads as a feature, not a footnote. */
+  .chip.immich { background: rgba(243,199,62,.14); border-color: rgba(243,199,62,.6); color: #f7dc8a; font-size: 26px; padding: 13px 26px; }
   .dzzz { position: absolute; top: -46px; right: -10px; color: #d7ddf2; font: 800 46px 'Cascadia Code', 'Segoe UI', monospace; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
   .dtail { position: absolute; bottom: -27px; left: 50%; margin-left: -18px; width: 0; height: 0; border: 18px solid transparent; border-top-color: #2a2c38; }
 `
@@ -134,8 +150,9 @@ function scenes(ic, settingsShot) {
     { // 6 — dream mode
       name: 'screenshot-6-dream.png',
       body: `<div class="copy"><h1>It dreams of<br>your photos.</h1>
-        <div class="sub">While your cat naps, it drifts through little photo bubbles of the pictures you love.</div>
-        <div class="chips"><span class="chip">🖼️ Works with your Immich photo server</span></div></div>
+        <div class="sub">While your cat naps, it drifts through little photo bubbles of the pictures
+          you love — pulled straight from your own <b>Immich</b> photo server.</div>
+        <div class="chips"><span class="chip immich">🖼️ Immich album</span><span class="chip">🔒 Self-hosted · stays yours</span></div></div>
         <img class="cat" src="${rig('ash', POSES.curl)}" style="width:360px; left:1290px; bottom:150px;">
         <div class="dbubble" style="left:1330px; bottom:360px;">
           ${dreamPhoto()}

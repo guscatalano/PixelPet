@@ -2,8 +2,9 @@
 
 A customizable pixel-art desktop pet for **Windows and macOS**. A little cat — or a dog, or a
 rabbit, or whatever you build — lives on your desktop. It sits on top of your windows, wanders
-around on its own, naps, dreams, and reacts when you hover, click, or drag it. Everything lives
-in the system tray.
+around on its own, naps, and reacts when you hover, click, or drag it. When it sleeps, it
+dreams about your own photos, straight from your [Immich](https://immich.app/) server.
+Everything lives in the system tray.
 
 ![Your desktop just got a cat.](docs/screenshots/screenshot-1-hero.png)
 
@@ -57,9 +58,10 @@ show/hide, and updates.
 - **Care Mode (optional).** Hunger, energy, fun, and hygiene decay over time and feed into
   overall health; feed, play, rest, groom, and medicate from the tray. Three difficulties —
   relaxed, normal, demanding. Off by default: you can just let your pet be.
-- **Dream Mode.** While your pet naps, it drifts through little photo bubbles of pictures you
-  love — the photos you created it from, and/or an [Immich](https://immich.app/) album.
-  Double-click a bubble to open the photo full-size.
+- **Dream Mode, with [Immich](https://immich.app/) built in.** While your pet naps, it drifts
+  through little photo bubbles of the pictures you love — pulled live from an album on your own
+  self-hosted Immich server, and/or the photos you created the pet from. Double-click a bubble
+  to open the photo full-size. **[Setup ↓](#dream-mode--immich)**
 - **Make it yours** — seven sizes (XXS to XXL), a Detail control (Chunky · Normal · Fine) that
   re-renders the same pet at a different pixel resolution, turn speed, per-pet personality
   sliders, per-animation toggles, and renaming.
@@ -71,8 +73,27 @@ show/hide, and updates.
 |  |  |
 | --- | --- |
 | ![Pick your cat](docs/screenshots/screenshot-2-roster.png)<br>**Pick your cat** — tabbies, tuxedos, calicos, Siamese and more. | ![It lives its own little life](docs/screenshots/screenshot-3-life.png)<br>**It lives its own little life** — sit, walk, loaf, sleep, groom, prance. |
-| ![Care for it](docs/screenshots/screenshot-4-care.png)<br>**Care for it (if you want to)** — optional Care Mode. | ![It dreams of your photos](docs/screenshots/screenshot-6-dream.png)<br>**It dreams of your photos** — photo bubbles while it naps. |
+| ![Care for it](docs/screenshots/screenshot-4-care.png)<br>**Care for it (if you want to)** — optional Care Mode. | ![It dreams of your photos](docs/screenshots/screenshot-6-dream.png)<br>**It dreams of your photos** — straight from your Immich album. |
 | ![Make it yours](docs/screenshots/screenshot-5-settings.png)<br>**Make it yours** — the real settings window: pets, size, personality, animations. | |
+
+## Dream Mode & Immich
+
+PixelPet integrates with [**Immich**](https://immich.app/), the self-hosted photo server, so
+your pet dreams about your actual photo library instead of stock art. Your app talks to *your*
+server directly — there's no PixelPet cloud in the middle, and the API key never leaves the
+machine.
+
+Turn it on in **Settings → Dreams**:
+
+| Field | What to enter |
+| --- | --- |
+| **Server URL** | Your Immich base URL, e.g. `https://immich.example.com` |
+| **Album id** | The album's UUID — or just paste the whole album URL and PixelPet pulls the id out of it |
+| **API key** | From Immich → *Account Settings → API Keys*. Stored encrypted through the OS keychain, never in `settings.json` |
+
+Hit **Test** to confirm the connection. PixelPet re-reads the album every 30 minutes, and each
+dream bubble shows the next photo; double-clicking one opens it full-size. You can also set how
+often your pet dreams and how big the bubble is.
 
 ## Roadmap
 
@@ -116,6 +137,9 @@ Run `npm run build` first, since the settings window is captured from `out/`:
 npm run shots:readme   # 1280x720 -> docs/screenshots/ (committed, shown above)
 npm run shots:store    # 1920x1080 -> store-assets/ (git-ignored, for Partner Center)
 ```
+
+The dream-bubble scene shows Ash's photo by default (the one embedded for the About
+dedication). Pass `--photo <path>` to swap in a different one.
 
 ### Project layout
 
