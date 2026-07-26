@@ -225,6 +225,8 @@ const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) 
   { key: 'poof', label: 'Poof!', rgba: (pet, t) => renderPet(generateRigGrid(pet, poofPose(t)), pet.coat) },
   { key: 'yawn', label: 'Yawn', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { yawn: yawnK(t) }), pet.coat) },
   // Making biscuits — one paw pushing, or both alternating.
+  // Negative pawX raises the paw — the tile bats upward at an imagined string.
+  { key: 'bat', label: 'String toy', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { paw: 0.8, pawX: -0.4 - 0.5 * (0.5 + 0.5 * Math.sin(t / 190)) }), pet.coat) },
   // The tile shows the reach-and-pat; the swipe only happens at a real ledge.
   { key: 'knock', label: 'Knock off', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { paw: 0.75, pawX: knockK(t) }), pet.coat) },
   { key: 'knead', label: 'Knead', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { paw: kneadK(t) }), pet.coat) },

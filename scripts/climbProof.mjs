@@ -111,6 +111,9 @@ const petOf = (wins) => wins.find((w) => w.w > 20 && w.w < 400 && w.h > 20 && w.
  *  by aspect, not width — GetWindowRect includes invisible borders, so the 40px
  *  strip measures wider than it was asked to be. */
 const knockedOf = (wins) => wins.find((w) => w.h > w.w * 2.5 && w.h > 100) ?? null
+/** The string toy: also a narrow strip, but hung above the pet rather than below
+ *  a ledge. Only one of the two is ever on screen, so the same shape test does. */
+const stringOf = knockedOf
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 /** Bin the throwaway profile. The just-killed pet may still hold GPU cache
@@ -201,6 +204,24 @@ async function phaseLive() {
       let gone = false
       for (let i = 0; i < 20 && !gone; i++) { await sleep(200); gone = !knockedOf(probe(pet.pid)) }
       check(gone, 'the object cleaned itself up')
+    }
+  }
+
+  // The string toy needs no ledge — force it and check the overlay turns up and
+  // then leaves. (Its swing is driven over IPC; that part needs eyes, not a probe.)
+  {
+    const before = probe(pet.pid).length
+    spawnSync(process.execPath, ['.', `--user-data-dir=${profile}`, '--play-clip=bat'], { cwd: root, stdio: 'ignore' })
+    let str = null
+    for (let i = 0; i < 24 && !str; i++) {
+      await sleep(150)
+      str = stringOf(probe(pet.pid))
+    }
+    check(!!str, 'the string toy appeared', str ? `strip ${str.w}x${str.h} at ${str.x},${str.y}` : `no new overlay (had ${before} windows)`)
+    if (str) {
+      let gone = false
+      for (let i = 0; i < 25 && !gone; i++) { await sleep(200); gone = !stringOf(probe(pet.pid)) }
+      check(gone, 'the string toy went away again')
     }
   }
 

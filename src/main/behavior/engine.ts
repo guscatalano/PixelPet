@@ -40,6 +40,18 @@ const TEETER_MS = 1900 // how long the cat wobbles at an edge before deciding
 // Time from the start of the knock clip to the swipe frame. Must match the sum
 // of the frames before the swipe in knockFrames() (src/renderer/pet/main.ts).
 const KNOCK_SWIPE_MS = 1300
+// The string toy. Hit offsets must match the two swipe frames in batFrames()
+// (src/renderer/pet/main.ts); the string is swung from here, not by the clip.
+const BAT_HITS_MS = [420, 840]
+const BAT_TOTAL_MS = 1320
+const STRING_ABOVE = 130 // px of string hanging above the pet's window
+
+/** The string-toy overlay, owned by main and driven from here. */
+export interface StringToy {
+  show: (x: number, topY: number, height: number) => void
+  hit: () => void
+  hide: () => void
+}
 const POOF_MS = 1100 // how long the scared poof holds
 const BIG_FALL = 90 // falls taller than this spook the cat on landing
 const CARE_TICK_MS = 60_000 // needs decay + self-care cadence (Care Mode)
@@ -78,6 +90,9 @@ export class PetEngine {
   private knockTimer: ReturnType<typeof setTimeout> | null = null
   /** Set by main: show something tumbling off the ledge at (x, y). */
   private knocker: ((x: number, y: number) => void) | null = null
+  /** Set by main: the dangling string toy. */
+  private stringToy: StringToy | null = null
+  private batTimers: Array<ReturnType<typeof setTimeout>> = []
   private fallStartY = 0 // where the current fall began (poof on big landings)
   private walkAskedAt = 0 // when we requested the walk visual (stall safety)
   private afterShot: (() => void) | null = null // continuation after a one-shot ends
@@ -115,6 +130,9 @@ export class PetEngine {
 
   dispose(): void {
     if (this.careMode) this.persistNeeds()
+    this.clearBatTimers()
+    this.stringToy?.hide()
+    if (this.knockTimer) clearTimeout(this.knockTimer)
     if (this.physicsTimer) clearInterval(this.physicsTimer)
     if (this.ambientTimer) clearTimeout(this.ambientTimer)
     if (this.actionTimer) clearTimeout(this.actionTimer)
@@ -256,6 +274,8 @@ export class PetEngine {
 
   onDragStart(): void {
     this.dragging = true
+    this.clearBatTimers()
+    this.stringToy?.hide() // picked up mid-play: the string goes with it
     this.cancelWander()
     this.airMode = 'none'
     this.vy = 0
@@ -301,6 +321,11 @@ export class PetEngine {
     this.knocker = cb
   }
 
+  /** Wire up the dangling string toy (main owns the window). */
+  setStringToy(toy: StringToy): void {
+    this.stringToy = toy
+  }
+
   setEmoter(fn: (kind: string) => void): void {
     this.emoter = fn
   }
@@ -315,7 +340,8 @@ export class PetEngine {
     this.airMode = 'none'; this.vx = 0; this.vy = 0
     switch (clip) {
       case 'yawn': case 'stretch': case 'react': case 'paw': case 'knead': case 'kneadboth': this.playOneShot(clip); break
-      case 'knock': this.startKnock(); break // needs the timed drop, not just the clip
+      case 'knock': this.startKnock(); break
+      case 'bat': this.startBat(); break // needs the timed drop, not just the clip
       case 'pounce': this.startPounce(); break
       case 'walk': case 'prance': case 'stalk': case 'trot': case 'hop': this.startWander(clip); break
       case 'zoomies': this.startZoomies(); break
@@ -517,6 +543,51 @@ export class PetEngine {
         this.scheduleAmbient(900)
       }
     }, TEETER_MS)
+  }
+
+  // ---- the string toy --------------------------------------------------------
+
+  private clearBatTimers(): void {
+    for (const t of this.batTimers) clearTimeout(t)
+    this.batTimers = []
+  }
+
+  /**
+   * A string drops in front of the pet and it has a go at it. Main owns the
+   * string window; the engine only says where to hang it and when a paw landed,
+   * so the swing is driven by the actual animation rather than a parallel
+   * timeline that has to be kept in step.
+   */
+  private startBat(): void {
+    const toy = this.stringToy
+    if (!toy || this.dragging) return
+    this.cancelWander()
+    this.clearBatTimers()
+
+    const b = this.win.getBounds()
+    // The raised paw is on whichever side the pet faces, so hang it there.
+    const dir = this.facing === 'right' ? 1 : -1
+    const x = Math.round(this.curX + b.width / 2 + dir * (b.width * 0.22))
+    const topY = Math.round(this.curY - STRING_ABOVE)
+    const height = STRING_ABOVE + Math.round(b.height * 0.45) // ends about chest high
+    toy.show(x, topY, height)
+
+    this.playOneShot('bat')
+    this.afterShot = () => {
+      this.clearBatTimers()
+      toy.hide()
+      this.setClip('idle')
+      this.scheduleAmbient()
+    }
+    for (const at of BAT_HITS_MS) {
+      this.batTimers.push(setTimeout(() => {
+        if (this.clip === 'bat' && !this.dragging) toy.hit()
+      }, at))
+    }
+    // Belt and braces: if the clip never reports back, the string still goes away.
+    this.batTimers.push(setTimeout(() => {
+      if (this.clip !== 'bat') toy.hide()
+    }, BAT_TOTAL_MS + 1200))
   }
 
   // ---- knocking things off ledges --------------------------------------------
@@ -783,7 +854,7 @@ export class PetEngine {
     const climbUrge = (0.06 + p.curiosity * 0.18 + p.energy * 0.12 + p.mischief * 0.08) * (1 - tired * 0.7) * (1 - sick)
     if (!wasAsleep && Math.random() < climbUrge && this.tryJumpUp()) return
 
-    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick' | 'sulk' | 'zoomies' | 'knead' | 'kneadboth'>([
+    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick' | 'sulk' | 'zoomies' | 'knead' | 'kneadboth' | 'bat'>([
       // When genuinely unwell, lying down with the cone dominates everything.
       { item: 'sick', weight: n && n.health < 0.35 ? 4 + (0.35 - n.health) * 12 : 0 },
       // Bored & not unwell: sulk (ears back) some of the time.
@@ -798,6 +869,9 @@ export class PetEngine {
       { item: 'paw', weight: this.allowed('paw') ? (0.05 + p.affection * 0.22 + lowHunger * 1.3 + bored * 0.3) * (1 - sick * 0.7) : 0 },
       // Making biscuits: a contented, settled thing, so it leans on affection and
       // sleepiness rather than energy. The two-paw version is the showier one.
+      // A string turns up and the pet has a go at it — playful, so it leans on
+      // mischief and curiosity, and a tired or unwell cat can't be bothered.
+      { item: 'bat', weight: this.allowed('bat') ? (0.05 + p.mischief * 0.24 + p.curiosity * 0.18 + bored * 0.4) * (1 - tired * 0.8) * (1 - sick) : 0 },
       { item: 'knead', weight: this.allowed('knead') ? (0.08 + p.affection * 0.30 + p.sleepiness * 0.16) * (1 - sick * 0.8) : 0 },
       { item: 'kneadboth', weight: this.allowed('kneadboth') ? (0.06 + p.affection * 0.26 + p.sleepiness * 0.14) * (1 - sick * 0.8) : 0 },
       // Deliberately tiny: at these weights an energetic cat has a fit every few
@@ -817,6 +891,9 @@ export class PetEngine {
         case 'knead':
         case 'kneadboth':
           this.playOneShot(action)
+          break
+        case 'bat':
+          this.startBat()
           break
         case 'sleep':
           this.setClip('sleep')

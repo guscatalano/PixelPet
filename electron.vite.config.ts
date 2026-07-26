@@ -21,7 +21,8 @@ export default defineConfig({
           index: resolve(__dirname, 'src/preload/index.ts'),
           settings: resolve(__dirname, 'src/preload/settings.ts'),
           item: resolve(__dirname, 'src/preload/item.ts'),
-          dream: resolve(__dirname, 'src/preload/dream.ts')
+          dream: resolve(__dirname, 'src/preload/dream.ts'),
+          string: resolve(__dirname, 'src/preload/string.ts')
         }
       }
     }
@@ -36,7 +37,8 @@ export default defineConfig({
           item: resolve(__dirname, 'src/renderer/item.html'),
           dream: resolve(__dirname, 'src/renderer/dream.html'),
           sonar: resolve(__dirname, 'src/renderer/sonar.html'),
-          knocked: resolve(__dirname, 'src/renderer/knocked.html')
+          knocked: resolve(__dirname, 'src/renderer/knocked.html'),
+          string: resolve(__dirname, 'src/renderer/string.html')
         }
       }
     }

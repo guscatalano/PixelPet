@@ -115,6 +115,7 @@ function createPetWindow(): BrowserWindow {
     engine.setDisabled(settings.disabledAnims)
     engine.setEmoter((kind) => petWindow?.webContents.send('pet:emote', kind))
     engine.setKnocker((x, y) => dropKnockedObject(x, y))
+    engine.setStringToy({ show: showStringToy, hit: hitStringToy, hide: hideStringToy })
     engine.start()
     applyCare()
     // Tell the renderer which pet to draw (the full spec, so user-generated pets
@@ -367,6 +368,49 @@ function dropKnockedObject(x: number, ledgeY: number): void {
     knockedTimer = null
     if (!win.isDestroyed()) win.destroy()
   }, KNOCKED_MS)
+}
+
+// ---- the string toy -----------------------------------------------------------
+// A string dangling in front of the pet while it plays. Unlike the yarn ball
+// (a care item you drag onto the cat), this is scenery the pet produces for
+// itself — click-through, and it leaves when the animation does.
+
+let stringWindow: BrowserWindow | null = null
+
+function showStringToy(x: number, topY: number, height: number): void {
+  hideStringToy()
+  const width = 44 // wide enough that the swing arc isn't clipped
+  const win = new BrowserWindow({
+    width, height,
+    x: Math.round(x - width / 2), y: Math.round(topY),
+    transparent: true, frame: false, resizable: false, show: false,
+    skipTaskbar: true, hasShadow: false, focusable: false, alwaysOnTop: true,
+    maximizable: false, fullscreenable: false,
+    webPreferences: { preload: join(__dirname, '../preload/string.js'), sandbox: false }
+  })
+  win.setAlwaysOnTop(true, 'screen-saver')
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  win.setIgnoreMouseEvents(true)
+  win.once('ready-to-show', () => { if (!win.isDestroyed()) win.showInactive() })
+  win.on('closed', () => { if (stringWindow === win) stringWindow = null })
+  if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/string.html`)
+  else win.loadFile(join(__dirname, '../renderer/string.html'))
+  stringWindow = win
+}
+
+function hitStringToy(): void {
+  const w = stringWindow
+  if (!w || w.isDestroyed()) return
+  // A hit can land before the page is up; deliver it once it is.
+  if (w.webContents.isLoading()) w.webContents.once('did-finish-load', () => {
+    if (!w.isDestroyed()) w.webContents.send('string:hit')
+  })
+  else w.webContents.send('string:hit')
+}
+
+function hideStringToy(): void {
+  if (stringWindow && !stringWindow.isDestroyed()) stringWindow.destroy()
+  stringWindow = null
 }
 
 /** Summon a draggable care item next to the cat (right-click → Bring…). */
@@ -1033,6 +1077,7 @@ if (!gotLock) {
     sonarWindow?.destroy()
     if (knockedTimer) clearTimeout(knockedTimer)
     knockedWindow?.destroy()
+    hideStringToy()
     if (dreamTimer) clearInterval(dreamTimer)
     dreamWindow?.destroy()
     engine?.dispose()
