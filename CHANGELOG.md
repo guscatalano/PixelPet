@@ -3,6 +3,39 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.9.0 — how a cat actually moves
+
+### New
+- **A “Faces you” control** (*Settings → Look → Drawing*). Your pet used to turn and look
+  at you at the end of *every* action, which reads more like staring than like a cat. Now
+  it's a dial — 40% by default, so it rests in profile most of the time and looking at you
+  means something.
+
+### Changed
+- **The string toy is a proper hunt.** Instead of standing still and patting the air, your
+  pet now stares, stalks into range, crouches, and **jumps** at the string. The string is a
+  real simulated rope — it bends, lags and whips when a paw connects — and it drifts about
+  like something alive, occasionally darting out of reach so your pet misses and has to try
+  again. Sometimes it catches it properly, drags it down, and the string wriggles free.
+- **Zoomies actually look like zoomies** — roughly four times faster, exploding out of each
+  turn and skidding into the next, rather than gliding along at a brisk walk.
+- **Kneading is slow and dreamy**, about a second and a half per push, and no longer
+  metronomic: the depth, the pauses and the number of pushes all vary.
+- **A hop is one or two bounds**, the way a cat clears a gap — it used to bunny-hop up to
+  forty times in a row across the whole screen. (Rabbits still bound continuously; that's
+  their gait, not a hop.)
+- **Trot is now brisker than prance**, so the two are finally distinguishable — they were
+  moving at exactly the same speed.
+- Running pets no longer pedal their legs at a comical rate: stride *length* grows with
+  speed, the way a real cat's does, instead of the legs simply spinning faster.
+
+### Fixed
+- **Your pet no longer falls through window edges it's standing on.** Windows keeps the
+  lock screen's windows around invisibly, above everything else, and v0.7's new z-order
+  check counted them as covering every ledge on your main monitor. They're now ignored.
+- A rare crash that could take the app down while your pet was moving. If anything like it
+  happens again the pet recovers instead of dying, and records what went wrong.
+
 ## v0.8.0 — something to play with
 
 ### New
