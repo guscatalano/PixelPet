@@ -340,13 +340,20 @@ function kneadFrames(both: boolean): Frame[] {
     const f = (a: number, b: number, ms: number): Frame => ({
       img: rgbaToCanvas(renderPet(generate34Grid(activePet, 0, { paw: a, paw2: b }), activePet.coat)), ms
     })
-    const PUSH = 0.5, LIFT = 0.12
-    const out: Frame[] = [f(LIFT, both ? PUSH : 0, 130)]
-    for (let i = 0; i < 4; i++) {
-      if (both) out.push(f(PUSH, LIFT, 170), f(LIFT, PUSH, 170))
-      else out.push(f(PUSH, 0, 180), f(LIFT, 0, 180))
+    // SLOW. Kneading is a dreamy, contented rhythm — about a second per paw, a
+    // world away from batting. At this pace two poses read as a slideshow, so
+    // each half-cycle passes through a midpoint on the way.
+    const PUSH = 0.5, MID = 0.31, LIFT = 0.12
+    const HOLD = 310, GLIDE = 200 // ~1s per full push-lift cycle
+    const out: Frame[] = [f(LIFT, both ? PUSH : 0, 260)]
+    for (let i = 0; i < 3; i++) {
+      if (both) {
+        out.push(f(MID, MID, GLIDE), f(PUSH, LIFT, HOLD), f(MID, MID, GLIDE), f(LIFT, PUSH, HOLD))
+      } else {
+        out.push(f(MID, 0, GLIDE), f(PUSH, 0, HOLD), f(MID, 0, GLIDE), f(LIFT, 0, HOLD))
+      }
     }
-    out.push(f(0, 0, 150)) // settle both feet back down
+    out.push(f(0, 0, 220)) // settle both feet back down
     return out
   })
 }
