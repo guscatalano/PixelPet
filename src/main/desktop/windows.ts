@@ -40,9 +40,23 @@ function init(): boolean {
     const IsIconic = user32.func('bool __stdcall IsIconic(void* hWnd)')
     const GetWindowLongPtrW = user32.func('intptr __stdcall GetWindowLongPtrW(void* hWnd, int nIndex)')
     const GetWindowTextW = user32.func('int __stdcall GetWindowTextW(void* hWnd, _Out_ uint16_t* lpString, int nMaxCount)')
+    // Undocumented but stable since Win10: which z-band a window lives in.
+    // ZBID_DESKTOP (1) is where real windows are. The lock-screen band windows
+    // ("Windows Default Lock Screen", LockScreenBackstopFrame, …) enumerate as
+    // visible, uncloaked, full-screen, and ABOVE everything — phantom platforms,
+    // and worse, phantom occluders that "bury" every ledge beneath them.
+    type BandFn = (h: unknown, out: number[]) => boolean
+    let GetWindowBand: BandFn | null = null
+    try {
+      GetWindowBand = user32.func('bool __stdcall GetWindowBand(void* hWnd, _Out_ uint32* band)') as unknown as BandFn
+    } catch { /* very old Windows: band filtering just switches off */ }
     const DwmGetWindowAttribute = dwmapi.func('int __stdcall DwmGetWindowAttribute(void* hWnd, uint32 dwAttribute, _Out_ void* pvAttribute, uint32 cbAttribute)')
     const WNDENUMPROC = koffi.proto('bool __stdcall WNDENUMPROC(void* hwnd, intptr lParam)')
-    const GWL_EXSTYLE = -20, WS_EX_TOOLWINDOW = 0x80, DWMWA_CLOAKED = 14
+    // WS_EX_TRANSPARENT = hit-test-transparent overlay layers (driver HUDs, input
+    // overlays — full-screen, topmost, invisible). They are not real platforms,
+    // and once supportY honoured z-order they'd "bury" every window beneath them,
+    // making the pet fall through ledges that are plainly visible.
+    const GWL_EXSTYLE = -20, WS_EX_TOOLWINDOW = 0x80, WS_EX_TRANSPARENT = 0x20, DWMWA_CLOAKED = 14
 
     // One persistent native callback that collects visible, real, top-level windows.
     const enumProc = koffi.register((hwnd: unknown, _lparam: unknown): boolean => {
@@ -52,7 +66,11 @@ function init(): boolean {
         // UWP/store apps stay "visible" while cloaked (off-screen) — skip those.
         const cloak = Buffer.alloc(4)
         if (DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, cloak, 4) === 0 && cloak.readUInt32LE(0) !== 0) return true
-        if (Number(GetWindowLongPtrW(hwnd, GWL_EXSTYLE)) & WS_EX_TOOLWINDOW) return true
+        if (Number(GetWindowLongPtrW(hwnd, GWL_EXSTYLE)) & (WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT)) return true
+        if (GetWindowBand) {
+          const band = [0]
+          if (GetWindowBand(hwnd, band) && band[0] !== 1) return true // not the desktop band
+        }
         const r = { left: 0, top: 0, right: 0, bottom: 0 }
         if (!GetWindowRect(hwnd, r)) return true
         const w = r.right - r.left, h = r.bottom - r.top
