@@ -60,6 +60,7 @@ const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never report
 // the safety net cuts them off mid-performance. A randomised knead can reach ~9s.
 const SHOT_SAFETY: Partial<Record<ClipName, number>> = { knead: 14000, kneadboth: 14000, knock: 6000 }
 const DEFAULT_FACE_CHANCE = 0.4 // mirrors settings.ts; used before settings arrive
+const CLIMB_GOAL_TTL_MS = 40_000 // give up on a debug climb target after this
 const GRAVITY = 0.45 // px/tick² — vertical acceleration while airborne
 const MAX_FALL = 9 // terminal velocity, px/tick
 const FALL_CLIP_GAP = 10 // only show the flailing fall clip when dropping more than this
@@ -143,6 +144,7 @@ export class PetEngine {
   private pendingJump: { vx: number; vy: number } | null = null
   /** Debug: a ledge the pet has been told to get onto (see climbToward). */
   private climbGoal: { x: number; y: number } | null = null
+  private climbGoalAt = 0 // when it was set, so a stale goal expires
   /** Sprints left in the current zoomies fit (0 = not having one). */
   private zoomiesLeft = 0
   private knockTimer: ReturnType<typeof setTimeout> | null = null
@@ -1035,6 +1037,7 @@ export class PetEngine {
    */
   climbToward(x: number, y: number): void {
     this.climbGoal = { x, y }
+    this.climbGoalAt = Date.now()
     this.pursueClimbGoal()
   }
 
@@ -1147,6 +1150,19 @@ export class PetEngine {
     if (this.dragging || this.busy || this.airMode !== 'none' || this.clip === 'teeter' || this.clip === 'pounce' || this.strPhase !== null) {
       this.scheduleAmbient(2000)
       return
+    }
+    // A pending climb goal outranks ambient life. It is retried here as well as
+    // from finishWander(), because the goal can arrive while the pet is airborne
+    // or mid-one-shot — the first pursue then fails and, with finishWander the
+    // only other retry, the goal used to be orphaned for good.
+    if (this.climbGoal) {
+      if (Date.now() - this.climbGoalAt > CLIMB_GOAL_TTL_MS) {
+        this.climbGoal = null
+      } else {
+        this.pursueClimbGoal()
+        if (this.climbGoal !== null && this.wanderTarget === null) this.scheduleAmbient(900)
+        return
+      }
     }
     const p = this.personality
     const wasAsleep = this.clip === 'sleep'

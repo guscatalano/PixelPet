@@ -171,23 +171,25 @@ async function phaseLive() {
   // the forwarded command line, so a space-separated value does not survive.
   spawnSync(process.execPath, ['.', `--user-data-dir=${profile}`, `--goto-window=${LEDGE.title}`], { cwd: root, stdio: 'ignore' })
 
-  // Two tries: ambient life (a wander off the far side, a bold hop down) can
-  // pull the pet off the ledge before four consecutive samples land — that is
-  // the pet being a cat, not the climb failing. A retry re-issues the goto.
-  let settled = 0, best = Infinity
-  for (let attempt = 0; attempt < 2 && settled < 4; attempt++) {
-    if (attempt > 0) spawnSync(process.execPath, ['.', `--user-data-dir=${profile}`, `--goto-window=${LEDGE.title}`], { cwd: root, stdio: 'ignore' })
-    settled = 0
-    for (let i = 0; i < 90 && settled < 4; i++) {
-      await sleep(500)
-      const r = petOf(probe(pet.pid))
-      if (!r) continue
-      const bottom = r.y + r.h
-      best = Math.min(best, bottom)
-      settled = Math.abs(bottom - LEDGE.y) <= 30 ? settled + 1 : 0
+  // Nudge every ~8s rather than betting everything on one command landing at a
+  // good moment: ambient life can pull the pet off the ledge (a wander off the
+  // far side, a bold hop down), which is the pet being a cat, not a failure.
+  // Success is four consecutive samples on the ledge, i.e. it settled there.
+  const NUDGE_EVERY = 16 // samples (× 500ms)
+  let settled = 0, best = Infinity, nudges = 0
+  for (let i = 0; i < 120 && settled < 4; i++) {
+    if (i % NUDGE_EVERY === 0) {
+      nudges++
+      spawnSync(process.execPath, ['.', `--user-data-dir=${profile}`, `--goto-window=${LEDGE.title}`], { cwd: root, stdio: 'ignore' })
     }
+    await sleep(500)
+    const r = petOf(probe(pet.pid))
+    if (!r) continue
+    const bottom = r.y + r.h
+    best = Math.min(best, bottom)
+    settled = Math.abs(bottom - LEDGE.y) <= 30 ? settled + 1 : 0
   }
-  check(settled >= 4, 'climbed onto the ledge and stayed', `ledge y=${LEDGE.y}, best bottom edge y=${best}`)
+  check(settled >= 4, 'climbed onto the ledge and stayed', `ledge y=${LEDGE.y}, best bottom edge y=${best}, ${nudges} nudge(s)`)
 
   if (settled >= 4) {
     // Knock something off. There is nothing to drop unless the pet is genuinely
