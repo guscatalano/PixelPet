@@ -180,3 +180,11 @@ runbooks.
 ## License
 
 MIT
+
+---
+
+<div align="center">
+  <img src="docs/ash.jpg" alt="Ash, a white cat stretched out on a carpet" width="280">
+  <p><em>In loving memory of <b>Ash</b> 🐾<br>
+  the cat PixelPet is named for, and all the joy she brought.</em></p>
+</div>
