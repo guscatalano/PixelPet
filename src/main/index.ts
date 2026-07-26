@@ -112,6 +112,7 @@ function createPetWindow(): BrowserWindow {
     engine?.dispose()
     engine = new PetEngine(win, effectivePersonality(settings, settings.activePetId))
     engine.setStayPut(settings.stayPut)
+    engine.setFaceChance(settings.faceChance)
     engine.setDisabled(settings.disabledAnims)
     engine.setEmoter((kind) => petWindow?.webContents.send('pet:emote', kind))
     engine.setKnocker((x, y) => dropKnockedObject(x, y))
@@ -798,6 +799,11 @@ function registerIpc(): void {
     settings.disabledAnims = Array.isArray(disabled) ? disabled : []
     saveSettings(settings)
     engine?.setDisabled(settings.disabledAnims)
+  })
+  ipcMain.on('settings:set-facechance', (_e, v: number) => {
+    settings.faceChance = Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0.4))
+    saveSettings(settings)
+    engine?.setFaceChance(settings.faceChance)
   })
   ipcMain.on('settings:set-frontscale', (_e, k: number) => {
     settings.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, k))

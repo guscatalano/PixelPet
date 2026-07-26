@@ -22,6 +22,9 @@ export const DEFAULT_TURN_MS = 80
 export const MIN_TURN_MS = 50
 export const MAX_TURN_MS = 600 // all the way to a really slow, deliberate turn
 
+/** How often the pet turns to face you when it settles (0..1). Not 1: landing
+ *  front-on after every single action is the thing that reads as unnatural. */
+export const DEFAULT_FACE_CHANCE = 0.4
 export const MIN_FRONT_SCALE = 0.65
 export const MAX_FRONT_SCALE = 1.0
 
@@ -42,7 +45,7 @@ function defaultAi(): AiConfig {
 function defaults(): AppSettings {
   return {
     activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS,
-    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, detail: DEFAULT_DETAIL, pupilsByTime: false, careMode: false, difficulty: 'normal', dreamMode: false, dreamChance: 0.55, dreamBubbleScale: 1,
+    stayPut: false, frontScale: DEFAULT_FRONT_SCALE, faceChance: DEFAULT_FACE_CHANCE, detail: DEFAULT_DETAIL, pupilsByTime: false, careMode: false, difficulty: 'normal', dreamMode: false, dreamChance: 0.55, dreamBubbleScale: 1,
     immich: { serverUrl: '', albumId: '' }, disabledAnims: [],
     ai: defaultAi(), userPets: [], nameOverrides: {}, petFilter: 'all', overrides: {}
   }
@@ -122,6 +125,7 @@ function sanitize(raw: unknown): AppSettings {
   if (typeof r.frontScale === 'number' && Number.isFinite(r.frontScale)) {
     s.frontScale = Math.max(MIN_FRONT_SCALE, Math.min(MAX_FRONT_SCALE, r.frontScale))
   }
+  if (typeof r.faceChance === 'number' && Number.isFinite(r.faceChance)) s.faceChance = clamp01(r.faceChance)
   if (typeof r.detail === 'number' && (DETAIL_LEVELS as readonly number[]).includes(r.detail)) s.detail = r.detail
   if (Array.isArray(r.disabledAnims)) {
     s.disabledAnims = (r.disabledAnims as unknown[]).filter(

@@ -21,6 +21,8 @@ const api = {
   setStayPut: (v: boolean): void => ipcRenderer.send('settings:set-stayput', v),
   /** Set the facing-you view scale (0.65 small .. 1.0 "coming at you"). */
   setFrontScale: (k: number): void => ipcRenderer.send('settings:set-frontscale', k),
+  /** How often it turns to face you when settling (0..1). */
+  setFaceChance: (v: number): void => ipcRenderer.send('settings:set-facechance', v),
   /** Set the pixel detail / supersample factor (0.5 chunkiest · 1 default · 4 smoothest). */
   setDetail: (v: number): void => ipcRenderer.send('settings:set-detail', v),
   /** Toggle time-of-day pupil dilation. */

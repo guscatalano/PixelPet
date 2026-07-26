@@ -187,6 +187,7 @@ window.pet.onConfig((cfg) => {
     // Everything derived from the front view re-renders at the new size.
     frontCache.clear()
     seqCache.clear()
+    kneadPoseCache.clear()
     hitMask = buildHitMask()
   }
   if (typeof cfg.detail === 'number') {
@@ -198,6 +199,7 @@ window.pet.onConfig((cfg) => {
     for (const c of Object.values(gaitCaches)) c.clear()
     rigCache.clear()
     seqCache.clear()
+    kneadPoseCache.clear()
     hitMask = buildHitMask()
   }
 })
@@ -335,27 +337,47 @@ function pawFrames(): Frame[] {
  * shallow (nothing like the full reach of `paw`) — kneading is a small, content
  * motion, and a big lift reads as reaching for you instead.
  */
+// Knead poses are cached by paw pair, but the SEQUENCE is rebuilt every time so
+// each session can be timed and shaped differently. Once the handful of canvases
+// exist, re-randomising costs nothing — hence a pose cache rather than seqFrames.
+const kneadPoseCache = new Map<string, HTMLCanvasElement>()
+function kneadPose(a: number, b: number): HTMLCanvasElement {
+  const key = `${a.toFixed(2)}|${b.toFixed(2)}`
+  let c = kneadPoseCache.get(key)
+  if (!c) {
+    c = rgbaToCanvas(renderPet(generate34Grid(activePet, 0, { paw: a, paw2: b }), activePet.coat))
+    kneadPoseCache.set(key, c)
+  }
+  return c
+}
+
 function kneadFrames(both: boolean): Frame[] {
-  return seqFrames(both ? 'knead-both' : 'knead-one', () => {
-    const f = (a: number, b: number, ms: number): Frame => ({
-      img: rgbaToCanvas(renderPet(generate34Grid(activePet, 0, { paw: a, paw2: b }), activePet.coat)), ms
-    })
-    // SLOW. Kneading is a dreamy, contented rhythm — about a second per paw, a
-    // world away from batting. At this pace two poses read as a slideshow, so
-    // each half-cycle passes through a midpoint on the way.
-    const PUSH = 0.5, MID = 0.31, LIFT = 0.12
-    const HOLD = 310, GLIDE = 200 // ~1s per full push-lift cycle
-    const out: Frame[] = [f(LIFT, both ? PUSH : 0, 260)]
-    for (let i = 0; i < 3; i++) {
-      if (both) {
-        out.push(f(MID, MID, GLIDE), f(PUSH, LIFT, HOLD), f(MID, MID, GLIDE), f(LIFT, PUSH, HOLD))
-      } else {
-        out.push(f(MID, 0, GLIDE), f(PUSH, 0, HOLD), f(MID, 0, GLIDE), f(LIFT, 0, HOLD))
-      }
+  // SLOW and drifting. Kneading is a dreamy, half-asleep rhythm, and a real cat
+  // is not a metronome: depth, dwell and pace all wander, and it does not push
+  // the same number of times twice. Values are quantised so the pose cache stays
+  // to a few entries however much the timing varies.
+  const rnd = (lo: number, hi: number): number => lo + Math.random() * (hi - lo)
+  const q = (v: number): number => Math.round(v * 20) / 20
+  const out: Frame[] = []
+  const cycles = 2 + Math.floor(Math.random() * 3) // 2-4 pushes, never a fixed count
+  const f = (a: number, b: number, ms: number): Frame => ({ img: kneadPose(a, b), ms })
+
+  let lift = q(rnd(0.08, 0.16))
+  out.push(f(lift, both ? q(rnd(0.42, 0.55)) : 0, rnd(320, 520)))
+  for (let i = 0; i < cycles; i++) {
+    const push = q(rnd(0.38, 0.58)) // some pushes go deeper than others
+    lift = q(rnd(0.08, 0.18))
+    const mid = q((push + lift) / 2)
+    const hold = rnd(430, 720) // ~1.5-2.1s per full cycle, vs ~1.0s before
+    const glide = rnd(250, 380)
+    if (both) {
+      out.push(f(mid, mid, glide), f(push, lift, hold), f(mid, mid, glide), f(lift, push, hold))
+    } else {
+      out.push(f(mid, 0, glide), f(push, 0, hold), f(mid, 0, glide), f(lift, 0, hold))
     }
-    out.push(f(0, 0, 220)) // settle both feet back down
-    return out
-  })
+  }
+  out.push(f(0, 0, rnd(220, 340))) // settle both feet back down
+  return out
 }
 
 /**
@@ -727,6 +749,7 @@ window.pet.onSetPet((next: Pet) => {
   for (const c of Object.values(gaitCaches)) c.clear()
   rigCache.clear()
   seqCache.clear()
+  kneadPoseCache.clear()
   hitMask = buildHitMask()
 })
 

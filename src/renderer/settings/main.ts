@@ -19,6 +19,7 @@ interface SettingsApi {
   setTurnMs: (ms: number) => void
   setStayPut: (v: boolean) => void
   setFrontScale: (k: number) => void
+  setFaceChance: (v: number) => void
   setDetail: (v: number) => void
   setPupilsByTime: (v: boolean) => void
   setDreamMode: (v: boolean) => void
@@ -619,6 +620,15 @@ function buildAnimation(): void {
   slider.addEventListener('input', () => {
     show()
     window.settings.setTurnMs(Number(slider.value))
+  })
+
+  const fc = $<HTMLInputElement>('facechance'), fcLabel = $('facechancev')
+  const showFc = (): void => { fcLabel.textContent = `${fc.value}%` }
+  fc.value = String(Math.round((state.faceChance ?? 0.4) * 100))
+  showFc()
+  fc.addEventListener('input', () => {
+    showFc()
+    window.settings.setFaceChance(Number(fc.value) / 100)
   })
 
   const fs = $<HTMLInputElement>('frontscale'), fsLabel = $('frontscalev')

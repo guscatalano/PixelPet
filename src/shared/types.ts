@@ -62,6 +62,8 @@ export interface AppSettings {
   stayPut: boolean
   /** Facing-you view scale (0.65 small .. 1.0 = big, "coming at you"). */
   frontScale: number
+  /** 0..1 — how often the pet turns to face you when it settles. */
+  faceChance: number
   /** Pixel detail / supersample factor (0.5 chunkiest · 1 default · 4 smoothest). */
   detail: number
   /** Pupils dilate/contract with the time of day (round at night, slits at midday). */

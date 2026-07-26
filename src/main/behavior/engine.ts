@@ -56,6 +56,10 @@ function strideFor(pxPerTick: number): number {
   return Math.max(STRIDE, (pxPerTick * (1000 / MOVE_TICK_MS)) / MAX_GAIT_HZ)
 }
 const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never reports it
+// Clips that legitimately run longer than the default need their own ceiling, or
+// the safety net cuts them off mid-performance. A randomised knead can reach ~9s.
+const SHOT_SAFETY: Partial<Record<ClipName, number>> = { knead: 14000, kneadboth: 14000, knock: 6000 }
+const DEFAULT_FACE_CHANCE = 0.4 // mirrors settings.ts; used before settings arrive
 const GRAVITY = 0.45 // px/tick² — vertical acceleration while airborne
 const MAX_FALL = 9 // terminal velocity, px/tick
 const FALL_CLIP_GAP = 10 // only show the flailing fall clip when dropping more than this
@@ -121,6 +125,7 @@ export class PetEngine {
   private clip: ClipName = 'idle'
   private facing: Facing = 'right'
   private stayPut = false // settings: hold this spot (no wandering / leaping)
+  private faceChance = DEFAULT_FACE_CHANCE // settings: how often it turns to you
   private disabled = new Set<ClipName>() // settings: animations the user turned off
   private dragging = false
   private busy = false // a one-shot (react/yawn/stretch) is playing
@@ -201,6 +206,21 @@ export class PetEngine {
     if (this.careTimer) clearInterval(this.careTimer)
   }
 
+  /** How often settling turns the pet to face you (0 = never, 1 = every time). */
+  setFaceChance(v: number): void {
+    this.faceChance = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : DEFAULT_FACE_CHANCE
+  }
+
+  /**
+   * What to settle into once something finishes. 'idle' is the front view — the
+   * pet turning to look at you — and everything used to land there, so it faced
+   * you after every wander, one-shot and landing, which is far too much. Roll
+   * against the setting and otherwise rest in side profile.
+   */
+  private settleClip(): ClipName {
+    return Math.random() < this.faceChance ? 'idle' : 'sit'
+  }
+
   /** Feet position (window-local y), accounting for the bob headroom. */
   private feetOffset(height: number): number {
     const scale = height / (SPRITE_H + BOB_AMPLITUDE * 2)
@@ -222,7 +242,7 @@ export class PetEngine {
     if (next) { next(); return }
     if (clip === 'react' || clip === 'yawn' || clip === 'stretch' || clip === 'paw' ||
         clip === 'knead' || clip === 'kneadboth') {
-      this.setClip('idle')
+      this.setClip(this.settleClip())
       this.scheduleAmbient()
     }
   }
@@ -421,7 +441,7 @@ export class PetEngine {
     this.afterShot = after ?? null
     this.setClip(shot)
     if (this.actionTimer) clearTimeout(this.actionTimer)
-    this.actionTimer = setTimeout(() => this.onClipEnded(shot), SHOT_SAFETY_MS)
+    this.actionTimer = setTimeout(() => this.onClipEnded(shot), SHOT_SAFETY[shot] ?? SHOT_SAFETY_MS)
   }
 
   // ---- wandering + physics -------------------------------------------------------
@@ -1037,7 +1057,7 @@ export class PetEngine {
     if (this.dragging) return
     // Mid-fit? Turn round and go again instead of settling.
     if (this.zoomiesLeft > 0) return this.nextDash()
-    this.setClip('idle')
+    this.setClip(this.settleClip())
     // Arrived under a debug climb target? Take the jump now rather than waiting
     // for the next ambient roll.
     if (this.climbGoal) {
@@ -1224,7 +1244,7 @@ export class PetEngine {
           this.scheduleAmbient(this.dwellFor('sit'))
           break
         default:
-          this.setClip('idle')
+          this.setClip(this.settleClip())
           this.scheduleAmbient(this.dwellFor('idle'))
           break
       }
