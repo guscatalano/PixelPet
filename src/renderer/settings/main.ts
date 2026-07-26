@@ -203,6 +203,8 @@ const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) 
   { key: 'trot', label: 'Trot', rgba: (pet, t) => renderPet(generateWalkGrid({ ...pet, geom: { ...pet.geom, gait: 'trot' } }, (t / 700) % 1), pet.coat) },
   { key: 'stalk', label: 'Stalk', rgba: (pet, t) => renderPet(generateWalkGrid({ ...pet, geom: { ...pet.geom, gait: 'stalk' } }, (t / 1100) % 1), pet.coat) },
   { key: 'hop', label: 'Hop', rgba: (pet, t) => renderPet(generateWalkGrid({ ...pet, geom: { ...pet.geom, gait: 'hop' } }, (t / 700) % 1), pet.coat) },
+  // Zoomies reuses the prance visual; the tile just runs the cycle flat out.
+  { key: 'zoomies', label: 'Zoomies', rgba: (pet, t) => renderPet(generateWalkGrid(pet, (t / 240) % 1, 1, 1), pet.coat) },
   { key: 'sit', label: 'Sit', rgba: (pet, t) => renderPet(generateRigGrid(pet, sitPose(t)), pet.coat) },
   { key: 'loaf', label: 'Loaf', rgba: (pet, t) => renderPet(generateRigGrid(pet, loafPose(t)), pet.coat) },
   { key: 'sphinx', label: 'Sphinx', rgba: (pet, t) => renderPet(generateRigGrid(pet, sphinxPose(t)), pet.coat) },

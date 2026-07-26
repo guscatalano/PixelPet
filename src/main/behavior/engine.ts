@@ -10,8 +10,14 @@ const MOVE_TICK_MS = 16
 const WALK_SPEED = 0.35 // px per tick (~22 px/s) — a calm walking pace, not a scramble
 const PRANCE_SPEED = 0.47 // an excited prance covers ground a bit faster than the walk
 // Every clip that travels across the screen (a gait). Its speed comes from GAIT_SPEED.
-const WALK_CLIPS = new Set<ClipName>(['walk', 'prance', 'stalk', 'trot', 'hop'])
-const GAIT_SPEED: Partial<Record<ClipName, number>> = { prance: PRANCE_SPEED, trot: PRANCE_SPEED, stalk: 0.22, hop: 0.42 }
+// A zoomies fit: several short sprints with hard turns, not one long walk. Rare
+// by design — it should feel like the cat briefly lost its mind, and a pet that
+// does it often is just annoying.
+const ZOOMIES_SPEED = 1.15 // px/tick (~72 px/s) — a genuine tear, ~3x a walk
+const ZOOMIES_DASHES = [4, 7] as const // inclusive range of sprints per fit
+const ZOOMIES_LEG = [110, 320] as const // px per sprint
+const WALK_CLIPS = new Set<ClipName>(['walk', 'prance', 'stalk', 'trot', 'hop', 'zoomies'])
+const GAIT_SPEED: Partial<Record<ClipName, number>> = { prance: PRANCE_SPEED, trot: PRANCE_SPEED, stalk: 0.22, hop: 0.42, zoomies: ZOOMIES_SPEED }
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
 const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never reports it
@@ -64,6 +70,8 @@ export class PetEngine {
   private pendingJump: { vx: number; vy: number } | null = null
   /** Debug: a ledge the pet has been told to get onto (see climbToward). */
   private climbGoal: { x: number; y: number } | null = null
+  /** Sprints left in the current zoomies fit (0 = not having one). */
+  private zoomiesLeft = 0
   private fallStartY = 0 // where the current fall began (poof on big landings)
   private walkAskedAt = 0 // when we requested the walk visual (stall safety)
   private afterShot: (() => void) | null = null // continuation after a one-shot ends
@@ -297,6 +305,7 @@ export class PetEngine {
       case 'yawn': case 'stretch': case 'react': case 'paw': this.playOneShot(clip); break
       case 'pounce': this.startPounce(); break
       case 'walk': case 'prance': case 'stalk': case 'trot': case 'hop': this.startWander(clip); break
+      case 'zoomies': this.startZoomies(); break
       case 'sleep': this.setClip('sleep'); this.scheduleAmbient(this.dwellFor('sleep')); break
       case 'loaf': this.setClip('loaf'); this.scheduleAmbient(this.dwellFor('loaf')); break
       case 'sphinx': this.setClip('sphinx'); this.scheduleAmbient(this.dwellFor('sphinx')); break
@@ -612,6 +621,8 @@ export class PetEngine {
   private finishWander(): void {
     this.wanderTarget = null
     if (this.dragging) return
+    // Mid-fit? Turn round and go again instead of settling.
+    if (this.zoomiesLeft > 0) return this.nextDash()
     this.setClip('idle')
     // Arrived under a debug climb target? Take the jump now rather than waiting
     // for the next ambient roll.
@@ -624,6 +635,51 @@ export class PetEngine {
 
   private cancelWander(): void {
     this.wanderTarget = null
+    this.zoomiesLeft = 0 // anything that interrupts a walk ends the fit
+  }
+
+  // ---- zoomies ---------------------------------------------------------------
+
+  /** A fit of several fast sprints with hard turns between them, then a breather. */
+  private startZoomies(): void {
+    const [lo, hi] = ZOOMIES_DASHES
+    this.zoomiesLeft = lo + Math.floor(Math.random() * (hi - lo + 1))
+    this.nextDash()
+  }
+
+  private endZoomies(): void {
+    this.zoomiesLeft = 0
+    this.wanderTarget = null
+    this.setClip('idle')
+    this.scheduleAmbient(1400) // stand there a moment, as if surprised at itself
+  }
+
+  private nextDash(): void {
+    if (this.zoomiesLeft <= 0 || this.dragging || this.win.isDestroyed()) return this.endZoomies()
+    this.zoomiesLeft--
+
+    const b = this.win.getBounds()
+    const wa = screen.getDisplayMatching(b).workArea
+    const minX = wa.x, maxX = wa.x + wa.width - b.width
+    const [legLo, legHi] = ZOOMIES_LEG
+    const leg = legLo + Math.random() * (legHi - legLo)
+    // Turn on a sixpence: each sprint goes back the way it came, bouncing off
+    // the screen edges rather than piling into them.
+    let dir = this.facing === 'right' ? -1 : 1
+    let target = this.curX + dir * leg
+    if (target < minX || target > maxX) {
+      dir = -dir
+      target = this.curX + dir * leg
+    }
+    target = Math.max(minX, Math.min(maxX, target))
+    // Boxed into a corner — stop rather than judder on the spot.
+    if (Math.abs(target - this.curX) < 40) return this.endZoomies()
+
+    this.wanderTarget = Math.round(target)
+    this.walkDist = 0
+    this.facing = dir > 0 ? 'right' : 'left'
+    this.walkAskedAt = Date.now()
+    this.setClip('zoomies', this.facing)
   }
 
   // ---- personality-weighted ambient loop ---------------------------------------
@@ -678,7 +734,7 @@ export class PetEngine {
     const climbUrge = (0.06 + p.curiosity * 0.18 + p.energy * 0.12 + p.mischief * 0.08) * (1 - tired * 0.7) * (1 - sick)
     if (!wasAsleep && Math.random() < climbUrge && this.tryJumpUp()) return
 
-    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick' | 'sulk'>([
+    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick' | 'sulk' | 'zoomies'>([
       // When genuinely unwell, lying down with the cone dominates everything.
       { item: 'sick', weight: n && n.health < 0.35 ? 4 + (0.35 - n.health) * 12 : 0 },
       // Bored & not unwell: sulk (ears back) some of the time.
@@ -691,6 +747,9 @@ export class PetEngine {
       { item: 'groom', weight: this.allowed('groom') ? 0.15 + p.independence * 0.2 + dirty * 1.3 : 0 },
       { item: 'pounce', weight: this.stayPut || !this.allowed('pounce') ? 0 : (0.06 + p.energy * 0.35 + p.mischief * 0.35 + bored * 0.3) * (1 - tired * 0.8) * (1 - sick) },
       { item: 'paw', weight: this.allowed('paw') ? (0.05 + p.affection * 0.22 + lowHunger * 1.3 + bored * 0.3) * (1 - sick * 0.7) : 0 },
+      // Deliberately tiny: at these weights an energetic cat has a fit every few
+      // minutes, which is the point. Turn it up and the pet stops being calming.
+      { item: 'zoomies', weight: this.stayPut || !this.allowed('zoomies') ? 0 : (0.02 + p.energy * 0.10 + p.mischief * 0.04) * (1 - tired * 0.9) * (1 - sick) },
       { item: 'sit', weight: 0.2 + (1 - p.energy) * 0.2 + sick * 0.3 },
       { item: 'linger', weight: 0.3 + (1 - p.energy) * 0.3 + sick * 0.4 }
     ])
@@ -698,6 +757,9 @@ export class PetEngine {
       switch (action) {
         case 'wander':
           this.startWander()
+          break
+        case 'zoomies':
+          this.startZoomies()
           break
         case 'sleep':
           this.setClip('sleep')

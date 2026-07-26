@@ -335,6 +335,8 @@ const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = { yawn: yawnFr
 // ---- Graph runtime state ------------------------------------------------------
 const NODE_OF: Partial<Record<ClipName, Node>> = {
   idle: 'front', sit: 'sit', walk: 'walk', prance: 'prance', stalk: 'stalk', trot: 'trot', hop: 'hop', sleep: 'sleep', loaf: 'loaf', sphinx: 'sphinx',
+  // Zoomies is a prance run flat out — same visual, the engine supplies the speed.
+  zoomies: 'prance',
   groom: 'groom', teeter: 'teeter', fall: 'fall', poof: 'poof', sick: 'sick', sulk: 'sulk'
 }
 const CROUCH_WIGGLE_MS = 1150 // butt-wiggle time before the leap

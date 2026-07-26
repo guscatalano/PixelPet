@@ -894,6 +894,15 @@ function registerIpc(): void {
  * as argv[i + 1] (you get something like --allow-file-access-from-files instead).
  */
 function handleDebugArgs(argv: string[]): void {
+  // --play-clip=<name>: force any animation immediately, so behaviours that are
+  // otherwise rare (zoomies) or situational (knock) can be tested on demand.
+  const clipArg = argv.find((a) => a.startsWith('--play-clip='))
+  const clip = clipArg?.slice('--play-clip='.length).trim()
+  if (clip) {
+    console.log(`[debug] forcing clip "${clip}"`)
+    engine?.forcePlay(clip as ClipName)
+  }
+
   const arg = argv.find((a) => a.startsWith('--goto-window='))
   const value = arg?.slice('--goto-window='.length).trim()
   if (!value) return
