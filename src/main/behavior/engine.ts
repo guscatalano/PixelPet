@@ -134,7 +134,8 @@ export class PetEngine {
     this.afterShot = null
     if (this.dragging) return
     if (next) { next(); return }
-    if (clip === 'react' || clip === 'yawn' || clip === 'stretch' || clip === 'paw') {
+    if (clip === 'react' || clip === 'yawn' || clip === 'stretch' || clip === 'paw' ||
+        clip === 'knead' || clip === 'kneadboth') {
       this.setClip('idle')
       this.scheduleAmbient()
     }
@@ -302,7 +303,7 @@ export class PetEngine {
     this.afterShot = null
     this.airMode = 'none'; this.vx = 0; this.vy = 0
     switch (clip) {
-      case 'yawn': case 'stretch': case 'react': case 'paw': this.playOneShot(clip); break
+      case 'yawn': case 'stretch': case 'react': case 'paw': case 'knead': case 'kneadboth': this.playOneShot(clip); break
       case 'pounce': this.startPounce(); break
       case 'walk': case 'prance': case 'stalk': case 'trot': case 'hop': this.startWander(clip); break
       case 'zoomies': this.startZoomies(); break
@@ -734,7 +735,7 @@ export class PetEngine {
     const climbUrge = (0.06 + p.curiosity * 0.18 + p.energy * 0.12 + p.mischief * 0.08) * (1 - tired * 0.7) * (1 - sick)
     if (!wasAsleep && Math.random() < climbUrge && this.tryJumpUp()) return
 
-    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick' | 'sulk' | 'zoomies'>([
+    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick' | 'sulk' | 'zoomies' | 'knead' | 'kneadboth'>([
       // When genuinely unwell, lying down with the cone dominates everything.
       { item: 'sick', weight: n && n.health < 0.35 ? 4 + (0.35 - n.health) * 12 : 0 },
       // Bored & not unwell: sulk (ears back) some of the time.
@@ -747,6 +748,10 @@ export class PetEngine {
       { item: 'groom', weight: this.allowed('groom') ? 0.15 + p.independence * 0.2 + dirty * 1.3 : 0 },
       { item: 'pounce', weight: this.stayPut || !this.allowed('pounce') ? 0 : (0.06 + p.energy * 0.35 + p.mischief * 0.35 + bored * 0.3) * (1 - tired * 0.8) * (1 - sick) },
       { item: 'paw', weight: this.allowed('paw') ? (0.05 + p.affection * 0.22 + lowHunger * 1.3 + bored * 0.3) * (1 - sick * 0.7) : 0 },
+      // Making biscuits: a contented, settled thing, so it leans on affection and
+      // sleepiness rather than energy. The two-paw version is the showier one.
+      { item: 'knead', weight: this.allowed('knead') ? (0.08 + p.affection * 0.30 + p.sleepiness * 0.16) * (1 - sick * 0.8) : 0 },
+      { item: 'kneadboth', weight: this.allowed('kneadboth') ? (0.06 + p.affection * 0.26 + p.sleepiness * 0.14) * (1 - sick * 0.8) : 0 },
       // Deliberately tiny: at these weights an energetic cat has a fit every few
       // minutes, which is the point. Turn it up and the pet stops being calming.
       { item: 'zoomies', weight: this.stayPut || !this.allowed('zoomies') ? 0 : (0.02 + p.energy * 0.10 + p.mischief * 0.04) * (1 - tired * 0.9) * (1 - sick) },
@@ -760,6 +765,10 @@ export class PetEngine {
           break
         case 'zoomies':
           this.startZoomies()
+          break
+        case 'knead':
+        case 'kneadboth':
+          this.playOneShot(action)
           break
         case 'sleep':
           this.setClip('sleep')

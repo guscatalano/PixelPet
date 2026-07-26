@@ -23,6 +23,10 @@ export interface State34 {
   paw?: number
   /** -1..1 — lateral pat offset of the raised paw (animate for pat-pat-pat). */
   pawX?: number
+  /** 0..1 — the OTHER front paw. Drive both out of phase to knead. */
+  paw2?: number
+  /** -1..1 — lateral pat offset of the second paw. */
+  pawX2?: number
 }
 
 export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Parts {
@@ -34,9 +38,12 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
   // leans away from the raised paw, the head tips back to watch you, and each
   // pat rocks the whole cat subtly. Feet stay planted (legs use bxBase). ---
   const pawAmtW = state.paw || 0, pawXW = state.pawX || 0
-  const leanX = -(1.1 * pawAmtW) + 0.35 * pawXW
-  const headUp = 0.9 * pawAmtW - 0.6 * pawXW
-  if (pawAmtW > 0.01) { g.headCy -= headUp; g.eyeY -= headUp; g.noseY -= headUp }
+  const paw2AmtW = state.paw2 || 0, paw2XW = state.pawX2 || 0
+  // Lean is driven by the DIFFERENCE between the paws, so kneading with both
+  // rocks in place instead of leaning the cat off its own feet.
+  const leanX = -(1.1 * (pawAmtW - paw2AmtW)) + 0.35 * (pawXW - paw2XW)
+  const headUp = 0.9 * Math.max(pawAmtW, paw2AmtW) - 0.6 * pawXW
+  if (pawAmtW > 0.01 || paw2AmtW > 0.01) { g.headCy -= headUp; g.eyeY -= headUp; g.noseY -= headUp }
 
   // --- asymmetric geometry (face angled toward viewer-right) ---
   const hx = g.headCx + 1.3 * t + leanX * 1.2 // head mass eases right (+ lean)
@@ -63,23 +70,33 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
   // travels up as the leg raises (forearm visible), the pad rotating toward
   // the viewer as it arrives — growing with foreshortening, toe beans out.
   const pawAmt = state.paw || 0, pawX = state.pawX || 0
+  const paw2Amt = state.paw2 || 0, paw2X = state.pawX2 || 0
   const pawMask = new Uint8Array(W * H)
-  const pawReach = 0.55 + 0.45 * pawAmt
-  const plantedX = bxBase + 0.9 * t + g.bodyRx * 0.3 // where that foot was standing
   const groundPawY = g.bodyCy + g.bodyRy * 0.98
-  const pawPx = plantedX + (bx + 6.2 - plantedX) * pawAmt
-  const pawPy = groundPawY + (g.bodyCy + g.bodyRy * 0.32 - 4.5 - groundPawY) * pawAmt + pawX * 1.6
-  const pawRx = 2.6 + 0.9 * pawAmt, pawRy = 2.1 + 1.0 * pawAmt // pad turns to camera at the top
+  /** Where a raised paw sits, for the viewer-right (+1) or viewer-left (-1) leg. */
+  const pawFor = (s: number): { amt: number; x: number; y: number; rx: number; ry: number } => {
+    const amt = s === 1 ? pawAmt : paw2Amt
+    const lat = s === 1 ? pawX : paw2X
+    const planted = bxBase + 0.9 * t + s * (g.bodyRx * 0.3) // where that foot was standing
+    return {
+      amt,
+      x: planted + (bx + s * 6.2 - planted) * amt,
+      y: groundPawY + (g.bodyCy + g.bodyRy * 0.32 - 4.5 - groundPawY) * amt + lat * 1.6,
+      rx: 2.6 + 0.9 * amt, // pad turns to camera at the top
+      ry: 2.1 + 1.0 * amt
+    }
+  }
   { // front legs, shifted with the chest
     const legDX = g.bodyRx * 0.3
     const legTop = g.bodyCy + g.bodyRy * 0.32, pawY = g.bodyCy + g.bodyRy * 0.98
     for (const s of [-1, 1]) {
       const lx = bxBase + 0.9 * t + s * legDX // planted — the body leans over them
-      if (s === 1 && pawAmt > 0.05) {
+      const p = pawFor(s)
+      if (p.amt > 0.05) {
         const setPaw = (x: number, y: number): void => { set(x, y); if (inB(x, y)) pawMask[idx(x, y)] = 1 }
         // the lifting foreleg, pivoting up from where the foot stood
-        for (let k = 0; k <= 1.001; k += 0.2) ellipse(setPaw, lx + (pawPx - 0.3 - lx) * k, legTop + 1.5 + (pawPy + 1.8 - (legTop + 1.5)) * k, 1.9 - k * 0.3, 1.7 - k * 0.2)
-        ellipse(setPaw, pawPx, pawPy, pawRx, pawRy) // the pad
+        for (let k = 0; k <= 1.001; k += 0.2) ellipse(setPaw, lx + (p.x - s * 0.3 - lx) * k, legTop + 1.5 + (p.y + 1.8 - (legTop + 1.5)) * k, 1.9 - k * 0.3, 1.7 - k * 0.2)
+        ellipse(setPaw, p.x, p.y, p.rx, p.ry) // the pad
         continue
       }
       for (let y = legTop; y <= pawY; y += 0.5) ellipse(set, lx, y, 2.3, 1.6)
@@ -177,8 +194,9 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
           }
       }
     // Toe beans — the unmistakable "paw at the glass" signature: three pink
-    // toes arcing across the pad's top, one bigger pad bean below.
-    if (pawAmt > 0.6) {
+    // toes arcing across the pad's top, one bigger pad bean below. Drawn for
+    // whichever paw is raised far enough to show its underside.
+    {
       const bean = (x: number, y: number): void => {
         const bxx = Math.round(x * S), byy = Math.round(y * S), b = Math.max(1, Math.round(S))
         for (let dy = 0; dy < b; dy++) for (let dx = 0; dx < b; dx++) {
@@ -186,11 +204,16 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
           if (inB(rx2, ry2) && pawMask[idx(rx2, ry2)] && overlay[idx(rx2, ry2)] === O.NONE) put(overlay, rx2, ry2, O.NOSE)
         }
       }
-      bean(pawPx - 1.8 * pawReach, pawPy - 1.2 * pawReach)
-      bean(pawPx, pawPy - 1.8 * pawReach)
-      bean(pawPx + 1.8 * pawReach, pawPy - 1.2 * pawReach)
-      ellipse((x, y) => { if (pawMask[idx(x, y)] && overlay[idx(x, y)] === O.NONE) put(overlay, x, y, O.NOSE) },
-        pawPx, pawPy + 1.1 * pawReach, 1.3 * pawReach, 0.9 * pawReach)
+      for (const s of [1, -1]) {
+        const p = pawFor(s)
+        if (p.amt <= 0.6) continue
+        const reach = 0.55 + 0.45 * p.amt
+        bean(p.x - 1.8 * reach, p.y - 1.2 * reach)
+        bean(p.x, p.y - 1.8 * reach)
+        bean(p.x + 1.8 * reach, p.y - 1.2 * reach)
+        ellipse((x, y) => { if (pawMask[idx(x, y)] && overlay[idx(x, y)] === O.NONE) put(overlay, x, y, O.NOSE) },
+          p.x, p.y + 1.1 * reach, 1.3 * reach, 0.9 * reach)
+      }
     }
   }
 

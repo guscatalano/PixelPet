@@ -329,8 +329,35 @@ function pawFrames(): Frame[] {
     ]
   })
 }
-const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = { yawn: 'front', stretch: 'stand', react: 'front', paw: 'front' }
-const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = { yawn: yawnFrames, stretch: stretchFrames, react: reactFrames, paw: pawFrames }
+/**
+ * Making biscuits. Cats do this both ways, so both ship: one paw pushing in a
+ * steady rhythm, or the classic two-paw alternation. The push is deliberately
+ * shallow (nothing like the full reach of `paw`) — kneading is a small, content
+ * motion, and a big lift reads as reaching for you instead.
+ */
+function kneadFrames(both: boolean): Frame[] {
+  return seqFrames(both ? 'knead-both' : 'knead-one', () => {
+    const f = (a: number, b: number, ms: number): Frame => ({
+      img: rgbaToCanvas(renderPet(generate34Grid(activePet, 0, { paw: a, paw2: b }), activePet.coat)), ms
+    })
+    const PUSH = 0.5, LIFT = 0.12
+    const out: Frame[] = [f(LIFT, both ? PUSH : 0, 130)]
+    for (let i = 0; i < 4; i++) {
+      if (both) out.push(f(PUSH, LIFT, 170), f(LIFT, PUSH, 170))
+      else out.push(f(PUSH, 0, 180), f(LIFT, 0, 180))
+    }
+    out.push(f(0, 0, 150)) // settle both feet back down
+    return out
+  })
+}
+
+const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = {
+  yawn: 'front', stretch: 'stand', react: 'front', paw: 'front', knead: 'front', kneadboth: 'front'
+}
+const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = {
+  yawn: yawnFrames, stretch: stretchFrames, react: reactFrames, paw: pawFrames,
+  knead: () => kneadFrames(false), kneadboth: () => kneadFrames(true)
+}
 
 // ---- Graph runtime state ------------------------------------------------------
 const NODE_OF: Partial<Record<ClipName, Node>> = {

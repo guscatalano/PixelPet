@@ -188,6 +188,9 @@ function poofPose(t: number): ReturnType<typeof lerpPose> {
   return lerpPose(RIG.stand, RIG.stand, 0)
 }
 const yawnK = (t: number): number => clamp01(Math.sin(((t % 3400) / 3400) * Math.PI * 2) * 1.4)
+// A shallow, steady push — kneading, not reaching. Offset by half a cycle for the
+// second paw to get the alternation.
+const kneadK = (t: number): number => 0.12 + 0.38 * (0.5 + 0.5 * Math.sin((t / 360) * Math.PI))
 function pawState(t: number): { paw: number; pawX: number } {
   const ph = t % 2600
   if (ph < 400) return { paw: easeIn(ph / 400), pawX: 0 }
@@ -215,6 +218,9 @@ const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) 
   { key: 'teeter', label: 'Teeter', rgba: (pet, t) => renderPet(generateRigGrid(pet, lerpPose(RIG.teeter, RIG.teeterFwd, 0.5 + 0.5 * Math.sin(t / 260))), pet.coat) },
   { key: 'poof', label: 'Poof!', rgba: (pet, t) => renderPet(generateRigGrid(pet, poofPose(t)), pet.coat) },
   { key: 'yawn', label: 'Yawn', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { yawn: yawnK(t) }), pet.coat) },
+  // Making biscuits — one paw pushing, or both alternating.
+  { key: 'knead', label: 'Knead', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { paw: kneadK(t) }), pet.coat) },
+  { key: 'kneadboth', label: 'Knead ×2', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { paw: kneadK(t), paw2: kneadK(t + 180) }), pet.coat) },
   { key: 'paw', label: 'Paw', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, pawState(t)), pet.coat) },
   { key: 'react', label: 'React', rgba: (pet, t) => renderPet(generateGrid(pet, reactState(t)), pet.coat) },
   { key: 'sulk', label: 'Sulk', rgba: (pet, t) => renderPet(generateRigGrid(pet, { ...RIG.sulk, eye: t % 4200 > 160 ? 1 : 0 }), pet.coat) },
