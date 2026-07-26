@@ -136,7 +136,7 @@ function getRigFrame(key: string, make: () => RigPose): HTMLCanvasElement {
 // the renderer walks the graph to it and reports arrival via stateReached.
 type Node =
   | 'front' | 'sit' | 'stand' | 'walk' | 'prance' | 'stalk' | 'trot' | 'hop' | 'loaf' | 'sphinx' | 'sleep' | 'groom'
-  | 'teeter' | 'crouch' | 'air' | 'fall' | 'poof' | 'sick' | 'sulk'
+  | 'teeter' | 'crouch' | 'air' | 'fall' | 'poof' | 'sick' | 'sulk' | 'zoomies'
 
 interface Frame { img: HTMLCanvasElement; ms: number; ox?: number; oy?: number }
 
@@ -232,6 +232,7 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
     case 'stand>stalk': case 'stalk>stand': return []
     case 'stand>trot': case 'trot>stand': return []
     case 'stand>hop': case 'hop>stand': return []
+    case 'stand>zoomies': case 'zoomies>stand': return [] // same base pose, bound legs
     case 'stand>teeter': return seqFrames(key, () => rigLerpFrames(POSES.stand, POSES.teeter, 4, 100))
     case 'teeter>stand': return seqFrames(key, () => rigLerpFrames(POSES.teeter, POSES.stand, 4, 100))
     case 'stand>poof': return seqFrames(key, () => rigLerpFrames(POSES.stand, POSES.poof, 4, 75)) // fast — it's a scare
@@ -254,12 +255,13 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
 const EDGES: Record<Node, Node[]> = {
   front: ['sit'],
   sit: ['front', 'stand', 'loaf', 'sphinx', 'sleep', 'groom', 'sick', 'sulk'],
-  stand: ['sit', 'walk', 'prance', 'stalk', 'trot', 'hop', 'teeter', 'poof', 'crouch'],
+  stand: ['sit', 'walk', 'prance', 'stalk', 'trot', 'hop', 'zoomies', 'teeter', 'poof', 'crouch'],
   walk: ['stand'],
   prance: ['stand'],
   stalk: ['stand'],
   trot: ['stand'],
   hop: ['stand'],
+  zoomies: ['stand'],
   loaf: ['sit', 'sphinx'],
   sphinx: ['sit', 'loaf'],
   sleep: ['sit'],
@@ -418,8 +420,9 @@ const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = {
 // ---- Graph runtime state ------------------------------------------------------
 const NODE_OF: Partial<Record<ClipName, Node>> = {
   idle: 'front', sit: 'sit', walk: 'walk', prance: 'prance', stalk: 'stalk', trot: 'trot', hop: 'hop', sleep: 'sleep', loaf: 'loaf', sphinx: 'sphinx',
-  // Zoomies is a prance run flat out — same visual, the engine supplies the speed.
-  zoomies: 'prance',
+  // Zoomies renders as a BOUND, not a fast prance: a real gallop is ~80% airborne
+  // flight per stride, which the bound silhouette shows and a prance does not.
+  zoomies: 'zoomies',
   groom: 'groom', teeter: 'teeter', fall: 'fall', poof: 'poof', sick: 'sick', sulk: 'sulk'
 }
 const CROUCH_WIGGLE_MS = 1150 // butt-wiggle time before the leap
@@ -521,8 +524,26 @@ function idleExpr(now: number): { eyeOpen: boolean; look: number; earPhase: numb
 let walkStep = 0
 window.pet.onWalkStep((step: number) => { walkStep = step })
 
-// Slow blink for the side rest nodes (sit / loaf).
-const restBlink = (now: number): boolean => now % 4200 > 160
+// Blink for the side rest nodes (sit / loaf / sphinx / sulk). Returns true when
+// the eyes are OPEN. Spontaneous blinking is irregular; a shared modulo clock
+// meant every side pose blinked in lockstep on a perfect 4.2s metronome forever,
+// which is the sort of thing you cannot stop seeing once you have seen it.
+let blinkOpenUntil = 0
+let blinkShutUntil = 0
+function restBlink(now: number): boolean {
+  if (now > blinkOpenUntil) {
+    blinkShutUntil = now + 110 + Math.random() * 90
+    blinkOpenUntil = blinkShutUntil + 1700 + Math.random() * 4300
+  }
+  return now > blinkShutUntil
+}
+// Breathing periods, in ms of sine argument. Healthy cats measure ~19 breaths/min
+// resting and ~21 asleep (clinical range 15-30); these used to sit at 9-11, below
+// the biological floor. k = 60000 / (bpm * 2π).
+const BREATH_SLEEP = 455 // ~21/min
+const BREATH_REST = 500 // ~19/min (loaf, sphinx)
+const BREATH_SICK = 300 // ~32/min — an unwell cat breathes FASTER, not slower;
+// >30/min is the clinical warning sign. It was the slowest of the lot.
 
 // Hover ear-perk while sleeping: perk eases toward 1 while hovered, back to 0.
 let hovering = false
@@ -546,12 +567,12 @@ function sleepFrame(now: number): HTMLCanvasElement {
   const target = hovering ? 1 : 0
   const speed = dt / 220 // ~220ms to full perk
   perkCur = target > perkCur ? Math.min(target, perkCur + speed) : Math.max(target, perkCur - speed)
-  const b = Math.round(((Math.sin(now / 900) + 1) / 2) * 5) // breath 0..5
+  const b = Math.round(((Math.sin(now / BREATH_SLEEP) + 1) / 2) * 5) // breath 0..5
   const p = Math.round(perkCur * 4) // perk 0..4
   return getRigFrame(`sleep|${sleepIdx}|${b}|${p}`, () => {
     const pose = lerpPose(sleepBase, sleepBase, 0)
     const br = (b / 5) * 2 - 1
-    pose.body = [pose.body[0], pose.body[1] - br * 0.25, pose.body[2], pose.body[3] + br * 0.5]
+    pose.body = [pose.body[0], pose.body[1] - br * 0.45, pose.body[2], pose.body[3] + br * 0.85]
     pose.earPerk = p / 4
     if (p === 4) pose.head = [pose.head[0], pose.head[1] - 1, pose.head[2]] // listening…
     return pose
@@ -574,6 +595,8 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
     case 'stalk': return { img: getGaitFrame('stalk', walkStep) }
     case 'trot': return { img: getGaitFrame('trot', walkStep) }
     case 'hop': return { img: getGaitFrame('hop', walkStep) }
+    // A gallop is ~80% airborne flight — the BOUND silhouette, not a fast prance.
+    case 'zoomies': return { img: getGaitFrame('hop', walkStep) }
     case 'fall': return { img: getWalkFrame((now / 90) % 1) } // legs scrabbling in the air
     case 'loaf': {
       // Hover a loafing cat and it turns its head to look at you (body stays
@@ -589,12 +612,12 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
       relaxCur = relaxTarget > relaxCur ? Math.min(relaxTarget, relaxCur + rSpeed) : Math.max(relaxTarget, relaxCur - rSpeed)
       const f = Math.round(headCur * 2) // 0 = profile, 1 = mid-turn blink, 2 = facing you
       const rq = Math.round(relaxCur * 4) // 0 = heads-up loaf .. 4 = fully settled
-      const b = Math.round(((Math.sin(now / 1100) + 1) / 2) * 5)
+      const b = Math.round(((Math.sin(now / BREATH_REST) + 1) / 2) * 5)
       const open = rq >= 3 ? false : restBlink(now) // dozing once fully settled
       return { img: getRigFrame(`loaf|${b}|${open ? 1 : 0}|${f}|${rq}`, () => {
         const pose = lerpPose(POSES.loaf, POSES.loafLow, rq / 4)
         const br = (b / 5) * 2 - 1
-        pose.body = [pose.body[0], pose.body[1] - br * 0.2, pose.body[2], pose.body[3] + br * 0.35]
+        pose.body = [pose.body[0], pose.body[1] - br * 0.35, pose.body[2], pose.body[3] + br * 0.6]
         pose.eye = open ? 1 : 0
         pose.headFace = f / 2
         pose.earPerk = f * 0.25 // it noticed you
@@ -609,12 +632,12 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
       const target = hovering ? 1 : 0
       headCur = target > headCur ? Math.min(target, headCur + speed) : Math.max(target, headCur - speed)
       const f = Math.round(headCur * 2)
-      const b = Math.round(((Math.sin(now / 1000) + 1) / 2) * 5)
+      const b = Math.round(((Math.sin(now / BREATH_REST) + 1) / 2) * 5)
       const open = restBlink(now)
       return { img: getRigFrame(`sphinx|${b}|${open ? 1 : 0}|${f}`, () => {
         const pose = lerpPose(POSES.sphinx, POSES.sphinx, 0)
         const br = (b / 5) * 2 - 1
-        pose.body = [pose.body[0], pose.body[1] - br * 0.2, pose.body[2], pose.body[3] + br * 0.35]
+        pose.body = [pose.body[0], pose.body[1] - br * 0.35, pose.body[2], pose.body[3] + br * 0.6]
         pose.eye = open ? 1 : 0
         pose.headFace = f / 2
         pose.earPerk = f * 0.25
@@ -633,7 +656,8 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
       return { img: getRigFrame(`teeter|${q}`, () => lerpPose(POSES.teeter, POSES.teeterFwd, q / 6)) }
     }
     case 'crouch': {
-      const k = 0.5 + 0.5 * Math.sin(now / 150)
+      // Rapid shimmying: ~4 shimmies inside CROUCH_WIGGLE_MS, not one slow lean.
+      const k = 0.5 + 0.5 * Math.sin(now / 48)
       const q = Math.round(k * 4)
       return { img: getRigFrame(`wiggle|${q}`, () => lerpPose(POSES.crouch, POSES.crouchWiggle, q / 4)) }
     }
@@ -645,12 +669,12 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
     }
     case 'sick': {
       // Lethargic: slow, shallow breathing and a heavy slow blink.
-      const b = Math.round(((Math.sin(now / 1500) + 1) / 2) * 4)
+      const b = Math.round(((Math.sin(now / BREATH_SICK) + 1) / 2) * 4)
       const open = now % 5200 > 320
       return { img: getRigFrame(`sick|${b}|${open ? 1 : 0}`, () => {
         const pose = lerpPose(POSES.sick, POSES.sick, 0)
         const br = (b / 4) * 2 - 1
-        pose.body = [pose.body[0], pose.body[1] - br * 0.15, pose.body[2], pose.body[3] + br * 0.3]
+        pose.body = [pose.body[0], pose.body[1] - br * 0.3, pose.body[2], pose.body[3] + br * 0.5]
         pose.eye = open ? 1 : 0
         return pose
       }) }

@@ -572,7 +572,11 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   // A hop (bunny bound): one big up-arc per cycle with the legs tucking under at
   // the apex, instead of the 4-beat walk. `air` = 0 grounded … 1 at the apex.
   const hop = g.gait === 'hop'
-  const ex = Math.min(1.2, excite + (g.gait === 'trot' ? 0.7 : 0)) // trot = a bouncy, lifted walk
+  // A trot is a TWO-beat gait: diagonal pairs strike together (50% diagonality),
+  // not a bouncier four-beat walk. It used to be excite=0.7, which made it a
+  // visual twin of the prance. Keep a little lift, but the footfalls do the work.
+  const trot = g.gait === 'trot'
+  const ex = Math.min(1.2, excite + (trot ? 0.25 : 0))
   const crouch = g.gait === 'stalk' ? 3 : 0 // stalk = a low, slinking creep
   const air = hop ? Math.sin((((step % 1) + 1) % 1) * Math.PI) : 0
   const bob = hop ? -air * 5 * motion : Math.sin(step * Math.PI * 4) * (1.3 + ex * 1.7) * (g.gait === 'stalk' ? 0.4 : 1) * motion
@@ -585,19 +589,33 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
 
   // 4-beat LATERAL-SEQUENCE walk (real cat gait): footfalls RH -> RF -> LH -> LF,
   // spaced a quarter-cycle apart, so only one paw is off the ground at a time.
-  const legs = [
-    { x: 14, ph: 0.0, near: false, back: true }, // RH (back far)
-    { x: 26, ph: 0.25, near: false, back: false }, // RF (front far) — under the chest, not the head
-    { x: 16, ph: 0.5, near: true, back: true }, // LH (back near)
-    { x: 28, ph: 0.75, near: true, back: false } // LF (front near)
-  ]
+  // Trot swaps to two beats by pairing the phases diagonally: RH+LF together,
+  // then LH+RF a half-cycle later. Same legs, same geometry — only the timing
+  // changes, which is exactly what distinguishes the real gaits.
+  const legs = trot
+    ? [
+        { x: 14, ph: 0.0, near: false, back: true }, // RH ┐ diagonal pair
+        { x: 28, ph: 0.0, near: true, back: false }, // LF ┘
+        { x: 16, ph: 0.5, near: true, back: true }, // LH ┐ diagonal pair
+        { x: 26, ph: 0.5, near: false, back: false } // RF ┘
+      ]
+    : [
+        { x: 14, ph: 0.0, near: false, back: true }, // RH (back far)
+        { x: 26, ph: 0.25, near: false, back: false }, // RF (front far) — under the chest, not the head
+        { x: 16, ph: 0.5, near: true, back: true }, // LH (back near)
+        { x: 28, ph: 0.75, near: true, back: false } // LF (front near)
+      ]
   const seg = (paint: SetFn, x0: number, y0: number, x1: number, y1: number, r0: number, r1: number): void => {
     const n = 7
     for (let t = 0; t <= 1.0001; t += 1 / n) ellipse(paint, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, r0 + (r1 - r0) * t, r0 + (r1 - r0) * t)
   }
   // Stance = 75% of the cycle. A sets the horizontal foot range so a planted foot
   // slides back exactly as fast as the body advances: STRIDE = 2*A/0.75. (=12.)
-  const A = 4.5, LIFT = (3.4 + ex * 2.4) * (g.gait === 'stalk' ? 0.5 : 1), SWING = 0.25
+  // Stance is 75% of the cycle for a walk (duty factor 0.75 — three feet down).
+  // A trot halves it: two beats, roughly even stance/swing, tending to a brief
+  // suspension at speed. STRIDE follows from it, so the engine's trot stride
+  // (GAIT_STRIDE) must match 2*A/stance or the feet skate.
+  const A = 4.5, LIFT = (3.4 + ex * 2.4) * (g.gait === 'stalk' ? 0.5 : 1), SWING = trot ? 0.5 : 0.25
   const drawLeg = (lg: { x: number; ph: number; near: boolean; back: boolean }): void => {
     if (hop) { // all four legs move together: extended at the bottom, tucked at the apex
       const tag = lg.near ? 1 : 2
@@ -649,11 +667,21 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
   }
 
   {
-    const tailSway = Math.sin(step * Math.PI * 2) * (2 + ex * 1.6) * motion
+    const stalking = g.gait === 'stalk'
+    const tailSway = Math.sin(step * Math.PI * 2) * (2 + ex * 1.6) * motion * (stalking ? 0.2 : 1)
     // Excited/trotting: the tail rises upright (proud "question-mark" carriage).
+    // Stalking is the opposite — a hunting cat drops the tail and stretches it
+    // out low behind to cut its profile, with only the TIP flicking (adrenaline;
+    // described as rattlesnake-like). The high carriage read as "pleased with
+    // itself" rather than "hunting", which undercut the whole creep.
+    const tipFlick = stalking ? Math.sin(step * Math.PI * 8) * 1.6 * motion : 0
     const p0 = [bodyCx - bodyRx * 0.7, bodyCy - 1]
-    const p1 = [bodyCx - bodyRx - 4 + ex * 3, bodyCy - 9 - ex * 5]
-    const p2 = [bodyCx - bodyRx + 3 + tailSway + ex * 5, bodyCy - 18 - ex * 7]
+    const p1 = stalking
+      ? [bodyCx - bodyRx - 6, bodyCy + 2.2]
+      : [bodyCx - bodyRx - 4 + ex * 3, bodyCy - 9 - ex * 5]
+    const p2 = stalking
+      ? [bodyCx - bodyRx - 12, bodyCy + 4.2 + tipFlick]
+      : [bodyCx - bodyRx + 3 + tailSway + ex * 5, bodyCy - 18 - ex * 7]
     const wts = g.tailStyle
     const wtb = 2.6 * (wts === 'bushy' ? 1.8 : wts === 'thin' ? 0.6 : 1)
     const wtEnd = wts === 'nub' ? 0.34 : 1.0001

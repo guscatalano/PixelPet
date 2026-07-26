@@ -35,12 +35,16 @@ const TROT_SPEED = 0.62
 //   whose DNA gait is 'hop' still bounds continuously, because that renders
 //   through the plain walk clip with the pet's own geometry — rabbits unaffected.
 const HOP_STRIDE = 52 // px covered by a single bound
+// A trot's stance is half the cycle (vs the walk's 0.75), so its stride is
+// 2*A/0.5 = 18px in generator units. Must track SWING in catgen.generateWalkGrid
+// or a planted foot slides against the ground.
+const TROT_STRIDE = 18
 const HOP_SPEED = 1.5 // px/tick (~94px/s) → ~1.8 bounds/sec at that stride
 const HOP_BOUNDS = [1, 2] as const // inclusive range of bounds per hop trip
 const GAIT_SPEED: Partial<Record<ClipName, number>> = { prance: PRANCE_SPEED, trot: TROT_SPEED, stalk: 0.22, hop: HOP_SPEED, zoomies: ZOOMIES_SPEED }
 /** Gaits whose stride is a fixed physical distance rather than derived from
  *  speed — a bound covers a bound's worth of ground, whatever the pace. */
-const GAIT_STRIDE: Partial<Record<ClipName, number>> = { hop: HOP_STRIDE }
+const GAIT_STRIDE: Partial<Record<ClipName, number>> = { hop: HOP_STRIDE, trot: TROT_STRIDE }
 const MIN_WANDER = 90 // don't bother wandering shorter than this
 const STRIDE = 12 // px travelled per full gait cycle; = 2*A/stance in the walk pose
 // Cats do not sprint by pedalling faster — stride LENGTH grows roughly linearly
