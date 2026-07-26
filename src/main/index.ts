@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, Menu, dialog, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, Menu, dialog, powerMonitor, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
@@ -30,6 +30,29 @@ let settingsWindow: BrowserWindow | null = null
 let tray: Electron.Tray | null = null
 let engine: PetEngine | null = null
 let settings!: AppSettings // assigned on app-ready, before any window is created
+
+// ---- OS-driven shutdown (session end / MSIX quiesce) ------------------------
+// Windows has to see every process in a package exit before it can replace that
+// package on disk, so an MSIX auto-update asks the running app to quiesce first.
+// A tray app deliberately outlives `window-all-closed`, so nothing here answered
+// that request: the deployment waited ~30s, gave up, and force-killed us — which
+// lands in the event log as an Application Hang (HangType=Quiesce) rather than a
+// clean exit, and looks like a crash to the user every time the app updates.
+
+/** True once a quit is underway, from either the user or the OS. */
+let quitting = false
+
+/** Exit because the OS asked us to, not because the user did. Idempotent. */
+function quitForOs(reason: string): void {
+  if (quitting) return
+  quitting = true
+  console.log(`[lifecycle] shutting down: ${reason}`)
+  // The OS only waits so long before killing us, and a wedged renderer can stall
+  // app.quit() past that. Hard-exit well inside the budget as a backstop; unref
+  // so this timer can never be the thing keeping the process alive.
+  setTimeout(() => app.exit(0), 4000).unref()
+  app.quit()
+}
 
 /** Cursor-follow drag state (main moves the window using the OS cursor position). */
 let dragTimer: ReturnType<typeof setInterval> | null = null
@@ -99,6 +122,15 @@ function createPetWindow(): BrowserWindow {
     win.webContents.send('pet:set-pet', findPet(settings, settings.activePetId))
     win.webContents.send('pet:set-config', { turnMs: settings.turnMs, frontScale: settings.frontScale, pupilsByTime: settings.pupilsByTime, detail: settings.detail })
   })
+
+  // Show/Hide only ever hide()s this window and nothing else closes it, so an
+  // incoming close is the OS telling us to go away — a package quiesce, the end
+  // of the session, or Task Manager's "End task". Take it as a quit signal.
+  win.on('close', () => quitForOs('pet window closed by the OS'))
+
+  // Windows-only: log off / restart / force shutdown (WM_ENDSESSION). We get very
+  // little time on this path, which is what quitForOs's hard-exit backstop is for.
+  win.on('session-end', () => quitForOs('session ending'))
 
   win.on('closed', () => {
     engine?.dispose()
@@ -811,16 +843,25 @@ if (!gotLock) {
 
     startDreamLoop()
 
+    // macOS/Linux counterpart to the pet window's win32 'session-end'.
+    powerMonitor.on('shutdown', () => quitForOs('system shutdown'))
+
     // Keep the pet reachable when the monitor layout changes.
     screen.on('display-removed', clampPetOnScreen)
     screen.on('display-metrics-changed', clampPetOnScreen)
   })
 
   app.on('window-all-closed', () => {
-    // Tray app: keep running with no visible windows.
+    // Tray app: keep running with no visible windows. An OS-driven close comes
+    // in through the pet window's 'close' handler, which quits us properly.
   })
 
+  // Terminal/`kill` shutdowns — mainly dev and macOS/Linux, harmless on Windows.
+  process.on('SIGTERM', () => quitForOs('SIGTERM'))
+  process.on('SIGINT', () => quitForOs('SIGINT'))
+
   app.on('before-quit', () => {
+    quitting = true // our own quit — stop quitForOs re-entering as windows close
     stopDrag()
     stopItemDrag()
     itemWindow?.destroy()
