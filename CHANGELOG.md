@@ -3,6 +3,38 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.10.0 — moves like the real thing
+
+Everything here came out of comparing the animations against research on how cats
+actually move — footfall patterns, hunting posture, breathing and blinking.
+
+### New
+- **A “Faces you” control** (*Settings → Look → Drawing*). Your pet used to turn and look
+  at you at the end of *every* action, which reads more like staring than like a cat. Now
+  it's a dial — 40% by default, so it rests in profile most of the time and looking at you
+  means something.
+
+### Changed
+- **Stalking looks like hunting now.** Your pet creeps a little, freezes stock-still to
+  watch — mid-step, one paw up — then creeps again, with its tail held low and stretched
+  out behind, only the tip flicking. It used to slink along continuously with its tail up,
+  which read as *pleased with itself* rather than *hunting something*.
+- **Trot is a real trot.** It's a two-beat gait — diagonal pairs of legs moving together —
+  rather than the bouncier walk it used to be, which made it nearly indistinguishable from
+  the prance.
+- **Zoomies bound rather than prance.** A cat at full tilt is airborne most of each stride,
+  so it now uses the bounding silhouette.
+- **Breathing looks right.** Resting and sleeping pets were breathing at roughly half the
+  rate of a real cat, shallowly enough to be nearly invisible at small sizes. An unwell pet
+  now breathes *faster*, not slower, which is what actually happens.
+- **Blinking is no longer clockwork.** Every resting pose blinked in perfect lockstep on a
+  fixed timer; blinks are now irregular, as they should be.
+- **A livelier wiggle** before a pounce — several quick shimmies instead of one slow lean.
+
+### Fixed
+- The Settings window now comes to the front when you ask for it again while it's already
+  open but buried behind something else.
+
 ## v0.9.0 — how a cat actually moves
 
 ### New
