@@ -308,7 +308,24 @@ function createSettingsWindow(): BrowserWindow {
 
 function openSettings(): void {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
-    settingsWindow.focus()
+    const win = settingsWindow
+    // focus() alone is not enough on Windows. The request comes from the tray,
+    // so our process is not the foreground one, and the foreground lock means
+    // SetForegroundWindow is downgraded to a taskbar flash — the window stays
+    // buried behind whatever is on top of it.
+    if (win.isMinimized()) win.restore()
+    win.show() // also covers a hidden window, and raises within its z-band
+    win.focus()
+    if (!win.isFocused()) {
+      // Still buried: briefly make it topmost. Windows honours a z-order change
+      // from a background process even when it refuses the foreground handoff,
+      // and the flag is dropped again immediately so it does not sit above
+      // everything afterwards.
+      win.setAlwaysOnTop(true)
+      win.focus()
+      win.setAlwaysOnTop(false)
+      win.moveTop()
+    }
     return
   }
   settingsWindow = createSettingsWindow()
@@ -1017,6 +1034,14 @@ function handleDebugArgs(argv: string[]): void {
   if (clip) {
     console.log(`[debug] forcing clip "${clip}"`)
     engine?.forcePlay(clip as ClipName)
+  }
+
+  // --open-settings: exactly what the tray item does. The tray cannot be driven
+  // from a script, and "does it actually come to the front" is precisely the
+  // kind of thing that needs testing rather than assuming.
+  if (argv.includes('--open-settings')) {
+    console.log('[debug] open settings')
+    openSettings()
   }
 
   const arg = argv.find((a) => a.startsWith('--goto-window='))
