@@ -1,6 +1,12 @@
-// Generates Microsoft Store SCREENSHOTS (1920x1080) — real pixel-cat sprites and
-// the real settings window composed onto branded desktop scenes with captions.
-// Run:  npx electron scripts/genStoreScreens.mjs
+// Generates the marketing SCREENSHOTS — real pixel-cat sprites and the real
+// settings window composed onto branded desktop scenes with captions.
+//
+// Scenes are always laid out at 1920x1080 (the CSS is written for that canvas)
+// and the capture is downscaled to the requested output size on the way out.
+//   Store (1920x1080 → store-assets/, git-ignored):
+//     npm run shots:store
+//   README (1280x720 → docs/screenshots/, committed):
+//     npm run shots:readme
 import { app, BrowserWindow, ipcMain, nativeImage } from 'electron'
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -11,7 +17,21 @@ import { encodePNG } from './pngEncoder.mjs'
 import { PRESETS } from './presets.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const outDir = resolve(root, 'store-assets')
+
+/** Read `--flag value` out of argv (electron passes script args through). */
+const arg = (name, dflt) => {
+  const i = process.argv.indexOf(`--${name}`)
+  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : dflt
+}
+
+const outDir = resolve(root, arg('out', 'store-assets'))
+// The scenes' CSS is authored against this canvas; never change it independently
+// of the layout. Output size is whatever you ask for, downscaled from here.
+const SCENE_W = 1920
+const SCENE_H = 1080
+// Output size — always 16:9, since the scenes are composed for it.
+const OUT_W = Number(arg('width', SCENE_W))
+const OUT_H = Math.round((OUT_W * 9) / 16)
 mkdirSync(outDir, { recursive: true })
 const pet = (id) => PRESETS.find((p) => p.id === id) || PRESETS[0]
 const url = (rgba) => 'data:image/png;base64,' + Buffer.from(encodePNG(W, H, rgba)).toString('base64')
@@ -145,6 +165,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('care:status', () => ({ needs: { hunger: 0.55, energy: 0.7, fun: 0.4, hygiene: 0.85, health: 0.95 }, state: { key: 'content', label: 'Content', emoji: '😺' } }))
   ipcMain.handle('ai:status', () => ({ provider: 'openai', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1', hasKey: false, encryptionAvailable: true }))
   ipcMain.handle('immich:status', () => ({ serverUrl: '', albumId: '', hasKey: false }))
+  // Real version, so the About section never shows a stale or blank number.
+  ipcMain.handle('app:version', () => JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).version)
   for (const ch of ['settings:set-pet', 'settings:set-scale', 'settings:set-trait', 'settings:reset-traits', 'ai:set-config', 'pets:delete-user', 'settings:set-pupils', 'settings:set-caremode', 'settings:set-difficulty', 'care:action', 'settings:set-dreammode', 'settings:set-dreamchance', 'settings:set-dreambubblescale', 'settings:set-petfilter', 'settings:play-clip', 'pets:rename']) {
     ipcMain.on(ch, () => {})
   }
@@ -159,9 +181,15 @@ app.whenReady().then(async () => {
 
   // --- render the scenes ---
   const ic = iconUrl()
-  const win = new BrowserWindow({ width: 1920, height: 1080, frame: false, useContentSize: true, show: false, webPreferences: { offscreen: true } })
+  const win = new BrowserWindow({ width: SCENE_W, height: SCENE_H, frame: false, useContentSize: true, show: false, webPreferences: { offscreen: true } })
+  // The constructor clamps height to the work area (e.g. 1032 on a 1080 screen
+  // with a taskbar), which would letterbox the scene and squash it on resize.
+  // Setting the content size explicitly afterwards is not clamped.
+  win.setContentSize(SCENE_W, SCENE_H)
   win.webContents.setFrameRate(30)
-  const tmp = resolve(outDir, '_scene.html')
+  // Scratch file lives in out/ (git-ignored) so it never lands in a committed
+  // screenshot directory.
+  const tmp = resolve(root, 'out', '_scene.html')
   for (const s of scenes(ic, settingsShot)) {
     writeFileSync(tmp, `<!doctype html><meta charset="utf-8"><style>${CSS}</style><body><div class="wall"></div><div class="grain"></div>${s.body}</body>`)
     await win.loadFile(tmp)
@@ -169,9 +197,9 @@ app.whenReady().then(async () => {
     let img = await win.webContents.capturePage()
     for (let t = 0; img.isEmpty() && t < 5; t++) { await new Promise((r) => setTimeout(r, 400)); img = await win.webContents.capturePage() }
     const sz = img.getSize()
-    if (!img.isEmpty()) img = img.resize({ width: 1920, height: 1080 })
+    if (!img.isEmpty()) img = img.resize({ width: OUT_W, height: OUT_H })
     writeFileSync(resolve(outDir, s.name), img.toPNG())
-    console.log(`wrote ${s.name} (from ${sz.width}x${sz.height}, empty=${img.isEmpty()})`)
+    console.log(`wrote ${s.name} @ ${OUT_W}x${OUT_H} (from ${sz.width}x${sz.height}, empty=${img.isEmpty()})`)
   }
   app.quit()
  } catch (e) { console.error('SCENE ERROR', e); app.exit(1) }

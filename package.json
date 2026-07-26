@@ -7,6 +7,8 @@
   "license": "MIT",
   "scripts": {
     "gen:icons": "node scripts/genIcons.mjs",
+    "shots:store": "electron scripts/genStoreScreens.mjs",
+    "shots:readme": "electron scripts/genStoreScreens.mjs --out docs/screenshots --width 1280",
     "predev": "npm run gen:icons",
     "dev": "electron-vite dev",
     "prebuild": "npm run gen:icons",
