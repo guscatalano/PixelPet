@@ -3,6 +3,14 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.8.0 — something to play with
+
+### New
+- **A string toy.** Every so often a string dangles down in front of your pet and it has a
+  go at it — a couple of swipes, and the string swings properly when a paw connects.
+  Playful, curious and bored pets reach for it most. Toggleable in *Settings → Behavior*
+  like every other animation.
+
 ## v0.7.0 — up on the furniture
 
 ### New
