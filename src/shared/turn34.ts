@@ -273,5 +273,11 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
     }
   }
 
+  // The ¾ view sees the band obliquely: narrower than the front, wider than side.
+  if (preset.coat?.collar) {
+    const nx = (hx + bx) / 2
+    const ny = (g.headCy + g.bodyCy) / 2 + 2
+    internals.collarBand(overlay, fur, nx, ny, g.headRx * 0.58, 1.6, { cx: nx + 1, cy: ny + 3, r: 1.2 })
+  }
   return { shade, region, overlay, geom: g, fur }
 }

@@ -30,7 +30,7 @@ const HI = 1, BASE = 2, SHADOW = 3, DEEP = 4
 // Coat regions.
 const P = 0, S = 1, WHITE = 2, T = 3
 // Overlay roles (0 = none).
-const O = { NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8, CONE: 9, CONE_HI: 10 }
+const O = { NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8, CONE: 9, CONE_HI: 10, COLLAR: 11, TAG: 12 }
 // The cone of shame — a translucent-plastic look: a light body + a brighter rim/edge.
 const CONE_COLOR = [176, 196, 224]
 const CONE_HI_COLOR = [225, 234, 247]
@@ -58,6 +58,10 @@ export interface CoatSpec {
   primary: string; secondary?: string; white?: string; tertiary?: string
   iris?: string; pupil?: string; glint?: string; nose?: string
   innerEar?: string; whisk?: string; outline?: string
+  /** Wearing a collar: the band's colour. Absent = no collar at all. */
+  collar?: string
+  /** The little hanging tag/bell. Defaults to a warm brass. */
+  collarTag?: string
 }
 export interface Pet {
   id?: string; name?: string; blurb?: string
@@ -435,6 +439,10 @@ export function generateGrid(preset: Pet, state: AnimState = {}): Parts {
 
   applyMarking(region, fur, g, marking)
   drawFace(overlay, fur, g, state)
+  if (preset.coat?.collar) {
+    const ny = (g.headCy + g.bodyCy) / 2 + 1.5
+    collarBand(overlay, fur, g.headCx, ny, g.headRx * 0.72, 1.6, { cx: g.headCx, cy: ny + 3, r: 1.3 })
+  }
   return { shade, region, overlay, geom: g, fur }
 }
 
@@ -445,6 +453,24 @@ function putU(overlay: Uint8Array, ux: number, uy: number, role: number): void {
   const bx = Math.round(ux * SS), by = Math.round(uy * SS), b = blk()
   for (let dy = 0; dy < b; dy++) for (let dx = 0; dx < b; dx++) put(overlay, bx + dx, by + dy, role)
 }
+/**
+ * A collar band: an ellipse painted ONLY where fur already exists, so it hugs
+ * whatever silhouette the current pose happens to have. Every view (front, side
+ * rig, walk, ¾) draws it the same way with its own neck position — the collar
+ * has to appear in all of them or it flickers in and out as the pet changes pose.
+ * `tag` optionally hangs a bead below the band's centre.
+ */
+function collarBand(
+  overlay: Uint8Array, fur: Uint8Array,
+  cx: number, cy: number, rx: number, ry: number,
+  tag?: { cx: number; cy: number; r: number }
+): void {
+  ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] === O.NONE) overlay[idx(x, y)] = O.COLLAR }, cx, cy, rx, ry)
+  // The tag hangs off the band, so it must ALSO stay on fur — otherwise poses
+  // that tuck the chest away leave a yellow pixel floating in mid-air.
+  if (tag) ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) overlay[idx(x, y)] = O.TAG }, tag.cx, tag.cy, tag.r, tag.r)
+}
+
 /** Like putU, but only over fur pixels (for a nose/detail that must sit on the body). */
 function putUFur(overlay: Uint8Array, fur: Uint8Array, ux: number, uy: number, role: number): void {
   const bx = Math.round(ux * SS), by = Math.round(uy * SS), b = blk()
@@ -747,6 +773,13 @@ export function generateWalkGrid(preset: Pet, step = 0, motion = 1, excite = 0):
     putUFur(overlay, fur, headCx + headR - 1, headCy + 0.8, O.NOSE)
   }
 
+  // Side-on, the collar is a band seen edge-on: a short upright bar at the neck.
+  if (preset.coat?.collar) {
+    const nx = (headCx + bodyCx) / 2 + 2.5
+    const ny = (headCy + bodyCy) / 2 - 1
+    collarBand(overlay, fur, nx, ny, 1.4, 2.3 * kby, { cx: nx, cy: ny + 2.6 * kby, r: 1.1 })
+  }
+
   return { shade, region, overlay, geom: defaultGeom(), fur }
 }
 
@@ -859,6 +892,7 @@ interface ResolvedCoat {
   ramps: Record<number, number[][]>
   iris: number[]; pupil: number[]; glint: number[]; nose: number[]
   inEar: number[]; mouth: number[]; whisk: number[]; outline: number[]
+  collar: number[]; collarTag: number[]
 }
 export function resolveCoat(spec: CoatSpec): ResolvedCoat {
   const white = spec.white || '#f6f6f8'
@@ -871,6 +905,8 @@ export function resolveCoat(spec: CoatSpec): ResolvedCoat {
     inEar: hexToRgb(spec.innerEar || '#f0b2c0'),
     mouth: hexToRgb(spec.outline || '#2b2b33'),
     whisk: hexToRgb(spec.whisk || '#d7d7e0'),
+    collar: hexToRgb(spec.collar || '#c0392b'),
+    collarTag: hexToRgb(spec.collarTag || '#f3c73e'),
     outline: hexToRgb(spec.outline || '#2b2b33')
   }
 }
@@ -890,6 +926,8 @@ export function render(parts: Parts, coatSpec: CoatSpec): Uint8ClampedArray {
     else if (ov === O.INEAR) col = coat.inEar
     else if (ov === O.MOUTH) col = coat.mouth
     else if (ov === O.WHISK) col = coat.whisk
+    else if (ov === O.COLLAR) col = coat.collar
+    else if (ov === O.TAG) col = coat.collarTag
     else if (ov === O.CONE) col = CONE_COLOR
     else if (ov === O.CONE_HI) col = CONE_HI_COLOR
     else if (shade[i]) col = coat.ramps[region[i]][shade[i] - 1]
@@ -911,4 +949,4 @@ export function renderCat(pet: Pet, state: AnimState = {}): { w: number; h: numb
  * Internal drawing primitives, shared with the pose/rig generators (rigcat,
  * turn34) so the raster helpers exist in exactly one place.
  */
-export const internals = { ellipse, triangle, idx, inB, put, putU, putUFur, lineOutline, sphereBright, shadeLevel, ss: () => SS, O, HI, BASE, SHADOW, DEEP }
+export const internals = { ellipse, triangle, idx, inB, put, putU, putUFur, collarBand, lineOutline, sphereBright, shadeLevel, ss: () => SS, O, HI, BASE, SHADOW, DEEP }

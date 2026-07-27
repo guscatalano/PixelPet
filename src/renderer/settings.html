@@ -245,6 +245,7 @@
       .bcolors { display: flex; flex-wrap: wrap; gap: 14px; padding: 6px 0; }
       .cfield { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
       .cfield input[type='color'] { width: 42px; height: 28px; border: 1px solid var(--hair); border-radius: 7px; background: var(--panel-2); cursor: pointer; padding: 2px; }
+      .cfield input[type='checkbox'] { width: 18px; height: 18px; margin: 5px 0; accent-color: var(--accent); cursor: pointer; }
       .cfield.hide { display: none; }
 
       /* A quiet dedication at the very bottom. */
@@ -344,6 +345,9 @@
               <label class="cfield" id="bsecwrap">Accent<input type="color" id="bsecondary" /></label>
               <label class="cfield" id="bwhitewrap">White<input type="color" id="bwhite" /></label>
               <label class="cfield" id="btertwrap">Patch<input type="color" id="btertiary" /></label>
+              <label class="cfield">Collar<input type="checkbox" id="bcollar" /></label>
+              <label class="cfield" id="bbandwrap">Band<input type="color" id="bcollarband" /></label>
+              <label class="cfield" id="btagwrap">Tag<input type="color" id="bcollartag" /></label>
             </div>
             <div class="brow2" style="margin-top: 4px">
               <button class="btn" id="brandom">🎲 Randomize</button>

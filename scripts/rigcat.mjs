@@ -8,7 +8,7 @@ import { W, H, render, sideMarking } from './catgen.mjs'
 
 // ---- helpers copied from catgen.mjs (module-private there) ------------------
 const HI = 1, BASE = 2, SHADOW = 3, DEEP = 4
-const O = { NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8, CONE: 9, CONE_HI: 10 }
+const O = { NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8, CONE: 9, CONE_HI: 10, COLLAR: 11, TAG: 12 }
 const idx = (x, y) => y * W + x
 const inB = (x, y) => x >= 0 && x < W && y >= 0 && y < H
 function ellipse(cb, cx, cy, rx, ry) {
@@ -17,6 +17,10 @@ function ellipse(cb, cx, cy, rx, ry) {
       const dx = (x - cx) / rx, dy = (y - cy) / ry
       if (dx * dx + dy * dy <= 1) cb(x, y)
     }
+}
+function collarBand(overlay, fur, cx, cy, rx, ry, tag) {
+  ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] === O.NONE) overlay[idx(x, y)] = O.COLLAR }, cx, cy, rx, ry)
+  if (tag) ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) overlay[idx(x, y)] = O.TAG }, tag.cx, tag.cy, tag.r, tag.r)
 }
 function triangle(cb, ax, ay, bx, by, cx, cy) {
   const mnX = Math.floor(Math.min(ax, bx, cx)), mxX = Math.ceil(Math.max(ax, bx, cx))
@@ -208,6 +212,12 @@ export function generateRigGrid(pet, pose) {
     for (let a=0;a<Math.PI*2;a+=0.035) { const c=Math.cos(a), s=Math.sin(a); putc(ccx+c*(crx+1), ccy+s*(cry+1), O.OUTLINE); putc(ccx+c*crx, ccy+s*cry, c>=0 ? O.CONE_HI : O.CONE) }
   }
 
+  // Side-on: the band is seen edge-on, so it is a short upright bar at the neck.
+  if (pet.coat?.collar) {
+    const [ncx, ncy, , nry] = pose.neck
+    const r = Math.min(2.4, Math.max(1.4, nry * 0.75))
+    collarBand(overlay, fur, ncx + 1, ncy, 1.4, r, { cx: ncx + 1, cy: ncy + r + 0.4, r: 1.1 })
+  }
   return { shade, region, overlay, geom: {}, fur }
 }
 

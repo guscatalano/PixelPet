@@ -10,9 +10,13 @@
 import { W, H, render, frontScaled, applyMarking } from './catgen.mjs'
 
 const HI = 1, BASE = 2, SHADOW = 3, DEEP = 4
-const O = { NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8 }
+const O = { NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8, COLLAR: 11, TAG: 12 }
 const idx = (x, y) => y * W + x, inB = (x, y) => x >= 0 && x < W && y >= 0 && y < H
 function ellipse(cb, cx, cy, rx, ry) { for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) { if (!inB(x, y)) continue; const dx = (x - cx) / rx, dy = (y - cy) / ry; if (dx * dx + dy * dy <= 1) cb(x, y) } }
+function collarBand(overlay, fur, cx, cy, rx, ry, tag) {
+  ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] === O.NONE) overlay[idx(x, y)] = O.COLLAR }, cx, cy, rx, ry)
+  if (tag) ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) overlay[idx(x, y)] = O.TAG }, tag.cx, tag.cy, tag.r, tag.r)
+}
 function triangle(cb, ax, ay, bx, by, cx, cy) { const mnX = Math.floor(Math.min(ax, bx, cx)), mxX = Math.ceil(Math.max(ax, bx, cx)), mnY = Math.floor(Math.min(ay, by, cy)), mxY = Math.ceil(Math.max(ay, by, cy)); for (let y = mnY; y <= mxY; y++) for (let x = mnX; x <= mxX; x++) { if (!inB(x, y)) continue; const w0 = (bx - ax) * (y - ay) - (by - ay) * (x - ax), w1 = (cx - bx) * (y - by) - (cy - by) * (x - bx), w2 = (ax - cx) * (y - cy) - (ay - cy) * (x - cx); if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) cb(x, y) } }
 const LIGHT = (() => { const v = [-0.35, -0.5, 0.79]; const m = Math.hypot(...v); return v.map((c) => c / m) })()
 function sphereBright(x, y, cx, cy, rx, ry) { const nx = (x - cx) / rx, ny = (y - cy) / ry; const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny)); return nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2] }
@@ -267,6 +271,12 @@ export function generate34Grid(preset, t, state = {}) {
     }
   }
 
+  // The 3/4 view sees the band obliquely: narrower than the front, wider than side.
+  if (preset.coat?.collar) {
+    const nx = (hx + bx) / 2
+    const ny = (g.headCy + g.bodyCy) / 2 + 2
+    collarBand(overlay, fur, nx, ny, g.headRx * 0.58, 1.6, { cx: nx + 1, cy: ny + 3, r: 1.2 })
+  }
   return { shade, region, overlay, geom: g, fur }
 }
 

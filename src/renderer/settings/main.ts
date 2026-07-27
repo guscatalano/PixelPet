@@ -722,6 +722,8 @@ function buildBuilder(): void {
   const primary = $<HTMLInputElement>('bprimary'), iris = $<HTMLInputElement>('biris')
   const secondary = $<HTMLInputElement>('bsecondary'), white = $<HTMLInputElement>('bwhite'), tertiary = $<HTMLInputElement>('btertiary')
   const secWrap = $('bsecwrap'), whiteWrap = $('bwhitewrap'), tertWrap = $('btertwrap')
+  const collar = $<HTMLInputElement>('bcollar'), band = $<HTMLInputElement>('bcollarband'), tag = $<HTMLInputElement>('bcollartag')
+  const bandWrap = $('bbandwrap'), tagWrap = $('btagwrap')
   const preview = $<HTMLCanvasElement>('bpreview'), pctx = preview.getContext('2d')!
   const preAnim = $<HTMLSelectElement>('bpreanim')
   const create = $<HTMLButtonElement>('bcreate'), status = $('bstatus')
@@ -757,6 +759,7 @@ function buildBuilder(): void {
     if (mk === 'tabby' || mk === 'points') coat.secondary = secondary.value
     if (mk === 'tuxedo' || mk === 'bicolor') coat.white = white.value
     if (mk === 'calico') { coat.secondary = secondary.value; coat.tertiary = tertiary.value; coat.white = white.value }
+    if (collar.checked) { coat.collar = band.value; coat.collarTag = tag.value }
     return {
       name: name.value.trim() || 'New Friend',
       style: { build: build.value, eyeStyle: eyes.value, earStyle: ears.value, tailStyle: tail.value, gait: gaitSel.value, snout: Number(snout.value) / 10 },
@@ -770,6 +773,8 @@ function buildBuilder(): void {
     whiteWrap.classList.toggle('hide', !(mk === 'tuxedo' || mk === 'bicolor' || mk === 'calico'))
     tertWrap.classList.toggle('hide', mk !== 'calico')
     if (secWrap.firstChild) secWrap.firstChild.nodeValue = mk === 'points' ? 'Points' : mk === 'calico' ? 'Ginger' : 'Stripes'
+    bandWrap.classList.toggle('hide', !collar.checked)
+    tagWrap.classList.toggle('hide', !collar.checked)
   }
 
   // Live preview: the creature walking (or hopping) in place, so every control —
@@ -798,11 +803,14 @@ function buildBuilder(): void {
     secondary.value = d.colors.secondary ?? '#c56a24'
     tertiary.value = d.colors.tertiary ?? '#3a3038'
     white.value = d.colors.white ?? '#f4f4f7'
+    collar.checked = !!d.colors.collar
+    band.value = d.colors.collar ?? '#c0392b'
+    tag.value = d.colors.collarTag ?? '#f3c73e'
     personality = d.personality as unknown as Record<string, number>
     syncFields(); draw()
   }
 
-  for (const el of [name, build, marking, eyes, ears, tail, gaitSel, snout, primary, iris, secondary, white, tertiary]) {
+  for (const el of [name, build, marking, eyes, ears, tail, gaitSel, snout, primary, iris, secondary, white, tertiary, collar, band, tag]) {
     el.addEventListener('input', () => { syncFields(); draw() })
   }
   $<HTMLButtonElement>('brandom').addEventListener('click', () => {

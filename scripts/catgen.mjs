@@ -28,7 +28,7 @@ const HI = 1, BASE = 2, SHADOW = 3, DEEP = 4
 const P = 0, S = 1, WHITE = 2, T = 3
 // Overlay roles (0 = none).
 const O = {
-  NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8, CONE: 9, CONE_HI: 10
+  NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8, CONE: 9, CONE_HI: 10, COLLAR: 11, TAG: 12
 }
 const CONE_COLOR = [176, 196, 224]
 const CONE_HI_COLOR = [225, 234, 247]
@@ -52,6 +52,18 @@ export function defaultGeom() {
 }
 
 // ---- raster helpers --------------------------------------------------------
+/**
+ * A collar band: an ellipse painted ONLY where fur already exists, so it hugs
+ * the neck instead of floating. Every view (front, rig, walk, 3/4) draws it the
+ * same way with its own neck position.
+ */
+function collarBand(overlay, fur, cx, cy, rx, ry, tag) {
+  ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] === O.NONE) overlay[idx(x, y)] = O.COLLAR }, cx, cy, rx, ry)
+  // The tag hangs off the band, so it must ALSO stay on fur -- otherwise poses
+  // that tuck the chest away leave a yellow pixel floating in mid-air.
+  if (tag) ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) overlay[idx(x, y)] = O.TAG }, tag.cx, tag.cy, tag.r, tag.r)
+}
+
 function ellipse(cb, cx, cy, rx, ry) {
   const x0 = Math.floor(cx - rx), x1 = Math.ceil(cx + rx)
   const y0 = Math.floor(cy - ry), y1 = Math.ceil(cy + ry)
@@ -388,6 +400,10 @@ export function generateGrid(preset, state = {}) {
   applyMarking(region, fur, g, marking)
   drawFace(overlay, fur, g, state)
 
+  if (preset.coat?.collar) {
+    const ny = (g.headCy + g.bodyCy) / 2 + 1.5
+    collarBand(overlay, fur, g.headCx, ny, g.headRx * 0.72, 1.6, { cx: g.headCx, cy: ny + 3, r: 1.3 })
+  }
   return { shade, region, overlay, geom: g, fur }
 }
 
@@ -648,6 +664,13 @@ export function generateWalkGrid(preset, step = 0, motion = 1, excite = 0) {
     if (fur[idx(Math.round(nfx), Math.round(nfy))]) put(overlay, Math.round(nfx), Math.round(nfy), O.NOSE)
   }
 
+  // Side-on, the collar is a band seen edge-on: a short upright bar at the neck.
+  if (preset.coat?.collar) {
+    const nx = (headCx + bodyCx) / 2 + 2.5
+    const ny = (headCy + bodyCy) / 2 - 1
+    collarBand(overlay, fur, nx, ny, 1.4, 2.3 * kby, { cx: nx, cy: ny + 2.6 * kby, r: 1.1 })
+  }
+
   return { shade, region, overlay, geom: {}, fur }
 }
 
@@ -775,6 +798,8 @@ export function resolveCoat(spec) {
     inEar: hexToRgb(spec.innerEar || '#f0b2c0'),
     mouth: hexToRgb(spec.outline || '#2b2b33'),
     whisk: hexToRgb(spec.whisk || '#d7d7e0'),
+    collar: hexToRgb(spec.collar || '#c0392b'),
+    collarTag: hexToRgb(spec.collarTag || '#f3c73e'),
     outline: hexToRgb(spec.outline || '#2b2b33')
   }
 }
@@ -794,7 +819,9 @@ export function render(parts, coatSpec) {
     else if (ov === O.INEAR) col = coat.inEar
     else if (ov === O.MOUTH) col = coat.mouth
     else if (ov === O.WHISK) col = coat.whisk
-    else if (ov === O.CONE) col = CONE_COLOR
+      else if (ov === O.COLLAR) col = coat.collar
+    else if (ov === O.TAG) col = coat.collarTag
+  else if (ov === O.CONE) col = CONE_COLOR
     else if (ov === O.CONE_HI) col = CONE_HI_COLOR
     else if (shade[i]) col = coat.ramps[region[i]][shade[i] - 1]
     if (!col) continue

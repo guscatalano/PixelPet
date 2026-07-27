@@ -30,7 +30,9 @@ export const DNA_SCHEMA = {
         iris: hexProp('Eye color'),
         nose: hexProp('Nose color (optional)'),
         innerEar: hexProp('Inner-ear color (optional)'),
-        whisk: hexProp('Whisker color (optional)')
+        whisk: hexProp('Whisker color (optional)'),
+        collar: hexProp('ONLY if the cat visibly wears a collar: the collar band color. Omit entirely if bare-necked'),
+        collarTag: hexProp("The hanging tag/bell on that collar (optional; only with 'collar')")
       },
       required: ['primary', 'iris']
     },
@@ -71,7 +73,7 @@ export const JSON_SYSTEM_PROMPT =
   `- build: one of ${list(BUILD_NAMES)}\n` +
   `- marking: one of ${list(MARKING_NAMES)} (points = pale body with a dark face/ears/legs like a siamese)\n` +
   `- eyeStyle: one of ${list(EYE_STYLES)}\n` +
-  `- colors: object with "primary" and "iris" as #RRGGBB hex (required); optional "secondary" (stripes/shading/point color), "white" (tuxedo/bicolor/calico areas), "tertiary" (third calico color), "nose", "innerEar" (all hex). Do NOT include whiskers.\n` +
+  `- colors: object with "primary" and "iris" as #RRGGBB hex (required); optional "secondary" (stripes/shading/point color), "white" (tuxedo/bicolor/calico areas), "tertiary" (third calico color), "nose", "innerEar", and — only if the cat visibly wears a collar — "collar" (the band) and "collarTag" (its tag/bell). Omit collar entirely for a bare-necked cat. Do NOT include whiskers.\n` +
   `- personality: object with ${list(TRAIT_KEYS)} — each a number from 0 to 1`
 
 export const JSON_USER_PROMPT = 'Here is my cat. Return the pixel-pet DNA JSON.'
