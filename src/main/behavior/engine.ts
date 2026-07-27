@@ -67,7 +67,7 @@ function strideFor(pxPerTick: number): number {
 const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never reports it
 // Clips that legitimately run longer than the default need their own ceiling, or
 // the safety net cuts them off mid-performance. A randomised knead can reach ~9s.
-const SHOT_SAFETY: Partial<Record<ClipName, number>> = { knead: 14000, kneadboth: 14000, knock: 6000, flop: 9000 }
+const SHOT_SAFETY: Partial<Record<ClipName, number>> = { knead: 14000, kneadboth: 14000, knock: 6000 }
 const DEFAULT_FACE_CHANCE = 0.4 // mirrors settings.ts; used before settings arrive
 const CLIMB_GOAL_TTL_MS = 40_000 // give up on a debug climb target after this
 const GRAVITY = 0.45 // px/tick² — vertical acceleration while airborne
@@ -254,7 +254,7 @@ export class PetEngine {
     if (this.dragging) return
     if (next) { next(); return }
     if (clip === 'react' || clip === 'yawn' || clip === 'stretch' || clip === 'paw' ||
-        clip === 'knead' || clip === 'kneadboth' || clip === 'scratch' || clip === 'flop') {
+        clip === 'knead' || clip === 'kneadboth' || clip === 'scratch') {
       this.setClip(this.settleClip())
       this.scheduleAmbient()
     }
@@ -433,7 +433,8 @@ export class PetEngine {
     this.afterShot = null
     this.airMode = 'none'; this.vx = 0; this.vy = 0
     switch (clip) {
-      case 'yawn': case 'stretch': case 'react': case 'paw': case 'knead': case 'kneadboth': case 'scratch': case 'flop': this.playOneShot(clip); break
+      case 'yawn': case 'stretch': case 'react': case 'paw': case 'knead': case 'kneadboth': case 'scratch': this.playOneShot(clip); break
+      case 'flop': this.setClip('flop'); this.scheduleAmbient(this.dwellFor('flop')); break
       case 'knock': this.startKnock(); break
       case 'bat': this.startStringPlay(); break // the full hunt, not a one-shot clip
       case 'pounce': this.startPounce(); break
@@ -1160,7 +1161,7 @@ export class PetEngine {
    * not seconds — and personality stretches them (a sleepy cat sleeps far
    * longer). These are floors-with-jitter, so sleep is never a 2-second blip.
    */
-  private dwellFor(state: 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'sit' | 'idle'): number {
+  private dwellFor(state: 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'sit' | 'idle' | 'flop'): number {
     const p = this.personality
     const r = (min: number, max: number): number => min + Math.random() * (max - min)
     switch (state) {
@@ -1168,6 +1169,9 @@ export class PetEngine {
       case 'loaf': return r(11000, 19000) * (0.8 + p.sleepiness * 0.45)
       case 'sphinx': return r(11000, 19000) * (0.8 + p.sleepiness * 0.45)
       case 'groom': return r(5000, 9000)
+      // Flopped out on its side. Wide on purpose: sometimes a brief flop and up
+      // again, sometimes it just lies there for the better part of half a minute.
+      case 'flop': return r(7000, 28000) * (0.8 + p.sleepiness * 0.5)
       case 'sit': return r(4500, 9000) * (0.85 + (1 - p.energy) * 0.4)
       default: return r(3000, 6500) // idle / linger — brief, restless
     }
@@ -1262,8 +1266,11 @@ export class PetEngine {
         case 'knead':
         case 'kneadboth':
         case 'scratch':
-        case 'flop':
           this.playOneShot(action)
+          break
+        case 'flop':
+          this.setClip('flop')
+          this.scheduleAmbient(this.dwellFor('flop'))
           break
         case 'bat':
           this.startStringPlay()

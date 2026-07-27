@@ -136,7 +136,7 @@ function getRigFrame(key: string, make: () => RigPose): HTMLCanvasElement {
 // the renderer walks the graph to it and reports arrival via stateReached.
 type Node =
   | 'front' | 'sit' | 'stand' | 'walk' | 'prance' | 'stalk' | 'trot' | 'hop' | 'loaf' | 'sphinx' | 'sleep' | 'groom'
-  | 'teeter' | 'crouch' | 'air' | 'fall' | 'poof' | 'sick' | 'sulk' | 'zoomies'
+  | 'teeter' | 'crouch' | 'air' | 'fall' | 'poof' | 'sick' | 'sulk' | 'zoomies' | 'flop'
 
 interface Frame { img: HTMLCanvasElement; ms: number; ox?: number; oy?: number }
 
@@ -221,6 +221,10 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
     // Not seqFrames-cached: the sleep pose varies per nap (sleepBase), so build fresh.
     case 'sit>sleep': return rigLerpFrames(POSES.sit, sleepBase, 7, 105)
     case 'sleep>sit': return rigLerpFrames(sleepBase, POSES.sit, 7, 105)
+    // Down fast (gravity does it), up slower and more effortful — that asymmetry
+    // is most of what gives the flop its weight.
+    case 'sit>flop': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.flop, 4, 60))
+    case 'flop>sit': return seqFrames(key, () => rigLerpFrames(POSES.flop, POSES.sit, 5, 105))
     case 'sit>groom': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.groom, 4, 110))
     case 'groom>sit': return seqFrames(key, () => rigLerpFrames(POSES.groom, POSES.sit, 4, 110))
     case 'sit>sick': return seqFrames(key, () => rigLerpFrames(POSES.sit, POSES.sick, 7, 120)) // slump down, unwell
@@ -254,7 +258,7 @@ function edgeSeq(from: Node, to: Node): Frame[] | null {
 // Graph adjacency for pathfinding (BFS over a dozen nodes).
 const EDGES: Record<Node, Node[]> = {
   front: ['sit'],
-  sit: ['front', 'stand', 'loaf', 'sphinx', 'sleep', 'groom', 'sick', 'sulk'],
+  sit: ['front', 'stand', 'loaf', 'sphinx', 'sleep', 'groom', 'sick', 'sulk', 'flop'],
   stand: ['sit', 'walk', 'prance', 'stalk', 'trot', 'hop', 'zoomies', 'teeter', 'poof', 'crouch'],
   walk: ['stand'],
   prance: ['stand'],
@@ -268,6 +272,7 @@ const EDGES: Record<Node, Node[]> = {
   groom: ['sit'],
   sick: ['sit'],
   sulk: ['sit'],
+  flop: ['sit'],
   teeter: ['stand'],
   crouch: ['stand', 'air'],
   air: ['stand'],
@@ -437,31 +442,48 @@ function scratchFrames(): Frame[] {
  * back up. The flop down is quick (gravity does it) and getting up is slower
  * and more effortful — that asymmetry is most of what sells the weight.
  */
-function flopFrames(): Frame[] {
-  const io = seqFrames('flop-io', () => [
-    ...rigLerpFrames(POSES.sit, POSES.flop, 4, 60), // 0..3   down it goes
-    ...rigLerpFrames(POSES.flop, POSES.rollBack, 4, 70), // 4..7   over onto the back
-    ...rigLerpFrames(POSES.rollBack, POSES.flop, 3, 90), // 8..10  back onto the side
-    ...rigLerpFrames(POSES.flop, POSES.sit, 5, 105) // 11..15 and up again
-  ])
-  const down = io.slice(0, 4), onto = io.slice(4, 8), off = io.slice(8, 11), up = io.slice(11)
-  const back = getRigFrame('roll|0', () => POSES.rollBack)
-  const wrig = getRigFrame('roll|1', () => POSES.rollWriggle)
-  const out: Frame[] = [...down, { img: down[3].img, ms: 360 + Math.random() * 220 }, ...onto]
-  const paddles = 2 + Math.floor(Math.random() * 3) // 2-4 wriggles, never a fixed count
-  for (let i = 0; i < paddles; i++) out.push({ img: wrig, ms: 170 }, { img: back, ms: 190 })
-  out.push(...off, { img: off[2].img, ms: 280 + Math.random() * 200 }, ...up)
-  return out
+// Flopped out on its side. This is a RESTING STATE, not a routine: the pet lies
+// there breathing for however long the engine gives it, and every so often rolls
+// belly-up, paddles, and rolls back. The roll is punctuation; lying there is the
+// animation.
+let rollStart = 0
+let rollEnd = 0
+let nextRoll = 0
+function flopFrame(now: number): HTMLCanvasElement {
+  if (!nextRoll) nextRoll = now + 1800 + Math.random() * 4000
+  if (now > nextRoll) {
+    rollStart = now
+    rollEnd = now + 1500 + Math.random() * 1900
+    nextRoll = rollEnd + 3500 + Math.random() * 8000
+  }
+  if (now < rollEnd) {
+    // Ease over onto the back, paddle at the top, ease back down.
+    const p = (now - rollStart) / (rollEnd - rollStart)
+    const e = p < 0.25 ? easeK(p / 0.25) : p > 0.75 ? easeK((1 - p) / 0.25) : 1
+    const q = Math.round(e * 4)
+    const pq = Math.round((0.5 + 0.5 * Math.sin(now / 165)) * 2)
+    return getRigFrame(`flop|roll|${q}|${pq}`, () =>
+      lerpPose(POSES.flop, lerpPose(POSES.rollBack, POSES.rollWriggle, pq / 2), q / 4))
+  }
+  const b = Math.round(((Math.sin(now / BREATH_REST) + 1) / 2) * 5)
+  const open = restBlink(now)
+  return getRigFrame(`flop|${b}|${open ? 1 : 0}`, () => {
+    const pose = lerpPose(POSES.flop, POSES.flop, 0)
+    const br = (b / 5) * 2 - 1
+    pose.body = [pose.body[0], pose.body[1] - br * 0.3, pose.body[2], pose.body[3] + br * 0.5]
+    pose.eye = open ? 1 : 0
+    return pose
+  })
 }
 
 const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = {
   yawn: 'front', stretch: 'stand', react: 'front', paw: 'front', knead: 'front', kneadboth: 'front', knock: 'front',
-  scratch: 'sit', flop: 'sit'
+  scratch: 'sit'
 }
 const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = {
   yawn: yawnFrames, stretch: stretchFrames, react: reactFrames, paw: pawFrames,
   knead: () => kneadFrames(false), kneadboth: () => kneadFrames(true), knock: knockFrames,
-  scratch: scratchFrames, flop: flopFrames
+  scratch: scratchFrames
 }
 
 // ---- Graph runtime state ------------------------------------------------------
@@ -470,6 +492,7 @@ const NODE_OF: Partial<Record<ClipName, Node>> = {
   // Zoomies renders as a BOUND, not a fast prance: a real gallop is ~80% airborne
   // flight per stride, which the bound silhouette shows and a prance does not.
   zoomies: 'zoomies',
+  flop: 'flop',
   groom: 'groom', teeter: 'teeter', fall: 'fall', poof: 'poof', sick: 'sick', sulk: 'sulk'
 }
 const CROUCH_WIGGLE_MS = 1150 // butt-wiggle time before the leap
@@ -692,6 +715,7 @@ function nodeFrame(now: number): { img: HTMLCanvasElement; ox?: number; oy?: num
       }) }
     }
     case 'sleep': return { img: sleepFrame(now) }
+    case 'flop': return { img: flopFrame(now) }
     case 'groom': {
       const k = 0.5 + 0.5 * Math.sin(now / 140)
       const q = Math.round(k * 4)
