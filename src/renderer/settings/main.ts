@@ -230,8 +230,10 @@ const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) 
   { key: 'bat', label: 'String toy', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { paw: 0.8, pawX: -0.4 - 0.5 * (0.5 + 0.5 * Math.sin(t / 190)) }), pet.coat) },
   // The tile shows the reach-and-pat; the swipe only happens at a real ledge.
   { key: 'knock', label: 'Knock off', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { paw: 0.75, pawX: knockK(t) }), pet.coat) },
-  // The social roll — the tile shows the belly-up paddle.
-  { key: 'flop', label: 'Flop & roll', rgba: (pet, t) => renderPet(generateRigGrid(pet, lerpPose(RIG.rollBack, RIG.rollWriggle, 0.5 + 0.5 * Math.sin(t / 190))), pet.coat) },
+  // Flopping out and the belly-up roll are separate animations, separately
+  // toggleable: the roll only ever happens partway through a flop.
+  { key: 'flop', label: 'Flop', rgba: (pet, t) => renderPet(generateRigGrid(pet, { ...RIG.flop, eye: t % 4000 > 180 ? 1 : 0 }), pet.coat) },
+  { key: 'roll', label: 'Belly roll', rgba: (pet, t) => renderPet(generateRigGrid(pet, lerpPose(RIG.rollBack, RIG.rollWriggle, 0.5 + 0.5 * Math.sin(t / 190))), pet.coat) },
   // Ear scratch: the fast shuttle between the two hind-paw poses.
   { key: 'scratch', label: 'Ear scratch', rgba: (pet, t) => renderPet(generateRigGrid(pet, lerpPose(RIG.scratch, RIG.scratchUp, t % 150 < 75 ? 0 : 1)), pet.coat) },
   { key: 'knead', label: 'Knead', rgba: (pet, t) => renderPet(generate34Grid(pet, 0, { paw: kneadK(t) }), pet.coat) },

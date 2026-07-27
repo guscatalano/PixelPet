@@ -442,29 +442,10 @@ function scratchFrames(): Frame[] {
  * back up. The flop down is quick (gravity does it) and getting up is slower
  * and more effortful — that asymmetry is most of what sells the weight.
  */
-// Flopped out on its side. This is a RESTING STATE, not a routine: the pet lies
-// there breathing for however long the engine gives it, and every so often rolls
-// belly-up, paddles, and rolls back. The roll is punctuation; lying there is the
-// animation.
-let rollStart = 0
-let rollEnd = 0
-let nextRoll = 0
+// Flopped out on its side: purely a resting state — it lies there and breathes.
+// Rolling belly-up is a SEPARATE animation ('roll', a one-shot played at this
+// node), so the two can be enjoyed and toggled independently.
 function flopFrame(now: number): HTMLCanvasElement {
-  if (!nextRoll) nextRoll = now + 1800 + Math.random() * 4000
-  if (now > nextRoll) {
-    rollStart = now
-    rollEnd = now + 1500 + Math.random() * 1900
-    nextRoll = rollEnd + 3500 + Math.random() * 8000
-  }
-  if (now < rollEnd) {
-    // Ease over onto the back, paddle at the top, ease back down.
-    const p = (now - rollStart) / (rollEnd - rollStart)
-    const e = p < 0.25 ? easeK(p / 0.25) : p > 0.75 ? easeK((1 - p) / 0.25) : 1
-    const q = Math.round(e * 4)
-    const pq = Math.round((0.5 + 0.5 * Math.sin(now / 165)) * 2)
-    return getRigFrame(`flop|roll|${q}|${pq}`, () =>
-      lerpPose(POSES.flop, lerpPose(POSES.rollBack, POSES.rollWriggle, pq / 2), q / 4))
-  }
   const b = Math.round(((Math.sin(now / BREATH_REST) + 1) / 2) * 5)
   const open = restBlink(now)
   return getRigFrame(`flop|${b}|${open ? 1 : 0}`, () => {
@@ -476,14 +457,31 @@ function flopFrame(now: number): HTMLCanvasElement {
   })
 }
 
+/** The social roll, played while already flopped: over onto the back, a paddle,
+ *  and back onto the side. Returns to the flop node it started from. */
+function rollFrames(): Frame[] {
+  const io = seqFrames('roll-io', () => [
+    ...rigLerpFrames(POSES.flop, POSES.rollBack, 4, 70), // 0..3 over she goes
+    ...rigLerpFrames(POSES.rollBack, POSES.flop, 3, 90) // 4..6 and back
+  ])
+  const over = io.slice(0, 4), back = io.slice(4)
+  const up = getRigFrame('roll|0', () => POSES.rollBack)
+  const wrig = getRigFrame('roll|1', () => POSES.rollWriggle)
+  const out: Frame[] = [...over]
+  const paddles = 2 + Math.floor(Math.random() * 3) // 2-4, never a fixed count
+  for (let i = 0; i < paddles; i++) out.push({ img: wrig, ms: 170 }, { img: up, ms: 190 })
+  out.push(...back)
+  return out
+}
+
 const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = {
   yawn: 'front', stretch: 'stand', react: 'front', paw: 'front', knead: 'front', kneadboth: 'front', knock: 'front',
-  scratch: 'sit'
+  scratch: 'sit', roll: 'flop'
 }
 const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = {
   yawn: yawnFrames, stretch: stretchFrames, react: reactFrames, paw: pawFrames,
   knead: () => kneadFrames(false), kneadboth: () => kneadFrames(true), knock: knockFrames,
-  scratch: scratchFrames
+  scratch: scratchFrames, roll: rollFrames
 }
 
 // ---- Graph runtime state ------------------------------------------------------

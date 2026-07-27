@@ -159,6 +159,7 @@ export class PetEngine {
   /** Sprints left in the current zoomies fit (0 = not having one). */
   private zoomiesLeft = 0
   private knockTimer: ReturnType<typeof setTimeout> | null = null
+  private rollTimer: ReturnType<typeof setTimeout> | null = null // mid-flop roll
   /** Set by main: show something tumbling off the ledge at (x, y). */
   private knocker: ((x: number, y: number) => void) | null = null
   /** Set by main: the dangling string toy. */
@@ -213,6 +214,7 @@ export class PetEngine {
     if (this.careMode) this.persistNeeds()
     this.abortStringPlay()
     if (this.knockTimer) clearTimeout(this.knockTimer)
+    if (this.rollTimer) clearTimeout(this.rollTimer)
     if (this.physicsTimer) clearInterval(this.physicsTimer)
     if (this.ambientTimer) clearTimeout(this.ambientTimer)
     if (this.actionTimer) clearTimeout(this.actionTimer)
@@ -369,6 +371,7 @@ export class PetEngine {
 
   onDragStart(): void {
     this.dragging = true
+    if (this.rollTimer) { clearTimeout(this.rollTimer); this.rollTimer = null }
     this.abortStringPlay() // picked up mid-play: the string goes with it
     this.cancelWander()
     this.airMode = 'none'
@@ -434,7 +437,8 @@ export class PetEngine {
     this.airMode = 'none'; this.vx = 0; this.vy = 0
     switch (clip) {
       case 'yawn': case 'stretch': case 'react': case 'paw': case 'knead': case 'kneadboth': case 'scratch': this.playOneShot(clip); break
-      case 'flop': this.setClip('flop'); this.scheduleAmbient(this.dwellFor('flop')); break
+      case 'flop': this.startFlop(); break
+      case 'roll': this.playOneShot('roll', () => this.setClip('flop')); break
       case 'knock': this.startKnock(); break
       case 'bat': this.startStringPlay(); break // the full hunt, not a one-shot clip
       case 'pounce': this.startPounce(); break
@@ -710,6 +714,31 @@ export class PetEngine {
         this.scheduleAmbient(900)
       }
     }, TEETER_MS)
+  }
+
+  // ---- flopping out ----------------------------------------------------------
+
+  /**
+   * Flop onto the side and stay there. The belly-up roll is a SEPARATE clip
+   * played partway through the dwell, so a plain flop is a plain flop and the
+   * two can be toggled independently.
+   */
+  private startFlop(): void {
+    if (this.rollTimer) { clearTimeout(this.rollTimer); this.rollTimer = null }
+    this.setClip('flop')
+    const dwell = this.dwellFor('flop')
+    this.scheduleAmbient(dwell)
+    // Long enough to be worth interrupting, and only if rolling is switched on.
+    if (dwell > 6000 && this.allowed('roll') && Math.random() < 0.55) {
+      const at = dwell * (0.25 + Math.random() * 0.4)
+      this.rollTimer = setTimeout(() => {
+        this.rollTimer = null
+        if (this.clip !== 'flop' || this.dragging) return
+        // Back to the flop when the roll finishes; the dwell timer is separate
+        // and still running, so the pet gets up when it was always going to.
+        this.playOneShot('roll', () => this.setClip('flop'))
+      }, at)
+    }
   }
 
   // ---- the string toy --------------------------------------------------------
@@ -1269,8 +1298,7 @@ export class PetEngine {
           this.playOneShot(action)
           break
         case 'flop':
-          this.setClip('flop')
-          this.scheduleAmbient(this.dwellFor('flop'))
+          this.startFlop()
           break
         case 'bat':
           this.startStringPlay()
