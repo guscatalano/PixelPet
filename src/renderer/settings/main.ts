@@ -6,7 +6,7 @@ import { randomPetDNA, BUILD_NAMES, MARKING_NAMES, EYE_STYLES, type PetDNA } fro
 import { loadCreature, EAR_STYLES, TAIL_STYLES, GAITS, type CreatureDef } from '../../shared/creature'
 import { ashPhoto } from '../ashPhoto'
 import { SIZE_LEVELS, SPRITE_W, SPRITE_H } from '../../shared/constants'
-import { TRAIT_KEYS, TOGGLEABLE_ANIMS, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Personality } from '../../shared/types'
+import { TRAIT_KEYS, TOGGLEABLE_ANIMS, DEFAULT_COLLAR, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Collar, type Personality } from '../../shared/types'
 import { NEED_KEYS, type CareStatus, type CareAction, type Difficulty, type Needs } from '../../shared/care'
 
 type GenResult = { ok: true; pet: AppPet } | { ok: false; error: string }
@@ -46,6 +46,7 @@ interface SettingsApi {
   getVersion: () => Promise<string>
   deleteUserPet: (petId: string) => void
   renamePet: (petId: string, name: string) => void
+  setCollar: (petId: string, collar: Collar | null) => void
   immichStatus: () => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
   setImmichConfig: (cfg: { serverUrl?: string; albumId?: string }) => void
   setImmichKey: (key: string) => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
@@ -63,9 +64,18 @@ const posesEl = $('poses'), poseWho = $('poseWho'), petid = $('petid'), mod = $(
 
 let state: AppSettings
 
-/** The full roster shown in the picker: built-in presets + user pets, with renames applied. */
+/**
+ * The full roster shown in the picker: built-in presets + user pets, with any
+ * renames and collars applied. Mirrors allPets() in main/settings.ts — a collar
+ * is an accessory layered onto the pet at draw time, never stored in its coat.
+ */
 const roster = (): AppPet[] =>
-  [...PETS, ...(state.userPets ?? [])].map((p) => (state.nameOverrides?.[p.id] ? { ...p, name: state.nameOverrides[p.id] } : p))
+  [...PETS, ...(state.userPets ?? [])].map((p) => {
+    const name = state.nameOverrides?.[p.id]
+    const c = state.collars?.[p.id]
+    if (!name && !c) return p
+    return { ...p, ...(name ? { name } : {}), ...(c ? { coat: { ...p.coat, collar: c.band, collarTag: c.tag } } : {}) }
+  })
 const findPet = (id: string): AppPet => roster().find((p) => p.id === id) ?? PETS[0]
 const isUserPet = (id: string): boolean => (state.userPets ?? []).some((p) => p.id === id)
 
@@ -106,7 +116,54 @@ function startRename(pet: AppPet): void {
   input.addEventListener('blur', () => commit(true))
 }
 
+// ---- Collar: an accessory you put ON the active pet -------------------------
+// Deliberately NOT part of the pet's DNA. It lives in settings keyed by pet id,
+// so it goes on any cat (built-ins included), comes straight back off, and never
+// changes the creature you'd export or the one the photo flow generated.
+const collarBtn = $<HTMLButtonElement>('collar'), collarColors = $('collarcolors'), collarWho = $('collarwho')
+const bandInput = $<HTMLInputElement>('collarband'), tagInput = $<HTMLInputElement>('collartag')
+
+const currentCollar = (): Collar | undefined => state.collars?.[state.activePetId]
+
+function paintCollar(): void {
+  const on = !!currentCollar()
+  collarWho.textContent = findPet(state.activePetId).name
+  collarBtn.classList.toggle('on', on)
+  collarBtn.setAttribute('aria-pressed', String(on))
+  collarBtn.textContent = on ? 'On — wearing a collar' : 'Off — no collar'
+  collarColors.classList.toggle('hide', !on)
+  bandInput.value = currentCollar()?.band ?? DEFAULT_COLLAR.band
+  tagInput.value = currentCollar()?.tag ?? DEFAULT_COLLAR.tag
+}
+
+// Colour inputs fire continuously while you drag, so the picker redraw and the
+// write to disk are debounced; local state updates immediately so the pose
+// previews (which re-resolve the pet every frame) track the drag live.
+let collarSaveTimer: ReturnType<typeof setTimeout> | null = null
+function setCollar(c: Collar | null, immediate: boolean): void {
+  state.collars = state.collars ?? {}
+  if (c) state.collars[state.activePetId] = c
+  else delete state.collars[state.activePetId]
+  const petId = state.activePetId
+  if (collarSaveTimer) clearTimeout(collarSaveTimer)
+  const commit = (): void => { collarSaveTimer = null; window.settings.setCollar(petId, c); buildGrid() }
+  if (immediate) commit()
+  else collarSaveTimer = setTimeout(commit, 150)
+}
+
+function buildCollar(): void {
+  paintCollar()
+  collarBtn.addEventListener('click', () => {
+    setCollar(currentCollar() ? null : { band: bandInput.value, tag: tagInput.value }, true)
+    paintCollar()
+  })
+  for (const el of [bandInput, tagInput]) {
+    el.addEventListener('input', () => setCollar({ band: bandInput.value, tag: tagInput.value }, false))
+  }
+}
+
 function refreshMeta(): void {
+  paintCollar()
   const pet = findPet(state.activePetId)
   const name = Object.assign(document.createElement('b'), { textContent: pet.name })
   name.className = 'rename'
@@ -662,6 +719,8 @@ function buildAnimation(): void {
     window.settings.setStayPut(state.stayPut)
   })
 
+  buildCollar()
+
   const pupils = $<HTMLButtonElement>('pupils')
   const paintPupils = (on: boolean): void => {
     pupils.classList.toggle('on', on)
@@ -722,8 +781,6 @@ function buildBuilder(): void {
   const primary = $<HTMLInputElement>('bprimary'), iris = $<HTMLInputElement>('biris')
   const secondary = $<HTMLInputElement>('bsecondary'), white = $<HTMLInputElement>('bwhite'), tertiary = $<HTMLInputElement>('btertiary')
   const secWrap = $('bsecwrap'), whiteWrap = $('bwhitewrap'), tertWrap = $('btertwrap')
-  const collar = $<HTMLInputElement>('bcollar'), band = $<HTMLInputElement>('bcollarband'), tag = $<HTMLInputElement>('bcollartag')
-  const bandWrap = $('bbandwrap'), tagWrap = $('btagwrap')
   const preview = $<HTMLCanvasElement>('bpreview'), pctx = preview.getContext('2d')!
   const preAnim = $<HTMLSelectElement>('bpreanim')
   const create = $<HTMLButtonElement>('bcreate'), status = $('bstatus')
@@ -759,7 +816,6 @@ function buildBuilder(): void {
     if (mk === 'tabby' || mk === 'points') coat.secondary = secondary.value
     if (mk === 'tuxedo' || mk === 'bicolor') coat.white = white.value
     if (mk === 'calico') { coat.secondary = secondary.value; coat.tertiary = tertiary.value; coat.white = white.value }
-    if (collar.checked) { coat.collar = band.value; coat.collarTag = tag.value }
     return {
       name: name.value.trim() || 'New Friend',
       style: { build: build.value, eyeStyle: eyes.value, earStyle: ears.value, tailStyle: tail.value, gait: gaitSel.value, snout: Number(snout.value) / 10 },
@@ -773,8 +829,6 @@ function buildBuilder(): void {
     whiteWrap.classList.toggle('hide', !(mk === 'tuxedo' || mk === 'bicolor' || mk === 'calico'))
     tertWrap.classList.toggle('hide', mk !== 'calico')
     if (secWrap.firstChild) secWrap.firstChild.nodeValue = mk === 'points' ? 'Points' : mk === 'calico' ? 'Ginger' : 'Stripes'
-    bandWrap.classList.toggle('hide', !collar.checked)
-    tagWrap.classList.toggle('hide', !collar.checked)
   }
 
   // Live preview: the creature walking (or hopping) in place, so every control —
@@ -803,14 +857,11 @@ function buildBuilder(): void {
     secondary.value = d.colors.secondary ?? '#c56a24'
     tertiary.value = d.colors.tertiary ?? '#3a3038'
     white.value = d.colors.white ?? '#f4f4f7'
-    collar.checked = !!d.colors.collar
-    band.value = d.colors.collar ?? '#c0392b'
-    tag.value = d.colors.collarTag ?? '#f3c73e'
     personality = d.personality as unknown as Record<string, number>
     syncFields(); draw()
   }
 
-  for (const el of [name, build, marking, eyes, ears, tail, gaitSel, snout, primary, iris, secondary, white, tertiary, collar, band, tag]) {
+  for (const el of [name, build, marking, eyes, ears, tail, gaitSel, snout, primary, iris, secondary, white, tertiary]) {
     el.addEventListener('input', () => { syncFields(); draw() })
   }
   $<HTMLButtonElement>('brandom').addEventListener('click', () => {

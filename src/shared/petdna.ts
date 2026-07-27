@@ -32,9 +32,6 @@ export interface PetDNA {
     nose?: string
     innerEar?: string
     whisk?: string
-    /** Present = the pet wears a collar, in this colour. Absent = bare neck. */
-    collar?: string
-    collarTag?: string
   }
   personality: Personality
 }
@@ -68,9 +65,7 @@ export function sanitizeDNA(raw: unknown): PetDNA {
       iris: hex(c.iris, '#9caf6e'),
       nose: typeof c.nose === 'string' && HEX.test(c.nose) ? c.nose.toLowerCase() : undefined,
       innerEar: typeof c.innerEar === 'string' && HEX.test(c.innerEar) ? c.innerEar.toLowerCase() : undefined,
-      whisk: typeof c.whisk === 'string' && HEX.test(c.whisk) ? c.whisk.toLowerCase() : undefined,
-      collar: typeof c.collar === 'string' && HEX.test(c.collar) ? c.collar.toLowerCase() : undefined,
-      collarTag: typeof c.collarTag === 'string' && HEX.test(c.collarTag) ? c.collarTag.toLowerCase() : undefined
+      whisk: typeof c.whisk === 'string' && HEX.test(c.whisk) ? c.whisk.toLowerCase() : undefined
     },
     personality
   }
@@ -87,7 +82,6 @@ const IRISES = ['#8fae5a', '#e0a93e', '#5b93c9', '#b6772e', '#6fae86', '#c98a3a'
 const DARKS = ['#2a2b31', '#33343d', '#3f3a44', '#463b33', '#2e2f39']
 const MIDS = ['#d9a35f', '#c8823c', '#9aa0ad', '#6d7280', '#a5734a', '#7a5236', '#b8b0c4', '#8a8f9c']
 const PALES = ['#ece7dc', '#e7c9a0', '#eceaf0', '#e6d8c4', '#dcd6e2']
-const COLLARS = ['#c0392b', '#2e7bb5', '#4f9d55', '#8e5aa8', '#e07a2f', '#d94f8a']
 const rpick = <T>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)]
 
 /** A curated random cat DNA — no AI, no setup. */
@@ -102,7 +96,6 @@ export function randomPetDNA(): PetDNA {
     case 'calico': colors.primary = rpick(PALES); colors.secondary = rpick(['#e2963f', '#d98a35', '#c47a2f']); colors.tertiary = rpick(['#3a3038', '#2e2a2e', '#43373a']); break
     default: colors.primary = rpick([...MIDS, ...DARKS, ...PALES]); break // solid
   }
-  if (Math.random() < 0.25) colors.collar = rpick(COLLARS) // a quarter of strays are somebody's
   const personality = {} as Personality
   for (const k of TRAIT_KEYS) personality[k] = Math.round(Math.random() * 100) / 100
   return { name: rpick(RAND_NAMES), blurb: rpick(RAND_BLURBS), build: rpick(BUILD_NAMES), marking, eyeStyle: rpick(EYE_STYLES), colors, personality }
@@ -136,8 +129,6 @@ function buildCoat(dna: PetDNA): CoatSpec {
   if (c.nose) coat.nose = c.nose
   if (c.innerEar) coat.innerEar = c.innerEar
   coat.whisk = naturalWhisker(c.primary) // never AI-chosen — real whiskers aren't colored
-  // The collar is opt-in: only a colour makes one appear. The tag follows it.
-  if (c.collar) { coat.collar = c.collar; coat.collarTag = c.collarTag ?? '#f3c73e' }
   const white = c.white ?? '#f4f4f7'
   switch (dna.marking) {
     case 'tabby':

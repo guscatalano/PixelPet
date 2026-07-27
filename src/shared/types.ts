@@ -88,6 +88,13 @@ export interface AppSettings {
   userPets: AppPet[]
   /** User-chosen display names, keyed by pet id (overrides the built-in/generated name). */
   nameOverrides: Record<string, string>
+  /**
+   * Collars the user has put on pets, keyed by pet id. A collar is an
+   * ACCESSORY, not part of the animal — it lives here rather than in the pet's
+   * DNA so you can put one on any cat (including the built-ins) and take it off
+   * again without editing, re-creating, or re-exporting the creature.
+   */
+  collars: Record<string, Collar>
   /** Remembered pet-picker filter (All / Built-in / Yours). */
   petFilter: 'all' | 'builtin' | 'user'
   overrides: Record<string, Partial<Personality>>
@@ -102,6 +109,13 @@ export interface AiConfig {
   model: string
   endpoint?: string
 }
+
+/** A collar you can put on a pet: the strap's colour and the hanging tag's. */
+export interface Collar {
+  band: string
+  tag: string
+}
+export const DEFAULT_COLLAR: Collar = { band: '#c0392b', tag: '#f3c73e' }
 
 /** Immich album config for Dream Mode (non-secret; the API key lives in safeStorage). */
 export interface ImmichConfig {

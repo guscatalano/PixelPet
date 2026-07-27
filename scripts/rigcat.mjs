@@ -18,9 +18,47 @@ function ellipse(cb, cx, cy, rx, ry) {
       if (dx * dx + dy * dy <= 1) cb(x, y)
     }
 }
-function collarBand(overlay, fur, cx, cy, rx, ry, tag) {
-  ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] === O.NONE) overlay[idx(x, y)] = O.COLLAR }, cx, cy, rx, ry)
-  if (tag) ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) overlay[idx(x, y)] = O.TAG }, tag.cx, tag.cy, tag.r, tag.r)
+/**
+ * A collar: a STRAP around the neck, painted only where fur already exists so
+ * it hugs the current silhouette. `thick` is the strap's width; a filled
+ * ellipse reads as a bib, so we hollow it out. `arc` keeps only the lower half
+ * of the ring -- face-on you see the band cross the throat, not loop over the chin.
+ */
+function collarBand(overlay, fur, cx, cy, rx, ry, opts) {
+  const irx = rx - opts.thick, iry = ry - opts.thick
+  ellipse((x, y) => {
+    if (!inB(x, y) || !fur[idx(x, y)] || overlay[idx(x, y)] !== O.NONE) return
+    if (opts.arc && y < cy) return
+    if (irx > 0 && iry > 0) {
+      const dx = (x - cx) / irx, dy = (y - cy) / iry
+      if (dx * dx + dy * dy <= 1) return
+    }
+    overlay[idx(x, y)] = O.COLLAR
+  }, cx, cy, rx, ry)
+  if (opts.tag) collarTag(overlay, fur, opts.tag.cx, opts.tag.cy, opts.tag.r)
+}
+
+function collarTag(overlay, fur, cx, cy, r) {
+  ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) overlay[idx(x, y)] = O.TAG }, cx, cy, r, r)
+}
+
+/**
+ * The collar seen EDGE-ON (side / walk views): a short band crossing the neck,
+ * running PERPENDICULAR to it -- an upright bar reads as a bandage the moment
+ * the cat lowers its head -- so the caller passes the neck axis.
+ */
+function collarStrap(overlay, fur, cx, cy, axX, axY, halfLen, thick) {
+  const m = Math.hypot(axX, axY) || 1
+  const ux = axX / m, uy = axY / m
+  const th = thick / 2
+  const reach = Math.ceil(halfLen + th + 2)
+  for (let y = Math.floor(cy - reach); y <= Math.ceil(cy + reach); y++) {
+    for (let x = Math.floor(cx - reach); x <= Math.ceil(cx + reach); x++) {
+      if (!inB(x, y) || !fur[idx(x, y)] || overlay[idx(x, y)] !== O.NONE) continue
+      const dx = x - cx, dy = y - cy
+      if (Math.abs(dx * ux + dy * uy) <= th && Math.abs(dx * -uy + dy * ux) <= halfLen) overlay[idx(x, y)] = O.COLLAR
+    }
+  }
 }
 function triangle(cb, ax, ay, bx, by, cx, cy) {
   const mnX = Math.floor(Math.min(ax, bx, cx)), mxX = Math.ceil(Math.max(ax, bx, cx))
@@ -212,11 +250,13 @@ export function generateRigGrid(pet, pose) {
     for (let a=0;a<Math.PI*2;a+=0.035) { const c=Math.cos(a), s=Math.sin(a); putc(ccx+c*(crx+1), ccy+s*(cry+1), O.OUTLINE); putc(ccx+c*crx, ccy+s*cry, c>=0 ? O.CONE_HI : O.CONE) }
   }
 
-  // Side-on: the band is seen edge-on, so it is a short upright bar at the neck.
+  // Side-on: a short band crossing the neck, angled to whatever the pose is
+  // doing with the head.
   if (pet.coat?.collar) {
-    const [ncx, ncy, , nry] = pose.neck
-    const r = Math.min(2.4, Math.max(1.4, nry * 0.75))
-    collarBand(overlay, fur, ncx + 1, ncy, 1.4, r, { cx: ncx + 1, cy: ncy + r + 0.4, r: 1.1 })
+    const [ncx, ncy, nrx, nry] = pose.neck
+    const hl = Math.min(2.6, Math.max(1.6, Math.max(nrx, nry) * 0.8))
+    collarStrap(overlay, fur, ncx, ncy, bcx - hcx, bcy - hcy, hl, 1.1)
+    collarTag(overlay, fur, ncx, ncy + hl + 0.6, 0.9)
   }
   return { shade, region, overlay, geom: {}, fur }
 }

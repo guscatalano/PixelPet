@@ -245,8 +245,8 @@
       .bcolors { display: flex; flex-wrap: wrap; gap: 14px; padding: 6px 0; }
       .cfield { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
       .cfield input[type='color'] { width: 42px; height: 28px; border: 1px solid var(--hair); border-radius: 7px; background: var(--panel-2); cursor: pointer; padding: 2px; }
-      .cfield input[type='checkbox'] { width: 18px; height: 18px; margin: 5px 0; accent-color: var(--accent); cursor: pointer; }
       .cfield.hide { display: none; }
+      .bcolors.hide { display: none; }
 
       /* A quiet dedication at the very bottom. */
       .about { display: flex; align-items: center; gap: 12px; margin-top: 40px; padding: 18px 2px 6px; border-top: 1px solid var(--hair); }
@@ -345,9 +345,6 @@
               <label class="cfield" id="bsecwrap">Accent<input type="color" id="bsecondary" /></label>
               <label class="cfield" id="bwhitewrap">White<input type="color" id="bwhite" /></label>
               <label class="cfield" id="btertwrap">Patch<input type="color" id="btertiary" /></label>
-              <label class="cfield">Collar<input type="checkbox" id="bcollar" /></label>
-              <label class="cfield" id="bbandwrap">Band<input type="color" id="bcollarband" /></label>
-              <label class="cfield" id="btagwrap">Tag<input type="color" id="bcollartag" /></label>
             </div>
             <div class="brow2" style="margin-top: 4px">
               <button class="btn" id="brandom">🎲 Randomize</button>
@@ -440,6 +437,24 @@
             <div class="tn">Eyes by time</div>
             <button class="toggle" id="pupils" aria-pressed="false">Off — fixed pupils</button>
             <div class="tv"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec" data-tab="look">
+        <div class="label">Collar</div>
+        <div class="traits">
+          <div class="traits-head">
+            <div class="who">Wearing it &mdash; <b id="collarwho">Ash</b></div>
+          </div>
+          <div class="trow">
+            <div class="tn">Collar</div>
+            <button class="toggle" id="collar" aria-pressed="false">Off &mdash; no collar</button>
+            <div class="tv"></div>
+          </div>
+          <div class="bcolors" id="collarcolors">
+            <label class="cfield">Band<input type="color" id="collarband" /></label>
+            <label class="cfield">Tag<input type="color" id="collartag" /></label>
           </div>
         </div>
       </section>

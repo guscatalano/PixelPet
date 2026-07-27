@@ -832,9 +832,14 @@ applyScale()
 window.addEventListener('resize', applyScale)
 
 // Swap the active pet at runtime: regenerate all frames + the hit mask.
+// A cheap "is this a different drawing?" key. The id alone is not enough: main
+// re-sends the SAME pet when you put a collar on it or take it off, and every
+// frame is cached, so an id-only guard would leave the old sprites on screen.
+const lookKey = (p: Pet): string => `${p.id}|${p.coat?.collar ?? ''}|${p.coat?.collarTag ?? ''}`
+
 window.pet.onSetPet((next: Pet) => {
   // Main sends the full spec (built-in or user-generated), so no roster lookup.
-  if (!next || next.id === activePet.id) return
+  if (!next || lookKey(next) === lookKey(activePet)) return
   activePet = next
   frontCache.clear()
   walkCache.clear()

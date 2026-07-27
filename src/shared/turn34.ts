@@ -277,7 +277,7 @@ export function generate34Grid(preset: Pet, t: number, state: State34 = {}): Par
   if (preset.coat?.collar) {
     const nx = (hx + bx) / 2
     const ny = (g.headCy + g.bodyCy) / 2 + 2
-    internals.collarBand(overlay, fur, nx, ny, g.headRx * 0.58, 1.6, { cx: nx + 1, cy: ny + 3, r: 1.2 })
+    internals.collarBand(overlay, fur, nx, ny, g.headRx * 0.58, 3.2, { thick: 1.1, arc: true, tag: { cx: nx + 1, cy: ny + 3.6, r: 1 } })
   }
   return { shade, region, overlay, geom: g, fur }
 }

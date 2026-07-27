@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { loadCreature } from '../shared/creature'
-import type { AppSettings, AiConfig, AiStatus, ClipName, Personality, TriggerEvent } from '../shared/types'
+import type { AppSettings, AiConfig, AiStatus, ClipName, Collar, Personality, TriggerEvent } from '../shared/types'
+import { DEFAULT_COLLAR } from '../shared/types'
 import { snapScale, petWindowSize } from '../shared/constants'
 import { createTray, applyTrayMenu, assetPath, type TrayCallbacks } from './tray'
 import { initAutoUpdate, onUpdateStateChange, isUpdateReady, pendingVersion, checkForUpdatesManual, restartToUpdate } from './updater'
@@ -994,6 +995,19 @@ function registerIpc(): void {
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
+  })
+  // Put a collar on a pet / take it off. An accessory, not part of the pet —
+  // stored against the pet's id, layered on by allPets() at render time.
+  ipcMain.on('pets:set-collar', (_e, p: { petId: string; collar: Collar | null }) => {
+    if (!p?.petId) return
+    const hex = /^#[0-9a-fA-F]{6}$/
+    if (p.collar && hex.test(p.collar.band)) {
+      settings.collars[p.petId] = { band: p.collar.band.toLowerCase(), tag: hex.test(p.collar.tag) ? p.collar.tag.toLowerCase() : DEFAULT_COLLAR.tag }
+    } else {
+      delete settings.collars[p.petId]
+    }
+    saveSettings(settings)
+    if (p.petId === settings.activePetId) applyActivePet()
   })
   ipcMain.on('pets:rename', (_e, p: { petId: string; name: string }) => {
     const name = typeof p?.name === 'string' ? p.name.trim().slice(0, 24) : ''

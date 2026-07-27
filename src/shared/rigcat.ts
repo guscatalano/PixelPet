@@ -9,7 +9,7 @@
 
 import { W, H, internals, sideMarking, type Pet, type Parts, defaultGeom } from './catgen'
 
-const { ellipse, triangle, idx, inB, put, putU, putUFur, lineOutline, sphereBright, shadeLevel, ss, collarBand, O, BASE, SHADOW } = internals
+const { ellipse, triangle, idx, inB, put, putU, putUFur, lineOutline, sphereBright, shadeLevel, ss, collarBand, collarStrap, collarTag, O, BASE, SHADOW } = internals
 
 export interface RigLeg { hip: number[]; mid: number[]; foot: number[]; near: boolean }
 export interface RigPose {
@@ -267,12 +267,14 @@ export function generateRigGrid(pet: Pet, pose: RigPose): Parts {
     }
   }
 
-  // Side-on: the band is seen edge-on, so it is a short upright bar at the neck.
-  // Uses the pose's own neck, so it follows the head wherever the pose puts it.
+  // Side-on: a short band crossing the neck, angled to whatever the pose is
+  // doing with the head — a grooming or flopped cat has a near-horizontal neck,
+  // and an upright bar there reads as a bandage rather than a collar.
   if (pet.coat?.collar) {
-    const [ncx, ncy, , nry] = pose.neck
-    const r = Math.min(2.4, Math.max(1.4, nry * 0.75))
-    collarBand(overlay, fur, ncx + 1, ncy, 1.4, r, { cx: ncx + 1, cy: ncy + r + 0.4, r: 1.1 })
+    const [ncx, ncy, nrx, nry] = pose.neck
+    const hl = Math.min(2.6, Math.max(1.6, Math.max(nrx, nry) * 0.8))
+    collarStrap(overlay, fur, ncx, ncy, bcx - hcx, bcy - hcy, hl, 1.1)
+    collarTag(overlay, fur, ncx, ncy + hl + 0.6, 0.9)
   }
   return { shade, region, overlay, geom: defaultGeom(), fur }
 }

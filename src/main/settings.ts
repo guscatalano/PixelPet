@@ -6,7 +6,7 @@ import { app } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AppSettings, Personality, AiConfig, AiProviderId } from '../shared/types'
-import { TRAIT_KEYS, TOGGLEABLE_ANIMS } from '../shared/types'
+import { TRAIT_KEYS, TOGGLEABLE_ANIMS, DEFAULT_COLLAR } from '../shared/types'
 import { DEFAULT_SCALE, snapScale } from '../shared/constants'
 import { DEFAULT_FRONT_SCALE } from '../shared/catgen'
 import { DEFAULT_PET, PETS, type AppPet } from '../shared/pets'
@@ -47,7 +47,7 @@ function defaults(): AppSettings {
     activePetId: DEFAULT_PET.id, scale: DEFAULT_SCALE, turnMs: DEFAULT_TURN_MS,
     stayPut: false, frontScale: DEFAULT_FRONT_SCALE, faceChance: DEFAULT_FACE_CHANCE, detail: DEFAULT_DETAIL, pupilsByTime: false, careMode: false, difficulty: 'normal', dreamMode: false, dreamChance: 0.55, dreamBubbleScale: 1,
     immich: { serverUrl: '', albumId: '' }, disabledAnims: [],
-    ai: defaultAi(), userPets: [], nameOverrides: {}, petFilter: 'all', overrides: {}
+    ai: defaultAi(), userPets: [], nameOverrides: {}, collars: {}, petFilter: 'all', overrides: {}
   }
 }
 
@@ -137,6 +137,14 @@ function sanitize(raw: unknown): AppSettings {
       if (known(petId) && typeof name === 'string' && name.trim()) s.nameOverrides[petId] = name.trim().slice(0, 24)
     }
   }
+  if (r.collars && typeof r.collars === 'object') {
+    for (const [petId, c] of Object.entries(r.collars as Record<string, unknown>)) {
+      if (!known(petId) || !c || typeof c !== 'object') continue
+      const { band, tag } = c as Record<string, unknown>
+      if (typeof band !== 'string' || !HEX.test(band)) continue // no band = no collar
+      s.collars[petId] = { band: band.toLowerCase(), tag: typeof tag === 'string' && HEX.test(tag) ? tag.toLowerCase() : DEFAULT_COLLAR.tag }
+    }
+  }
   if (r.overrides && typeof r.overrides === 'object') {
     for (const [petId, ov] of Object.entries(r.overrides as Record<string, unknown>)) {
       if (!known(petId) || !ov || typeof ov !== 'object') continue
@@ -167,9 +175,23 @@ export function saveSettings(s: AppSettings): void {
   }
 }
 
-/** The full roster the app offers: built-in presets + user pets, with any renames applied. */
+/**
+ * The full roster the app offers: built-in presets + user pets, with any
+ * renames and collars applied. A collar is an accessory the user put ON a pet,
+ * so it is layered here rather than stored in the pet — that way it works on
+ * the built-ins too, and comes straight off without touching the creature.
+ */
 export function allPets(s: AppSettings): AppPet[] {
-  return [...PETS, ...s.userPets].map((p) => (s.nameOverrides[p.id] ? { ...p, name: s.nameOverrides[p.id] } : p))
+  return [...PETS, ...s.userPets].map((p) => {
+    const name = s.nameOverrides[p.id]
+    const c = s.collars[p.id]
+    if (!name && !c) return p
+    return {
+      ...p,
+      ...(name ? { name } : {}),
+      ...(c ? { coat: { ...p.coat, collar: c.band, collarTag: c.tag } } : {})
+    }
+  })
 }
 
 /** Resolve a pet id against the full roster (built-in + user), falling back to Ash. */

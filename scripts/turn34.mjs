@@ -13,9 +13,47 @@ const HI = 1, BASE = 2, SHADOW = 3, DEEP = 4
 const O = { NONE: 0, OUTLINE: 1, IRIS: 2, PUPIL: 3, GLINT: 4, NOSE: 5, INEAR: 6, MOUTH: 7, WHISK: 8, COLLAR: 11, TAG: 12 }
 const idx = (x, y) => y * W + x, inB = (x, y) => x >= 0 && x < W && y >= 0 && y < H
 function ellipse(cb, cx, cy, rx, ry) { for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) { if (!inB(x, y)) continue; const dx = (x - cx) / rx, dy = (y - cy) / ry; if (dx * dx + dy * dy <= 1) cb(x, y) } }
-function collarBand(overlay, fur, cx, cy, rx, ry, tag) {
-  ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] === O.NONE) overlay[idx(x, y)] = O.COLLAR }, cx, cy, rx, ry)
-  if (tag) ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) overlay[idx(x, y)] = O.TAG }, tag.cx, tag.cy, tag.r, tag.r)
+/**
+ * A collar: a STRAP around the neck, painted only where fur already exists so
+ * it hugs the current silhouette. `thick` is the strap's width; a filled
+ * ellipse reads as a bib, so we hollow it out. `arc` keeps only the lower half
+ * of the ring -- face-on you see the band cross the throat, not loop over the chin.
+ */
+function collarBand(overlay, fur, cx, cy, rx, ry, opts) {
+  const irx = rx - opts.thick, iry = ry - opts.thick
+  ellipse((x, y) => {
+    if (!inB(x, y) || !fur[idx(x, y)] || overlay[idx(x, y)] !== O.NONE) return
+    if (opts.arc && y < cy) return
+    if (irx > 0 && iry > 0) {
+      const dx = (x - cx) / irx, dy = (y - cy) / iry
+      if (dx * dx + dy * dy <= 1) return
+    }
+    overlay[idx(x, y)] = O.COLLAR
+  }, cx, cy, rx, ry)
+  if (opts.tag) collarTag(overlay, fur, opts.tag.cx, opts.tag.cy, opts.tag.r)
+}
+
+function collarTag(overlay, fur, cx, cy, r) {
+  ellipse((x, y) => { if (inB(x, y) && fur[idx(x, y)] && overlay[idx(x, y)] !== O.OUTLINE) overlay[idx(x, y)] = O.TAG }, cx, cy, r, r)
+}
+
+/**
+ * The collar seen EDGE-ON (side / walk views): a short band crossing the neck,
+ * running PERPENDICULAR to it -- an upright bar reads as a bandage the moment
+ * the cat lowers its head -- so the caller passes the neck axis.
+ */
+function collarStrap(overlay, fur, cx, cy, axX, axY, halfLen, thick) {
+  const m = Math.hypot(axX, axY) || 1
+  const ux = axX / m, uy = axY / m
+  const th = thick / 2
+  const reach = Math.ceil(halfLen + th + 2)
+  for (let y = Math.floor(cy - reach); y <= Math.ceil(cy + reach); y++) {
+    for (let x = Math.floor(cx - reach); x <= Math.ceil(cx + reach); x++) {
+      if (!inB(x, y) || !fur[idx(x, y)] || overlay[idx(x, y)] !== O.NONE) continue
+      const dx = x - cx, dy = y - cy
+      if (Math.abs(dx * ux + dy * uy) <= th && Math.abs(dx * -uy + dy * ux) <= halfLen) overlay[idx(x, y)] = O.COLLAR
+    }
+  }
 }
 function triangle(cb, ax, ay, bx, by, cx, cy) { const mnX = Math.floor(Math.min(ax, bx, cx)), mxX = Math.ceil(Math.max(ax, bx, cx)), mnY = Math.floor(Math.min(ay, by, cy)), mxY = Math.ceil(Math.max(ay, by, cy)); for (let y = mnY; y <= mxY; y++) for (let x = mnX; x <= mxX; x++) { if (!inB(x, y)) continue; const w0 = (bx - ax) * (y - ay) - (by - ay) * (x - ax), w1 = (cx - bx) * (y - by) - (cy - by) * (x - bx), w2 = (ax - cx) * (y - cy) - (ay - cy) * (x - cx); if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) cb(x, y) } }
 const LIGHT = (() => { const v = [-0.35, -0.5, 0.79]; const m = Math.hypot(...v); return v.map((c) => c / m) })()
@@ -275,7 +313,7 @@ export function generate34Grid(preset, t, state = {}) {
   if (preset.coat?.collar) {
     const nx = (hx + bx) / 2
     const ny = (g.headCy + g.bodyCy) / 2 + 2
-    collarBand(overlay, fur, nx, ny, g.headRx * 0.58, 1.6, { cx: nx + 1, cy: ny + 3, r: 1.2 })
+    collarBand(overlay, fur, nx, ny, g.headRx * 0.58, 3.2, { thick: 1.1, arc: true, tag: { cx: nx + 1, cy: ny + 3.6, r: 1 } })
   }
   return { shade, region, overlay, geom: g, fur }
 }

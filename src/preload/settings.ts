@@ -86,7 +86,9 @@ const api = {
   /** Delete a user-generated pet. */
   deleteUserPet: (petId: string): void => ipcRenderer.send('pets:delete-user', petId),
   /** Rename any cat (empty name clears the override back to its default). */
-  renamePet: (petId: string, name: string): void => ipcRenderer.send('pets:rename', { petId, name })
+  renamePet: (petId: string, name: string): void => ipcRenderer.send('pets:rename', { petId, name }),
+  /** Put a collar on a pet, or pass null to take it off. */
+  setCollar: (petId: string, collar: { band: string; tag: string } | null): void => ipcRenderer.send('pets:set-collar', { petId, collar })
 }
 
 contextBridge.exposeInMainWorld('settings', api)
