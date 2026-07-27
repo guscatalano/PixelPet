@@ -310,6 +310,12 @@ export const POSES: Record<string, RigPose> = {
     ]
   },
   sit: {
+    // The rump needs its own mass ON the ground. The single torso ellipse
+    // bottoms out at cy+ry = 39 against a ground of 43, so the seated rear
+    // hovered ~4px up with only a sliver of folded leg reaching down — the cat
+    // looked propped up rather than sat down. A sitting cat's haunches spread
+    // and take its weight, which is what this second mass is.
+    body2: [13, 36, 8, 7],
     body: [17, 31, 11, 8], head: [32, 22.5, 7], neck: [27.5, 28, 5.5, 4.4],
     tail: { root: [7, 33], ctrl: [7, 42], tip: [22, 42] }, eye: 1,
     legs: [
@@ -404,6 +410,43 @@ export const POSES: Record<string, RigPose> = {
   },
   // Washing up: sitting, one front paw raised to the mouth, head dipped toward
   // it, eyes squeezed in concentration. Lerp groom <-> groomLick for the licks.
+  // The social roll: flops onto its side, then rolls onto its back with the
+  // legs in the air. Research calls this a trust/contentment display — a cat
+  // only shows its belly where it feels safe — so it is weighted on affection.
+  // Lying on the side: long and low, head down on the ground, legs stretched out.
+  flop: {
+    body: [19, 37, 12.5, 6], head: [33, 36.5, 7], neck: [27.5, 36.5, 5.5, 4.2],
+    tail: { root: [7.5, 39], ctrl: [4, 43], tip: [14, 43] }, eye: 1, earsBack: 0.3,
+    legs: [
+      { hip: [15, 38], mid: [11, 41], foot: [7.5, 42], near: false }, // hind stretched back
+      { hip: [26, 38], mid: [31, 40], foot: [35, 41.5], near: false }, // front reaching forward
+      { hip: [17, 39], mid: [13, 42], foot: [9.5, 43], near: true },
+      { hip: [27.5, 39], mid: [32.5, 41.5], foot: [36, 42.5], near: true }
+    ]
+  },
+  // Rolled onto the back: belly up, all four legs folded loosely in the air,
+  // head tipped back. The legs going ABOVE their hips is the whole read.
+  rollBack: {
+    body: [19, 37.5, 12.5, 6], head: [31.5, 38, 6.8], neck: [26.5, 37.5, 5.5, 4.4],
+    tail: { root: [7.5, 39.5], ctrl: [3.5, 43], tip: [13, 43] }, eye: 0, earsBack: 0.55,
+    legs: [
+      { hip: [15.5, 33], mid: [12.5, 28.5], foot: [15, 26], near: false },
+      { hip: [25, 33], mid: [28.5, 28.5], foot: [26, 26], near: false },
+      { hip: [17.5, 33], mid: [14, 27], foot: [17, 24], near: true },
+      { hip: [27, 33], mid: [30.5, 27], foot: [28.5, 24.5], near: true }
+    ]
+  },
+  // Mid-wriggle on the back — paws paddle and the body shifts a touch.
+  rollWriggle: {
+    body: [19.5, 37.5, 12.5, 6], head: [32, 38.5, 6.8], neck: [27, 37.5, 5.5, 4.4],
+    tail: { root: [7.5, 39.5], ctrl: [4.5, 42.5], tip: [14, 43] }, eye: 0, earsBack: 0.5,
+    legs: [
+      { hip: [15.5, 33], mid: [13.5, 27.5], foot: [16.5, 25], near: false },
+      { hip: [25, 33], mid: [27.5, 29.5], foot: [25, 27], near: false },
+      { hip: [17.5, 33], mid: [15, 26], foot: [18.5, 23.5], near: true },
+      { hip: [27, 33], mid: [29.5, 28], foot: [27, 25.5], near: true }
+    ]
+  },
   // Scratching an ear with a HIND foot — the yoga-like sit every cat does. The
   // near hind leg swings up beside the head, hock cocked well out, and the head
   // tips down toward the incoming foot to meet it. Two poses a few units apart

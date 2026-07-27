@@ -67,7 +67,7 @@ function strideFor(pxPerTick: number): number {
 const SHOT_SAFETY_MS = 4500 // force-end a one-shot if the renderer never reports it
 // Clips that legitimately run longer than the default need their own ceiling, or
 // the safety net cuts them off mid-performance. A randomised knead can reach ~9s.
-const SHOT_SAFETY: Partial<Record<ClipName, number>> = { knead: 14000, kneadboth: 14000, knock: 6000 }
+const SHOT_SAFETY: Partial<Record<ClipName, number>> = { knead: 14000, kneadboth: 14000, knock: 6000, flop: 9000 }
 const DEFAULT_FACE_CHANCE = 0.4 // mirrors settings.ts; used before settings arrive
 const CLIMB_GOAL_TTL_MS = 40_000 // give up on a debug climb target after this
 const GRAVITY = 0.45 // px/tick² — vertical acceleration while airborne
@@ -254,7 +254,7 @@ export class PetEngine {
     if (this.dragging) return
     if (next) { next(); return }
     if (clip === 'react' || clip === 'yawn' || clip === 'stretch' || clip === 'paw' ||
-        clip === 'knead' || clip === 'kneadboth' || clip === 'scratch') {
+        clip === 'knead' || clip === 'kneadboth' || clip === 'scratch' || clip === 'flop') {
       this.setClip(this.settleClip())
       this.scheduleAmbient()
     }
@@ -433,7 +433,7 @@ export class PetEngine {
     this.afterShot = null
     this.airMode = 'none'; this.vx = 0; this.vy = 0
     switch (clip) {
-      case 'yawn': case 'stretch': case 'react': case 'paw': case 'knead': case 'kneadboth': case 'scratch': this.playOneShot(clip); break
+      case 'yawn': case 'stretch': case 'react': case 'paw': case 'knead': case 'kneadboth': case 'scratch': case 'flop': this.playOneShot(clip); break
       case 'knock': this.startKnock(); break
       case 'bat': this.startStringPlay(); break // the full hunt, not a one-shot clip
       case 'pounce': this.startPounce(); break
@@ -1217,7 +1217,7 @@ export class PetEngine {
     const climbUrge = (0.06 + p.curiosity * 0.18 + p.energy * 0.12 + p.mischief * 0.08) * (1 - tired * 0.7) * (1 - sick)
     if (!wasAsleep && Math.random() < climbUrge && this.tryJumpUp()) return
 
-    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick' | 'sulk' | 'zoomies' | 'knead' | 'kneadboth' | 'bat' | 'scratch'>([
+    const action = weightedPick<'wander' | 'sleep' | 'loaf' | 'sphinx' | 'groom' | 'pounce' | 'paw' | 'sit' | 'linger' | 'sick' | 'sulk' | 'zoomies' | 'knead' | 'kneadboth' | 'bat' | 'scratch' | 'flop'>([
       // When genuinely unwell, lying down with the cone dominates everything.
       { item: 'sick', weight: n && n.health < 0.35 ? 4 + (0.35 - n.health) * 12 : 0 },
       // Bored & not unwell: sulk (ears back) some of the time.
@@ -1239,6 +1239,10 @@ export class PetEngine {
       // Research puts scratch-grooming at a tiny fraction of a cat's grooming
       // time, so the base rate stays low — it is punctuation, not an activity.
       { item: 'scratch', weight: this.allowed('scratch') ? 0.10 + dirty * 0.85 : 0 },
+      // The social roll. Showing a belly is a trust and contentment display, so
+      // it leans hard on affection — an aloof cat should rarely do it, and an
+      // unwell or exhausted one not at all.
+      { item: 'flop', weight: this.allowed('flop') ? (0.05 + p.affection * 0.34 + p.energy * 0.08) * (1 - tired * 0.7) * (1 - sick) : 0 },
       { item: 'knead', weight: this.allowed('knead') ? (0.08 + p.affection * 0.30 + p.sleepiness * 0.16) * (1 - sick * 0.8) : 0 },
       { item: 'kneadboth', weight: this.allowed('kneadboth') ? (0.06 + p.affection * 0.26 + p.sleepiness * 0.14) * (1 - sick * 0.8) : 0 },
       // Deliberately tiny: at these weights an energetic cat has a fit every few
@@ -1258,6 +1262,7 @@ export class PetEngine {
         case 'knead':
         case 'kneadboth':
         case 'scratch':
+        case 'flop':
           this.playOneShot(action)
           break
         case 'bat':

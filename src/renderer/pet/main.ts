@@ -432,14 +432,36 @@ function scratchFrames(): Frame[] {
   return [...out, ...tail]
 }
 
+/**
+ * The social roll: flop onto the side, roll belly-up, paddle a bit, and get
+ * back up. The flop down is quick (gravity does it) and getting up is slower
+ * and more effortful — that asymmetry is most of what sells the weight.
+ */
+function flopFrames(): Frame[] {
+  const io = seqFrames('flop-io', () => [
+    ...rigLerpFrames(POSES.sit, POSES.flop, 4, 60), // 0..3   down it goes
+    ...rigLerpFrames(POSES.flop, POSES.rollBack, 4, 70), // 4..7   over onto the back
+    ...rigLerpFrames(POSES.rollBack, POSES.flop, 3, 90), // 8..10  back onto the side
+    ...rigLerpFrames(POSES.flop, POSES.sit, 5, 105) // 11..15 and up again
+  ])
+  const down = io.slice(0, 4), onto = io.slice(4, 8), off = io.slice(8, 11), up = io.slice(11)
+  const back = getRigFrame('roll|0', () => POSES.rollBack)
+  const wrig = getRigFrame('roll|1', () => POSES.rollWriggle)
+  const out: Frame[] = [...down, { img: down[3].img, ms: 360 + Math.random() * 220 }, ...onto]
+  const paddles = 2 + Math.floor(Math.random() * 3) // 2-4 wriggles, never a fixed count
+  for (let i = 0; i < paddles; i++) out.push({ img: wrig, ms: 170 }, { img: back, ms: 190 })
+  out.push(...off, { img: off[2].img, ms: 280 + Math.random() * 200 }, ...up)
+  return out
+}
+
 const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = {
   yawn: 'front', stretch: 'stand', react: 'front', paw: 'front', knead: 'front', kneadboth: 'front', knock: 'front',
-  scratch: 'sit'
+  scratch: 'sit', flop: 'sit'
 }
 const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = {
   yawn: yawnFrames, stretch: stretchFrames, react: reactFrames, paw: pawFrames,
   knead: () => kneadFrames(false), kneadboth: () => kneadFrames(true), knock: knockFrames,
-  scratch: scratchFrames
+  scratch: scratchFrames, flop: flopFrames
 }
 
 // ---- Graph runtime state ------------------------------------------------------

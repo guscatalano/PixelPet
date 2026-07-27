@@ -12,7 +12,7 @@ import type { Difficulty } from './care'
 export type ClipName =
   | 'idle' | 'sit' | 'walk' | 'prance' | 'stalk' | 'trot' | 'hop' | 'sleep' | 'react' | 'fall'
   | 'loaf' | 'sphinx' | 'groom' | 'teeter' | 'poof' | 'pounce' | 'yawn' | 'stretch' | 'paw' | 'sick' | 'sulk'
-  | 'zoomies' | 'knock' | 'knead' | 'kneadboth' | 'bat' | 'scratch'
+  | 'zoomies' | 'knock' | 'knead' | 'kneadboth' | 'bat' | 'scratch' | 'flop'
 
 /** Which way the pet faces (affects horizontal flip). */
 export type Facing = 'left' | 'right'
@@ -128,7 +128,7 @@ export interface AiStatus {
 /** Behaviors the user may turn off in settings (core locomotion is not toggleable). */
 export const TOGGLEABLE_ANIMS: ClipName[] = [
   'sleep', 'loaf', 'sphinx', 'groom', 'stretch', 'pounce', 'teeter', 'poof', 'yawn', 'paw', 'react',
-  'zoomies', 'knock', 'knead', 'kneadboth', 'bat', 'scratch'
+  'zoomies', 'knock', 'knead', 'kneadboth', 'bat', 'scratch', 'flop'
 ]
 
 /** Live-tunable renderer config pushed over pet:set-config. */
