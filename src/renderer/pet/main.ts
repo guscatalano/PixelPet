@@ -409,12 +409,37 @@ function knockFrames(): Frame[] {
 // 'bat' (the string toy) is deliberately NOT a one-shot here: the engine runs it
 // as a full hunt — stare, stalk, the pounce crouch, a real ballistic leap — all
 // of which are existing states. There is no canned batting clip any more.
+/**
+ * Scratching an ear with a hind foot. The scratch itself is a fast shuttle
+ * between two poses — real scratching is a blur, several strokes a second, and
+ * a slow version reads as the leg being stuck rather than as an itch. The
+ * lead-in and lead-out are cached (fixed), the shuttle is rebuilt each time so
+ * the stroke count varies; both shuttle poses come from the keyed rig cache, so
+ * rebuilding costs nothing.
+ */
+function scratchFrames(): Frame[] {
+  const io = seqFrames('scratch-io', () => [
+    ...rigLerpFrames(POSES.sit, POSES.scratch, 3, 70), // leg comes up fast
+    ...rigLerpFrames(POSES.scratch, POSES.sit, 3, 90) // and back down
+  ])
+  const lead = io.slice(0, 3), tail = io.slice(3)
+  const lo = getRigFrame('scratch|0', () => POSES.scratch)
+  const hi = getRigFrame('scratch|1', () => POSES.scratchUp)
+  const out: Frame[] = [...lead]
+  const strokes = 6 + Math.floor(Math.random() * 5) // 6-10, ~6.9 per second
+  for (let i = 0; i < strokes; i++) out.push({ img: hi, ms: 70 }, { img: lo, ms: 75 })
+  out.push({ img: lo, ms: 200 + Math.random() * 160 }) // a beat before lowering
+  return [...out, ...tail]
+}
+
 const ONE_SHOT_NODE: Partial<Record<ClipName, Node>> = {
-  yawn: 'front', stretch: 'stand', react: 'front', paw: 'front', knead: 'front', kneadboth: 'front', knock: 'front'
+  yawn: 'front', stretch: 'stand', react: 'front', paw: 'front', knead: 'front', kneadboth: 'front', knock: 'front',
+  scratch: 'sit'
 }
 const ONE_SHOT_FRAMES: Partial<Record<ClipName, () => Frame[]>> = {
   yawn: yawnFrames, stretch: stretchFrames, react: reactFrames, paw: pawFrames,
-  knead: () => kneadFrames(false), kneadboth: () => kneadFrames(true), knock: knockFrames
+  knead: () => kneadFrames(false), kneadboth: () => kneadFrames(true), knock: knockFrames,
+  scratch: scratchFrames
 }
 
 // ---- Graph runtime state ------------------------------------------------------

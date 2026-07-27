@@ -404,6 +404,37 @@ export const POSES: Record<string, RigPose> = {
   },
   // Washing up: sitting, one front paw raised to the mouth, head dipped toward
   // it, eyes squeezed in concentration. Lerp groom <-> groomLick for the licks.
+  // Scratching an ear with a HIND foot — the yoga-like sit every cat does. The
+  // near hind leg swings up beside the head, hock cocked well out, and the head
+  // tips down toward the incoming foot to meet it. Two poses a few units apart
+  // so the scratch itself is a fast shuttle between them.
+  // The foot must clear the HEAD CIRCLE (centre ~[30,25.5], r 7 — so it spans
+  // x 23..37) or it is drawn inside the skull and reads as nothing. Keeping it
+  // just behind the head silhouettes it against the background, which is also
+  // where a real hind paw appears in side profile: up past the cheek to the ear.
+  scratch: {
+    body: [17, 31.5, 11, 8], head: [30, 25.5, 7], neck: [26, 29.5, 5.6, 4.6],
+    tail: { root: [7, 33], ctrl: [6, 42], tip: [20, 43] }, eye: 0, earsBack: 0.35,
+    legs: [
+      { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false },
+      { hip: [25, 33], mid: [25, 38], foot: [25, GROUND], near: false },
+      // near hind: hock swung right out, shin vertical, paw up beside the cheek
+      { hip: [17, 34], mid: [17.5, 28], foot: [22.5, 23.5], near: true },
+      { hip: [27.5, 33], mid: [27.5, 38], foot: [27.5, GROUND], near: true }
+    ]
+  },
+  // The far end of the shuttle: paw driven up level with the ear, head tipped
+  // down into it. Only the paw and head move — that contrast is the scratch.
+  scratchUp: {
+    body: [17, 31.5, 11, 8], head: [30, 26.8, 7], neck: [26, 30, 5.6, 4.6],
+    tail: { root: [7, 33], ctrl: [6, 42], tip: [20, 43] }, eye: 0, earsBack: 0.55,
+    legs: [
+      { hip: [14, 34], mid: [10, 39], foot: [19, 42], near: false },
+      { hip: [25, 33], mid: [25, 38], foot: [25, GROUND], near: false },
+      { hip: [17, 34], mid: [17.5, 27], foot: [23, 20], near: true },
+      { hip: [27.5, 33], mid: [27.5, 38], foot: [27.5, GROUND], near: true }
+    ]
+  },
   groom: {
     body: [17, 31, 11, 8], head: [31, 24, 7], neck: [26, 28, 6, 5.5],
     tail: { root: [7, 33], ctrl: [7, 42], tip: [22, 42] }, eye: 0,
