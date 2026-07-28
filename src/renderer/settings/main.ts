@@ -709,6 +709,48 @@ function buildDetail(): void {
   }
 }
 
+/**
+ * What each personality slider actually changes. A bare word like "Curiosity"
+ * tells you nothing about what moving it will do, and these are the knobs people
+ * most want to understand.
+ *
+ * Taken from the ambient weights and interaction rules in behavior/engine.ts —
+ * every effect listed here is a real term in that code, so keep them in step if
+ * the weights move. `low` and `high` describe the ends of the slider.
+ */
+const TRAIT_ABOUT: Record<keyof Personality, { what: string; high: string; low: string }> = {
+  energy: {
+    what: 'How much your pet is up for doing anything at all. The single biggest influence on how often it gets up and goes somewhere.',
+    high: 'wanders constantly, pounces and prances, rarely settles',
+    low: 'sits, loafs and lingers; long pauses between moves'
+  },
+  sleepiness: {
+    what: 'How readily it naps, and how long it stays down once it does.',
+    high: 'sleeps often and for much longer; yawns on the way down; kneads more',
+    low: 'rarely sleeps, and not for long when it does'
+  },
+  affection: {
+    what: 'How much it cares that you are there. Drives whether it answers a hover, and the trust behaviours.',
+    high: 'greets you when you hover, reaches a paw at you, flops over and kneads',
+    low: 'mostly ignores you'
+  },
+  mischief: {
+    what: 'The troublemaking streak. Matters most when it is standing on a window ledge.',
+    high: 'shoves things off ledges, pounces, stalks, prances, hops down instead of backing off',
+    low: 'peers over the edge and thinks better of it'
+  },
+  curiosity: {
+    what: 'The pull toward somewhere it is not. Drives wandering and climbing up onto windows.',
+    high: 'roams further, climbs onto windows more, goes after the string toy',
+    low: 'stays put around where it already is'
+  },
+  independence: {
+    what: 'How self-contained it is. Works against affection rather than having many effects of its own.',
+    high: 'often ignores your hover; grooms itself more',
+    low: 'more responsive to you'
+  }
+}
+
 function buildTraits(): void {
   const pet = findPet(state.activePetId)
   who.textContent = pet.name
@@ -720,6 +762,9 @@ function buildTraits(): void {
     const name = document.createElement('div')
     name.className = 'tn'
     name.textContent = key
+    const about = TRAIT_ABOUT[key]
+    // On the whole row, so hovering the slider explains it too, not just the word.
+    row.title = `${key[0].toUpperCase()}${key.slice(1)} — ${about.what}\n\nHigh: ${about.high}\nLow: ${about.low}`
     const slider = document.createElement('input')
     slider.type = 'range'
     slider.min = '0'; slider.max = '100'; slider.step = '1'

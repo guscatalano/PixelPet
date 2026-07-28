@@ -466,7 +466,10 @@
       <section class="sec" data-tab="behavior">
         <div class="label">Startup</div>
         <div class="traits">
-          <div class="trow">
+          <div
+            class="trow"
+            title="Start on boot &mdash; launch PixelPet automatically when you log in.&#10;&#10;This is an ordinary Windows startup entry, so you can also see and remove it in Task Manager &rarr; Startup."
+          >
             <div class="tn">Start on boot</div>
             <button class="toggle" id="autostart" aria-pressed="false">Off &mdash; start it yourself</button>
             <div class="tv"></div>
@@ -489,12 +492,19 @@
       <section class="sec" data-tab="behavior">
         <div class="label">Movement</div>
         <div class="traits">
-          <div class="trow wide">
+          <div
+            class="trow wide"
+            title="Turn speed &mdash; how long each frame of the turn-to-face-you animation holds.&#10;&#10;Low: snaps round quickly&#10;High: a slow, deliberate turn"
+          >
             <div class="tn">Turn speed</div>
             <input type="range" id="turnms" min="50" max="600" step="10" />
             <div class="tv" id="turnmsv">80ms</div>
           </div>
-          <div class="trow" style="margin-top: 6px">
+          <div
+            class="trow"
+            style="margin-top: 6px"
+            title="Stay here &mdash; pins your pet to the spot it is on.&#10;&#10;On: no wandering, no pouncing, no zoomies, no going after the string. It still sits, sleeps, grooms and reacts to you.&#10;Off: free to roam the whole desktop and climb onto windows."
+          >
             <div class="tn">Stay here</div>
             <button class="toggle" id="stayput" aria-pressed="false">Off — free to roam</button>
             <div class="tv"></div>
