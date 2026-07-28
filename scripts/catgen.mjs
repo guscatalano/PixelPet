@@ -208,28 +208,41 @@ export function applyMarking(region, fur, g, kind) {
     const dx = (x - cx) / rx, dy = (y - cy) / ry
     return dx * dx + dy * dy <= 1
   }
+  // Paint one pixel, over fur only (this mirror draws 1:1, no supersampling).
+  const paintU = (ux, uy, val) => { if (inB(ux, uy) && fur[idx(ux, uy)]) region[idx(ux, uy)] = val }
   switch (kind) {
+    // A mackerel tabby, front-on: the M on the forehead, a line sweeping back off
+    // each eye, narrow vertical bars down the flanks, bracelets on the legs.
+    // Bars are spaced by the angle AROUND the barrel, so they crowd toward the
+    // silhouette like a curved surface really does. (The old version sheared them
+    // with a sine about a full period wide, which made them 45 degree pinstripes.)
     case 'tabby': {
+      const BARS = 3.6
       forEachFur((x, y) => {
         if (inEllipse(x, y, g.bodyCx, g.bodyCy, g.bodyRx, g.bodyRy)) {
-          // mackerel stripes: vertical bands that follow the body curve
-          const v = (x - g.bodyCx) + Math.sin((y - g.bodyCy) * 0.45) * 2.6
-          if (((Math.round(v) % 5) + 5) % 5 === 0) region[idx(x, y)] = S
+          const u = Math.asin(Math.max(-1, Math.min(1, (x - g.bodyCx) / g.bodyRx)))
+          const phase = (u / (Math.PI / 2)) * BARS + Math.sin((y - g.bodyCy) * 0.22) * 0.12
+          if (Math.abs(phase - Math.round(phase)) < 0.17) region[idx(x, y)] = S
         } else if (inEllipse(x, y, g.headCx, g.headCy, g.headRx, g.headRy)) {
-          // temple stripes on the upper sides of the head
-          if (y < g.headCy - 1 && Math.abs(x - g.headCx) > 3 && (((y - g.headCy) % 2) + 2) % 2 === 0)
-            region[idx(x, y)] = S
+          // face markings are drawn as real shapes below
         } else if (((Math.round(y) % 3) + 3) % 3 === 0) {
-          // tail rings
-          region[idx(x, y)] = S
+          region[idx(x, y)] = S // legs and tail: banded across
         }
       })
-      // forehead "M" dashes above the eyes
-      for (let yy = Math.round(g.headCy - 6); yy <= Math.round(g.headCy - 2); yy++)
-        for (const xx of [g.headCx - 2, g.headCx, g.headCx + 2]) {
-          const rx = Math.round(xx)
-          if (inB(rx, yy) && fur[idx(rx, yy)]) region[idx(rx, yy)] = S
+      // The M: outer uprights plus a V meeting in the middle, above the eyes.
+      const mw = g.headRx * 0.44, my = g.headCy - g.headRy * 0.58
+      for (let k = 0; k <= 1; k += 0.04) {
+        for (const sgn of [-1, 1]) {
+          paintU(Math.round(g.headCx + sgn * mw), Math.round(my + k * 4.6), S)
+          paintU(Math.round(g.headCx + sgn * mw * (1 - k * 0.82)), Math.round(my + 0.6 + k * 3.4), S)
         }
+      }
+      // One cheek stroke per side, sweeping back off the eye toward the jaw.
+      for (const sgn of [-1, 1]) {
+        for (let k = 0; k <= 1; k += 0.06) {
+          paintU(Math.round(g.headCx + sgn * (g.eyeDX * 1.2 + k * 2.4)), Math.round(g.eyeY + 1.2 + k * 1.6), S)
+        }
+      }
       break
     }
     case 'tuxedo':
@@ -291,13 +304,40 @@ export function sideMarking(region, fur, s, kind) {
   const inBody = (x, y) => inEllipse(x, y, s.bcx, s.bcy, s.brx + 1, s.bry + 1)
   const fx = s.faceSign
   switch (kind) {
+    // A mackerel tabby in profile: a solid line down the spine, bars dropping off
+    // it down the ribs, RINGS around the tail, bracelets around the legs. Each
+    // runs across its own limb, so each gets its own rule -- one banded-by-x
+    // formula for the whole cat wrapped the tail and legs lengthwise.
     case 'tabby': {
+      const legTop = s.bcy + s.bry * 0.55
+      // Poses carry a second mass, so torso sits outside the body ellipse. It has
+      // to count as torso or it gets ringed like a tail -- a chevron across the side.
+      const inTorso = (x, y) => inEllipse(x, y, s.bcx, s.bcy, s.brx + 3.5, s.bry + 3.5)
       forEachFur((x, y) => {
-        const v = (x - s.bcx) + Math.sin((y - s.bcy) * 0.5) * 2.6
-        if (((Math.round(v) % 5) + 5) % 5 === 0) region[idx(x, y)] = S
-      })
-      forEachFur((x, y) => {
-        if (y < s.hcy - 1 && inHead(x, y) && (((Math.round(x - s.hcx) % 2) + 2) % 2 === 0)) region[idx(x, y)] = S
+        const i = idx(x, y)
+        if (inHead(x, y)) {
+          if (y < s.hcy - s.hr * 0.25 && (((Math.round(x - s.hcx) % 3) + 3) % 3 === 0)) region[i] = S
+          return
+        }
+        if (inTorso(x, y)) {
+          const dx = (x - s.bcx) / s.brx
+          if (Math.abs(dx) <= 1) {
+            const top = s.bcy - s.bry * Math.sqrt(1 - dx * dx)
+            if (y >= top - 2 && y - top < 1.8) { region[i] = S; return }
+          }
+          // Lean measured from the spine DOWN: centred, it reverses at mid-height
+          // and bends every bar into a chevron.
+          const drop = (y - (s.bcy - s.bry)) / (2 * s.bry)
+          const v = (x - s.bcx) + drop * s.faceSign * 1.9
+          if (((Math.round(v) % 5) + 5) % 5 === 0) region[i] = S
+          return
+        }
+        if (y > legTop) {
+          if (((Math.round(y) % 3) + 3) % 3 === 0) region[i] = S
+          return
+        }
+        const d = Math.hypot(x - s.bcx, y - s.bcy)
+        if (((Math.round(d) % 4) + 4) % 4 === 0) region[i] = S
       })
       break
     }

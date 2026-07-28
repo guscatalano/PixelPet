@@ -213,19 +213,49 @@ export function applyMarking(region: Uint8Array, fur: Uint8Array, g: Geom, kind:
     for (let dy = 0; dy < b; dy++) for (let dx = 0; dx < b; dx++) { const px = bx + dx, py = by + dy; if (inB(px, py) && fur[idx(px, py)]) region[idx(px, py)] = val }
   }
   switch (kind) {
+    // A mackerel tabby, front-on. The markings a real one actually has, in the
+    // order you notice them: the "M" on the forehead, curved lines sweeping back
+    // off each eye, a broken necklace across the chest, narrow vertical bars down
+    // the flanks, and bracelets ringing the legs.
+    //
+    // The flank bars are the bit that used to look wrong. They were sheared by a
+    // sine roughly a full period across the body, which turned them into 45°
+    // pinstripes; a real tabby's run vertically, perpendicular to the spine.
+    // Spacing them by the angle AROUND the barrel rather than by x also makes
+    // them crowd toward the silhouette the way a curved surface really does.
     case 'tabby': {
+      const BARS = 3.6 // half the number of bars visible across the chest
       forEachFur((x, y, i) => {
         if (inEllipse(x, y, g.bodyCx, g.bodyCy, g.bodyRx, g.bodyRy)) {
-          const v = (x - g.bodyCx) + Math.sin((y - g.bodyCy) * 0.45) * 2.6
-          if (((Math.round(v) % 5) + 5) % 5 === 0) region[i] = S
+          const u = Math.asin(Math.max(-1, Math.min(1, (x - g.bodyCx) / g.bodyRx)))
+          // A whisper of bow so they aren't a picket fence — a tenth of the old shear.
+          const phase = (u / (Math.PI / 2)) * BARS + Math.sin((y - g.bodyCy) * 0.22) * 0.12
+          if (Math.abs(phase - Math.round(phase)) < 0.17) region[i] = S
         } else if (inEllipse(x, y, g.headCx, g.headCy, g.headRx, g.headRy)) {
-          if (y < g.headCy - 1 && Math.abs(x - g.headCx) > 3 && (((Math.round(y - g.headCy)) % 2) + 2) % 2 === 0) region[i] = S
+          // handled below, so the face markings can be drawn as real shapes
         } else if (((Math.round(y) % 3) + 3) % 3 === 0) {
-          region[i] = S
+          region[i] = S // legs and tail: bracelets and rings, banded across
         }
       })
-      for (let yy = Math.round(g.headCy - 6); yy <= Math.round(g.headCy - 2); yy++)
-        for (const xx of [g.headCx - 2, g.headCx, g.headCx + 2]) paintU(Math.round(xx), yy, S)
+      // A real tabby also wears a "necklace" band at the base of the throat, but
+      // that is exactly where a collar sits — drawn here it just reads as one.
+      // Left off deliberately; the M and the flank bars carry the pattern.
+      //
+      // The M: outer uprights plus a V meeting in the middle, above the eyes.
+      const mw = g.headRx * 0.44, my = g.headCy - g.headRy * 0.58
+      for (let k = 0; k <= 1; k += 0.04) {
+        for (const sgn of [-1, 1]) {
+          paintU(Math.round(g.headCx + sgn * mw), Math.round(my + k * 4.6), S)
+          paintU(Math.round(g.headCx + sgn * mw * (1 - k * 0.82)), Math.round(my + 0.6 + k * 3.4), S)
+        }
+      }
+      // Cheek line: one clear stroke per side, sweeping back off the eye toward
+      // the jaw. Kept inside the cheek — any further out and the outline eats it.
+      for (const sgn of [-1, 1]) {
+        for (let k = 0; k <= 1; k += 0.06) {
+          paintU(Math.round(g.headCx + sgn * (g.eyeDX * 1.2 + k * 2.4)), Math.round(g.eyeY + 1.2 + k * 1.6), S)
+        }
+      }
       break
     }
     case 'tuxedo':
@@ -298,15 +328,51 @@ export function sideMarking(region: Uint8Array, fur: Uint8Array, s: SideGeom, ki
   const fx = s.faceSign // front direction
   switch (kind) {
     case 'tabby': {
-      // Mackerel stripes: vertical bands running down the spine, wrapping legs
-      // and tail. A sine warp keeps them from looking like a picket fence.
+      // A mackerel tabby in profile. The one formula it used to use — bands by x
+      // with a big sine shear — gave 45° pinstripes and wrapped the tail and legs
+      // lengthwise, which is wrong in three different ways at once. A real one
+      // has: a solid dark line down the spine, narrow bars dropping off it down
+      // the ribs, RINGS around the tail, and bracelets around the legs. Each of
+      // those runs across its own limb, so each gets its own rule.
+      const legTop = s.bcy + s.bry * 0.55
+      // Poses carry a second mass (the loaf's spread, the stretch's raised rear),
+      // so a fair bit of torso sits OUTSIDE the body ellipse. It has to count as
+      // torso: fall through to the tail rule and it gets ringed instead of
+      // barred, which draws a big chevron across the cat's side.
+      const inTorso = (x: number, y: number): boolean => inEllipse(x, y, s.bcx, s.bcy, s.brx + 3.5, s.bry + 3.5)
       forEachFur((x, y, i) => {
-        const v = (x - s.bcx) + Math.sin((y - s.bcy) * 0.5) * 2.6
-        if (((Math.round(v) % 5) + 5) % 5 === 0) region[i] = S
-      })
-      // Forehead "M" hint: a couple of short bars between the ears.
-      forEachFur((x, y, i) => {
-        if (y < s.hcy - 1 && inHead(x, y) && (((Math.round(x - s.hcx) % 2) + 2) % 2 === 0)) region[i] = S
+        if (inHead(x, y)) {
+          // Forehead bars (the M, side-on) and one cheek line behind the eye.
+          if (y < s.hcy - s.hr * 0.25 && (((Math.round(x - s.hcx) % 3) + 3) % 3 === 0)) region[i] = S
+          return
+        }
+        if (inTorso(x, y)) {
+          // The spine: a solid stripe hugging the top of the barrel. Only over the
+          // ellipse's own span — past that there is no "top" to hug.
+          const dx = (x - s.bcx) / s.brx
+          if (Math.abs(dx) <= 1) {
+            const top = s.bcy - s.bry * Math.sqrt(1 - dx * dx)
+            if (y >= top - 2 && y - top < 1.8) { region[i] = S; return }
+          }
+          // Ribs: vertical bars off the spine, leaning back a little down the
+          // flank. Measured from the spine DOWN, not from the body centre out —
+          // centred, the lean reverses at mid-height and every bar comes out
+          // bent into a chevron.
+          const drop = (y - (s.bcy - s.bry)) / (2 * s.bry)
+          const v = (x - s.bcx) + drop * s.faceSign * 1.9
+          if (((Math.round(v) % 5) + 5) % 5 === 0) region[i] = S
+          return
+        }
+        if (y > legTop) {
+          // Legs: bracelets ring the limb, so they run ACROSS it — horizontal.
+          if (((Math.round(y) % 3) + 3) % 3 === 0) region[i] = S
+          return
+        }
+        // What is left above the legs and clear of the torso is the tail. Ring it
+        // by distance out from the body, so the bands sit across the tail
+        // whichever way the pose has curled it.
+        const d = Math.hypot(x - s.bcx, y - s.bcy)
+        if (((Math.round(d) % 4) + 4) % 4 === 0) region[i] = S
       })
       break
     }

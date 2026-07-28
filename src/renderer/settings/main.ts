@@ -330,6 +330,44 @@ const POSES: Array<{ key: string; label: string; rgba: (pet: AppPet, t: number) 
   { key: 'sulk', label: 'Sulk', rgba: (pet, t) => renderPet(generateRigGrid(pet, { ...RIG.sulk, eye: t % 4200 > 160 ? 1 : 0 }), pet.coat) },
   { key: 'sick', label: 'Sick', rgba: (pet, t) => renderPet(generateRigGrid(pet, { ...RIG.sick, eye: t % 5000 > 320 ? 1 : 0 }), pet.coat) }
 ]
+/**
+ * What each animation actually is, and what makes your pet do it — the tiles
+ * only showed a name, which says nothing about what turning one off would stop.
+ * These describe the real triggers in behavior/engine.ts (the ambient weights,
+ * and the few that are driven by something else); keep them honest if the
+ * weights change.
+ */
+const POSE_ABOUT: Record<string, string> = {
+  idle: 'Standing still, breathing and blinking. Where your pet goes between everything else.',
+  walk: 'Wandering off to somewhere else on the desktop. Its usual pace.',
+  prance: 'A pleased, bouncy walk. Used by lively pets in a good mood.',
+  trot: 'A brisk two-beat gait — diagonal pairs of legs together. Some pets walk this way by default.',
+  stalk: 'Creeping low, freezing to watch, then creeping again. Some pets move this way by default.',
+  hop: 'Bunny-hopping instead of walking. A per-pet trait rather than a mood.',
+  zoomies: 'A sudden tear back and forth across the screen. Rare on purpose — energetic, mischievous pets, every few minutes at most.',
+  sit: 'Sitting upright. One of the resting poses it settles into.',
+  loaf: 'Tucked into a loaf with its paws under it. A longer rest; sleepy pets hold it longer.',
+  sphinx: 'Lying with forepaws stretched out in front. A longer rest.',
+  sleep: 'Curled up asleep. The longest rest, and much longer for sleepy pets. Dreams happen here.',
+  groom: 'Washing itself. A short, frequent tidy-up.',
+  stretch: 'A long stretch, usually on the way out of a rest.',
+  pounce: 'A crouch, a wiggle, and a leap — also how it jumps up onto windows.',
+  teeter: 'Peering over the edge of a window before deciding not to walk off it. Turning this off makes it simply turn around at edges instead.',
+  poof: 'Startled: arched back, fur on end, tail up.',
+  yawn: 'A wide yawn. Mostly when tired.',
+  bat: 'The string toy: a string drops in and your pet stalks, crouches and jumps at it. Driven by mischief, curiosity and boredom.',
+  knock: 'Reaching out and deliberately shoving something off the edge of a window. Only happens when it is actually standing on one.',
+  flop: 'Flopping onto its side and lying there a while. A trust display, so affectionate pets do it far more.',
+  roll: 'Rolling belly-up and wriggling. Only ever happens partway through a flop, so it needs Flop on too.',
+  scratch: 'Scratching behind an ear with a back foot. An itch rather than a mood — more often when it needs a wash.',
+  knead: 'Making biscuits with one paw. Affectionate and sleepy pets do it most.',
+  kneadboth: 'Making biscuits with both paws, alternating.',
+  paw: 'Reaching out and patting at nothing in particular.',
+  react: 'A little perk-up when you hover over or click your pet.',
+  sulk: 'Ears flat, hunched. Care Mode, when a need has gone unmet.',
+  sick: 'Unwell: a lethargic lie-down with a cone. Care Mode only.'
+}
+
 const poseCanvases: CanvasRenderingContext2D[] = []
 
 // Each tile PLAYS its animation on the live cat when clicked; toggleable ones
@@ -351,7 +389,15 @@ function buildPoses(): void {
     tile.append(c, label)
     tile.tabIndex = 0
     tile.setAttribute('role', 'button')
-    tile.title = `Play the ${pose.label.toLowerCase()} animation on your cat`
+    // Hovering explains what the animation IS and what sets it off, then what
+    // clicking does — a bare label gave no clue what turning one off would stop.
+    const about = POSE_ABOUT[pose.key] ?? ''
+    tile.title = [
+      `${pose.label}${about ? ` — ${about}` : ''}`,
+      '',
+      'Click to play it now.',
+      togglable ? 'The dot turns it off, so it stops happening on its own.' : 'Always on: this one can’t be turned off.'
+    ].join('\n')
     const play = (): void => window.settings.playClip(pose.key as ClipName)
     tile.addEventListener('click', play)
     tile.addEventListener('keydown', (e) => {
@@ -363,7 +409,12 @@ function buildPoses(): void {
       const paint = (): void => {
         const off = tile.classList.contains('off')
         dot.textContent = off ? '○' : '●'
-        dot.title = off ? `${pose.label} is off — click to enable` : `Turn ${pose.label.toLowerCase()} off`
+        dot.title = [
+          off ? `${pose.label} is OFF — your pet never does this on its own.` : `${pose.label} is ON.`,
+          about,
+          '',
+          off ? 'Click to turn it back on.' : 'Click to turn it off.'
+        ].filter((l, i) => l !== '' || i === 2).join('\n')
       }
       paint()
       dot.addEventListener('click', (e) => {
