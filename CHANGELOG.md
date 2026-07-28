@@ -18,12 +18,19 @@ All notable changes to PixelPet are documented here. This project follows
 - **An ear scratch.** A back foot comes up and goes at it.
 
 ### Changed
+- **Independence does something now.** It used to be a minor modifier on Affection and
+  almost nothing else. It now decides *where* your pet goes: an independent one takes
+  itself off to the other end of the screen, a dependent one comes over and settles near
+  your mouse pointer.
+- **The Behavior tab explains itself.** Hovering a personality slider now tells you what
+  that trait actually changes and what each end of it does — no more guessing what
+  "Curiosity" is for. Same for the Movement and Startup rows.
 - **Tabbies look like tabbies.** The stripes used to run diagonally, like pinstripes on a
   shirt, and wrapped the tail and legs the long way. Now they're the markings a real
   mackerel tabby has: the **M** on the forehead, a line sweeping back off each eye, narrow
   vertical bars down the flanks, a dark line along the spine, **rings** around the tail and
   **bracelets** on the legs.
-- **The animation toggles explain themselves.** Hovering a tile in *Settings → Behavior →
+- **The animation tiles explain themselves too.** Hovering one in *Settings → Behavior →
   Animations* now tells you what that animation is and what makes your pet do it — that
   zoomies are rare on purpose, that the belly roll only ever happens partway through a
   flop, that the ear scratch is an itch rather than a mood. Tiles that can't be turned off

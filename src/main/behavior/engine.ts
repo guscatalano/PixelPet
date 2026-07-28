@@ -8,6 +8,7 @@ import { weightedPick } from './personality'
 import { decay, apply as applyCare, nudge, careState, freshNeeds } from '../care/needs'
 import { refreshPlatforms, supportY, ledgesAbove } from '../desktop/world'
 import { winCoord } from '../desktop/coords'
+import { pickWanderTarget } from './wander'
 
 const MOVE_TICK_MS = 16
 const WALK_SPEED = 0.35 // px per tick (~22 px/s) — a calm walking pace, not a scramble
@@ -465,6 +466,21 @@ export class PetEngine {
 
   // ---- wandering + physics -------------------------------------------------------
 
+  /**
+   * Where your pointer is, in screen x — or null if it isn't on the same display
+   * as the pet, in which case "toward you" has no meaning worth acting on.
+   */
+  private cursorX(): number | null {
+    try {
+      const c = screen.getCursorScreenPoint()
+      const wa = screen.getDisplayMatching(this.win.getBounds()).workArea
+      if (c.x < wa.x || c.x > wa.x + wa.width) return null
+      return c.x
+    } catch {
+      return null // headless / display teardown — just wander at random
+    }
+  }
+
   private startWander(force?: ClipName, toX?: number): void {
     if (this.dragging || this.win.isDestroyed()) return
     const wa = screen.getDisplayMatching(this.win.getBounds()).workArea
@@ -504,7 +520,16 @@ export class PetEngine {
       target = Math.round(Math.max(minX, Math.min(maxX, this.curX + dir * dist)))
       if (Math.abs(target - this.curX) < HOP_STRIDE * 0.6) clip = 'walk' // boxed in
     } else {
-      target = Math.round(minX + Math.random() * (maxX - minX))
+      // Where it chooses to go says more about a cat than how often it goes, so
+      // this is what independence actually controls (see behavior/wander.ts).
+      target = pickWanderTarget({
+        minX,
+        maxX,
+        halfW: this.win.getBounds().width / 2,
+        cursorX: this.cursorX(),
+        independence: this.personality.independence,
+        rnd: Math.random
+      })
       if (Math.abs(target - this.curX) < MIN_WANDER) {
         target = this.curX + (target >= this.curX ? 1 : -1) * (MIN_WANDER + Math.random() * 140)
         target = Math.round(Math.max(minX, Math.min(maxX, target)))

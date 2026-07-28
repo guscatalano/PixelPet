@@ -745,9 +745,9 @@ const TRAIT_ABOUT: Record<keyof Personality, { what: string; high: string; low: 
     low: 'stays put around where it already is'
   },
   independence: {
-    what: 'How self-contained it is. Works against affection rather than having many effects of its own.',
-    high: 'often ignores your hover; grooms itself more',
-    low: 'more responsive to you'
+    what: 'How self-contained it is — mostly, where it chooses to go relative to your mouse pointer.',
+    high: 'takes itself off to the other end of the screen; ignores your hover; grooms itself more',
+    low: 'comes over and settles near your pointer; answers when you hover'
   }
 }
 

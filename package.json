@@ -9,6 +9,7 @@
     "gen:icons": "node scripts/genIcons.mjs",
     "proof:climb": "electron scripts/climbProof.mjs",
     "proof:coords": "node scripts/coordProof.mjs",
+    "proof:wander": "node scripts/wanderProof.mjs",
     "shots:store": "electron scripts/genStoreScreens.mjs",
     "shots:readme": "electron scripts/genStoreScreens.mjs --out docs/screenshots --width 1280",
     "predev": "npm run gen:icons",
