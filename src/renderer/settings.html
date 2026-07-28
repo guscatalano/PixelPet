@@ -87,6 +87,10 @@
         text-transform: uppercase; color: var(--faint); margin-bottom: 8px;
       }
       .stack .sublabel .note { text-transform: none; letter-spacing: 0; }
+      /* A line of explanation under a control. Empty = collapsed, so a note that
+         only applies on some platforms leaves no gap on the others. */
+      .traits .note { font-size: 12px; color: var(--faint); line-height: 1.45; }
+      .traits .note:not(:empty) { margin-top: 8px; }
 
       /* Pet grid — scrolls within itself so the controls below stay in view */
       .grid {
@@ -456,6 +460,18 @@
             <label class="cfield">Band<input type="color" id="collarband" /></label>
             <label class="cfield">Tag<input type="color" id="collartag" /></label>
           </div>
+        </div>
+      </section>
+
+      <section class="sec" data-tab="behavior">
+        <div class="label">Startup</div>
+        <div class="traits">
+          <div class="trow">
+            <div class="tn">Start on boot</div>
+            <button class="toggle" id="autostart" aria-pressed="false">Off &mdash; start it yourself</button>
+            <div class="tv"></div>
+          </div>
+          <div class="note" id="autostartnote"></div>
         </div>
       </section>
 

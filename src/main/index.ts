@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { loadCreature } from '../shared/creature'
-import type { AppSettings, AiConfig, AiStatus, ClipName, Collar, Personality, TriggerEvent } from '../shared/types'
+import type { AppSettings, AiConfig, AiStatus, ClipName, Collar, LoginItem, Personality, TriggerEvent } from '../shared/types'
 import { DEFAULT_COLLAR } from '../shared/types'
 import { snapScale, petWindowSize } from '../shared/constants'
 import { createTray, applyTrayMenu, assetPath, type TrayCallbacks } from './tray'
@@ -725,6 +725,23 @@ function applyCare(): void {
   }
 }
 
+/**
+ * "Start on boot" state.
+ *
+ * The OS is the single source of truth, so this is read live rather than
+ * mirrored into AppSettings: the user can also turn startup off from Task
+ * Manager or Windows Settings, and a persisted copy of ours would quietly
+ * disagree with reality the moment they did.
+ *
+ * Store (MSIX) builds are the exception — packaged startup is declared in the
+ * manifest and owned by Windows, so the app cannot set it from in here.
+ */
+function loginItem(): LoginItem {
+  if (process.platform === 'linux') return { supported: false, openAtLogin: false, reason: 'unsupported' }
+  if (process.windowsStore) return { supported: false, openAtLogin: app.getLoginItemSettings().openAtLogin, reason: 'store' }
+  return { supported: true, openAtLogin: app.getLoginItemSettings().openAtLogin }
+}
+
 /** Non-secret AI status for the settings UI. */
 function aiStatus(): AiStatus {
   return {
@@ -792,6 +809,11 @@ function registerIpc(): void {
   // ---- settings channels ----
   ipcMain.handle('settings:get', () => settings)
   ipcMain.handle('app:version', () => app.getVersion())
+  ipcMain.handle('app:login-item', () => loginItem())
+  ipcMain.on('app:set-login-item', (_e, on: boolean) => {
+    if (!loginItem().supported) return
+    app.setLoginItemSettings({ openAtLogin: !!on })
+  })
   ipcMain.on('settings:set-pet', (_e, petId: string) => {
     // Persist the outgoing pet's needs under its own id before switching.
     if (settings.careMode && engine) saveNeeds(settings.activePetId, engine.getStatus().needs, Date.now())

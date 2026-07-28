@@ -88,7 +88,10 @@ const api = {
   /** Rename any cat (empty name clears the override back to its default). */
   renamePet: (petId: string, name: string): void => ipcRenderer.send('pets:rename', { petId, name }),
   /** Put a collar on a pet, or pass null to take it off. */
-  setCollar: (petId: string, collar: { band: string; tag: string } | null): void => ipcRenderer.send('pets:set-collar', { petId, collar })
+  setCollar: (petId: string, collar: { band: string; tag: string } | null): void => ipcRenderer.send('pets:set-collar', { petId, collar }),
+  /** Whether the app launches at login (read live from the OS, never stored). */
+  loginItem: (): Promise<{ supported: boolean; openAtLogin: boolean; reason?: string }> => ipcRenderer.invoke('app:login-item'),
+  setLoginItem: (on: boolean): void => ipcRenderer.send('app:set-login-item', on)
 }
 
 contextBridge.exposeInMainWorld('settings', api)

@@ -110,6 +110,18 @@ export interface AiConfig {
   endpoint?: string
 }
 
+/**
+ * Whether the app launches itself at login. Read live from the OS rather than
+ * stored, so it can't drift from what Task Manager says.
+ * `reason` explains an unsupported platform: 'store' = a packaged Store build,
+ * where Windows owns startup; 'unsupported' = the platform has no such concept.
+ */
+export interface LoginItem {
+  supported: boolean
+  openAtLogin: boolean
+  reason?: 'store' | 'unsupported'
+}
+
 /** A collar you can put on a pet: the strap's colour and the hanging tag's. */
 export interface Collar {
   band: string

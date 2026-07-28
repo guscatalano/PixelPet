@@ -6,7 +6,7 @@ import { randomPetDNA, BUILD_NAMES, MARKING_NAMES, EYE_STYLES, type PetDNA } fro
 import { loadCreature, EAR_STYLES, TAIL_STYLES, GAITS, type CreatureDef } from '../../shared/creature'
 import { ashPhoto } from '../ashPhoto'
 import { SIZE_LEVELS, SPRITE_W, SPRITE_H } from '../../shared/constants'
-import { TRAIT_KEYS, TOGGLEABLE_ANIMS, DEFAULT_COLLAR, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Collar, type Personality } from '../../shared/types'
+import { TRAIT_KEYS, TOGGLEABLE_ANIMS, DEFAULT_COLLAR, type AppSettings, type AiConfig, type AiStatus, type AiProviderId, type ClipName, type Collar, type LoginItem, type Personality } from '../../shared/types'
 import { NEED_KEYS, type CareStatus, type CareAction, type Difficulty, type Needs } from '../../shared/care'
 
 type GenResult = { ok: true; pet: AppPet } | { ok: false; error: string }
@@ -47,6 +47,8 @@ interface SettingsApi {
   deleteUserPet: (petId: string) => void
   renamePet: (petId: string, name: string) => void
   setCollar: (petId: string, collar: Collar | null) => void
+  loginItem: () => Promise<LoginItem>
+  setLoginItem: (on: boolean) => void
   immichStatus: () => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
   setImmichConfig: (cfg: { serverUrl?: string; albumId?: string }) => void
   setImmichKey: (key: string) => Promise<{ serverUrl: string; albumId: string; hasKey: boolean }>
@@ -160,6 +162,34 @@ function buildCollar(): void {
   for (const el of [bandInput, tagInput]) {
     el.addEventListener('input', () => setCollar({ band: bandInput.value, tag: tagInput.value }, false))
   }
+}
+
+// ---- Start on boot ----------------------------------------------------------
+// The OS owns this, so the control mirrors what the OS reports rather than any
+// stored flag — turn startup off in Task Manager and this reflects it on the
+// next open. Where the app can't set it (a Store build, or a platform with no
+// such concept) the toggle is disabled and says who does own it.
+async function buildAutostart(): Promise<void> {
+  const btn = $<HTMLButtonElement>('autostart'), note = $('autostartnote')
+  const paint = (s: LoginItem): void => {
+    btn.classList.toggle('on', s.openAtLogin)
+    btn.setAttribute('aria-pressed', String(s.openAtLogin))
+    btn.textContent = s.openAtLogin ? 'On — starts with your PC' : 'Off — start it yourself'
+    btn.disabled = !s.supported
+    note.textContent = s.supported
+      ? ''
+      : s.reason === 'store'
+        ? 'The Store version leaves this to Windows — Settings → Apps → Startup.'
+        : 'Not available on this platform.'
+  }
+  let s = await window.settings.loginItem()
+  paint(s)
+  btn.addEventListener('click', async () => {
+    if (!s.supported) return
+    window.settings.setLoginItem(!s.openAtLogin)
+    s = await window.settings.loginItem() // re-read: the OS, not us, is the truth
+    paint(s)
+  })
 }
 
 function refreshMeta(): void {
@@ -720,6 +750,7 @@ function buildAnimation(): void {
   })
 
   buildCollar()
+  void buildAutostart()
 
   const pupils = $<HTMLButtonElement>('pupils')
   const paintPupils = (on: boolean): void => {
