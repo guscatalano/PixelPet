@@ -3,6 +3,40 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.11.0 — collars, and a crash finally cornered
+
+### New
+- **Collars.** Put one on any cat — the built-ins included — in *Settings → Look → Collar*,
+  pick the band and tag colours, and take it off again whenever you like. It's an accessory
+  rather than part of the animal, so it doesn't change the creature underneath: switch pets
+  and each one remembers whether it's wearing one.
+- **Start on boot** (*Settings → Behavior → Startup*), so your pet is there when you log in.
+  It's an ordinary Windows startup entry, visible and removable from Task Manager too. The
+  Store version leaves this to Windows, and says so.
+- **A flop.** Your pet now flops over on its side and just lies there for a while, breathing.
+  Sometimes it rolls onto its back and wriggles; sometimes it doesn't.
+- **An ear scratch.** A back foot comes up and goes at it.
+
+### Changed
+- **Tabbies look like tabbies.** The stripes used to run diagonally, like pinstripes on a
+  shirt, and wrapped the tail and legs the long way. Now they're the markings a real
+  mackerel tabby has: the **M** on the forehead, a line sweeping back off each eye, narrow
+  vertical bars down the flanks, a dark line along the spine, **rings** around the tail and
+  **bracelets** on the legs.
+- **The animation toggles explain themselves.** Hovering a tile in *Settings → Behavior →
+  Animations* now tells you what that animation is and what makes your pet do it — that
+  zoomies are rare on purpose, that the belly roll only ever happens partway through a
+  flop, that the ear scratch is an itch rather than a mood. Tiles that can't be turned off
+  say so.
+
+### Fixed
+- **The crash.** `Math.round()` returns negative zero for anything just below zero, and
+  Windows rejects that as a window coordinate — so a cat resting against the left edge of
+  your screen could take the whole app down. It slipped past the existing safety net twice
+  over, because `-0` counts as both a finite number and as equal to zero. Every computed
+  window coordinate now goes through one guard, with a test to keep it that way.
+- The sitting pose no longer floats a few pixels off the ground.
+
 ## v0.10.0 — moves like the real thing
 
 Everything here came out of comparing the animations against research on how cats
