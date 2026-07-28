@@ -14,6 +14,7 @@ import {
   MIN_TURN_MS, MAX_TURN_MS, MIN_FRONT_SCALE, MAX_FRONT_SCALE, DETAIL_LEVELS
 } from './settings'
 import { setSelfWindow, enumWindowsTitled } from './desktop/windows'
+import { clampWinCoord, winPoint } from './desktop/coords'
 import { testConnection, DEFAULT_MODEL, DEFAULT_ENDPOINT, type VisionConfig } from './ai/providers'
 import { generatePetFromPhotos, dataUrlToImage } from './ai/petGenerator'
 import { saveApiKey, loadApiKey, hasApiKey, clearApiKey, encryptionAvailable } from './ai/secrets'
@@ -271,7 +272,7 @@ function clampPetOnScreen(): void {
   if (!petWindow || petWindow.isDestroyed()) return
   const [x, y] = petWindow.getPosition()
   const { width: w, height: h } = petWindow.getBounds()
-  const disp = screen.getDisplayNearestPoint({ x: x + Math.round(w / 2), y: y + Math.round(h / 2) })
+  const disp = screen.getDisplayNearestPoint(winPoint(x + w / 2, y + h / 2))
   const wa = disp.workArea
   const nx = Math.max(wa.x, Math.min(wa.x + wa.width - w, x))
   const ny = Math.max(wa.y, Math.min(wa.y + wa.height - h, y))
@@ -365,7 +366,7 @@ let knockedTimer: ReturnType<typeof setTimeout> | null = null
 
 /** Something goes over the edge at (x, ledgeY) and tumbles to the floor. */
 function dropKnockedObject(x: number, ledgeY: number): void {
-  const disp = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(ledgeY) })
+  const disp = screen.getDisplayNearestPoint(winPoint(x, ledgeY))
   const floor = disp.workArea.y + disp.workArea.height
   const height = Math.round(floor - ledgeY)
   if (height < 40) return // already on the floor; nothing to fall
@@ -467,7 +468,7 @@ function bringItem(kind: ItemKind): void {
   else send()
   const b = petWindow.getBounds()
   const s = win.getBounds()
-  win.setPosition(Math.round(b.x - s.width - 6), Math.round(b.y + b.height / 2 - s.height / 2))
+  win.setPosition(clampWinCoord(b.x - s.width - 6), clampWinCoord(b.y + b.height / 2 - s.height / 2))
   win.show()
 }
 
@@ -678,7 +679,7 @@ function dreamTick(): void {
     const s = dreamWindow.getBounds()
     const wa = screen.getDisplayMatching(b).workArea
     const y = Math.max(wa.y + 2, b.y - s.height + 10)
-    dreamWindow.setPosition(Math.round(b.x + b.width / 2 - s.width / 2), Math.round(y))
+    dreamWindow.setPosition(clampWinCoord(b.x + b.width / 2 - s.width / 2), clampWinCoord(y))
     const now = Date.now()
     if (!dreamShowing) {
       dreamWindow.showInactive()
@@ -753,8 +754,8 @@ function applyScale(): void {
   const { x, y, width: ow, height: oh } = petWindow.getBounds()
   const { width, height } = petWindowSize(settings.scale)
   // Anchor bottom-center so the pet grows upward from where it stands.
-  const nx = Math.round(x + (ow - width) / 2)
-  const ny = y + (oh - height)
+  const nx = clampWinCoord(x + (ow - width) / 2)
+  const ny = clampWinCoord(y + (oh - height))
   petWindow.setBounds({ x: nx, y: ny, width, height })
   clampPetOnScreen()
 }

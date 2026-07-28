@@ -3,6 +3,7 @@
 
 import { screen } from 'electron'
 import { enumWindows, type WinRect } from './windows'
+import { winPoint } from './coords'
 
 let platforms: WinRect[] = []
 
@@ -77,7 +78,7 @@ export function supportY(feetX: number, feetY: number): number {
     if (buriedAt(i, feetX, w.y)) continue // that edge is behind another window
     best = w.y
   }
-  const disp = screen.getDisplayNearestPoint({ x: Math.round(feetX), y: Math.round(feetY) })
+  const disp = screen.getDisplayNearestPoint(winPoint(feetX, feetY))
   const floor = disp.workArea.y + disp.workArea.height
   return Math.min(best, floor)
 }

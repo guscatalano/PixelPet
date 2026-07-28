@@ -7,6 +7,7 @@ import { SPRITE_H, BOB_AMPLITUDE } from '../../shared/constants'
 import { weightedPick } from './personality'
 import { decay, apply as applyCare, nudge, careState, freshNeeds } from '../care/needs'
 import { refreshPlatforms, supportY, ledgesAbove } from '../desktop/world'
+import { winCoord } from '../desktop/coords'
 
 const MOVE_TICK_MS = 16
 const WALK_SPEED = 0.35 // px per tick (~22 px/s) — a calm walking pace, not a scramble
@@ -621,14 +622,16 @@ export class PetEngine {
       if (this.airMode !== 'none') this.landAt(T, feetOff)
     }
 
-    const rx = Math.round(this.curX), ry = Math.round(this.curY)
-    if (!Number.isFinite(rx) || !Number.isFinite(ry)) {
-      // A NaN/Infinity that reaches setPosition throws a native conversion error
-      // from inside the interval and takes the whole app down (seen in the
-      // field). Log enough state to identify the culprit, snap back to the last
-      // position that successfully reached the window, and reset all motion.
+    // winCoord, not Math.round: setPosition takes a C++ int and rejects both a
+    // huge-but-finite coordinate and -0 (which Math.round hands back for any
+    // value in (-0.5, 0]) with a native conversion error. Thrown from inside
+    // this interval, that error takes the whole app down — see desktop/coords.
+    const rx = winCoord(this.curX), ry = winCoord(this.curY)
+    if (rx === null || ry === null) {
+      // Log enough state to identify the culprit, snap back to the last position
+      // that successfully reached the window, and reset all motion.
       const dump =
-        `[engine] non-finite position cur=(${this.curX},${this.curY}) v=(${this.vx},${this.vy})` +
+        `[engine] unusable position cur=(${this.curX},${this.curY}) v=(${this.vx},${this.vy})` +
         ` clip=${this.clip} air=${this.airMode} wander=${this.wanderTarget} str=${this.strPhase}` +
         ` strPivot=(${this.strPivot.x},${this.strPivot.y}) strOrigin=(${this.strOrigin.x},${this.strOrigin.y})` +
         ` jump=${JSON.stringify(this.pendingJump)} zoomies=${this.zoomiesLeft}`
