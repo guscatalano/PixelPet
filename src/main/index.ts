@@ -229,12 +229,43 @@ function pingSonar(): void {
  * Position it doesn't move the pet: it just makes sure the pet is showing, fully
  * on-screen and back on top, then pings the sonar so your eye can find it.
  */
+/**
+ * Show or hide the pet — and everything that belongs to it.
+ *
+ * The pet is not one window. The string toy, the dream bubble, a knocked-off
+ * object and a dragged care item are each their own always-on-top window, and
+ * hiding only the pet used to leave whichever were open floating on screen with
+ * no cat: the string toy in particular, since play can run for a while. Worse,
+ * the engine kept running, so a hidden cat could START playing and pop a fresh
+ * string up out of nowhere. One place owns this now so nothing gets missed.
+ */
+function setPetVisible(on: boolean): void {
+  if (!petWindow || petWindow.isDestroyed()) return
+  engine?.setHidden(!on) // stand the behaviour down BEFORE hiding, so nothing respawns
+  if (on) {
+    petWindow.show()
+    clampPetOnScreen()
+    ensureOnTop()
+    return
+  }
+  hideStringToy()
+  stopItemDrag()
+  if (itemWindow && !itemWindow.isDestroyed()) itemWindow.destroy()
+  if (knockedTimer) { clearTimeout(knockedTimer); knockedTimer = null }
+  if (knockedWindow && !knockedWindow.isDestroyed()) knockedWindow.destroy()
+  if (sonarTimer) { clearTimeout(sonarTimer); sonarTimer = null }
+  if (sonarWindow && !sonarWindow.isDestroyed()) sonarWindow.destroy()
+  if (dreamWindow && !dreamWindow.isDestroyed()) dreamWindow.hide()
+  dreamShowing = false
+  petWindow.hide()
+}
+
 function findCat(): void {
   if (!petWindow || petWindow.isDestroyed()) {
     petWindow = createPetWindow() // gone entirely — a fresh one lands somewhere obvious
     return
   }
-  if (!petWindow.isVisible()) petWindow.show()
+  if (!petWindow.isVisible()) setPetVisible(true) // wakes the behaviour back up too
   clampPetOnScreen()
   ensureOnTop()
   engine?.forcePlay('react') // a little perk-up, so it's obvious which pixels are the cat
@@ -246,7 +277,7 @@ function resetPetPosition(): void {
   if (!petWindow) return
   const [x, y] = defaultPetPosition()
   petWindow.setPosition(x, y)
-  if (!petWindow.isVisible()) petWindow.show()
+  if (!petWindow.isVisible()) setPetVisible(true)
 }
 
 // ---- staying on top ---------------------------------------------------------
@@ -668,7 +699,7 @@ function dreamTick(): void {
   if (sleeping && !dreamWasSleeping) dreamThisSession = Math.random() < settings.dreamChance
   dreamWasSleeping = sleeping
   const hasPhotos = dreamPool.length + dreamImmichIds.length > 0
-  const active = settings.dreamMode && sleeping && dreamThisSession && hasPhotos && !!petWindow
+  const active = settings.dreamMode && sleeping && dreamThisSession && hasPhotos && !!petWindow && petWindow.isVisible()
   // Keep the Immich list fresh while dreaming.
   if (settings.dreamMode && settings.immich.albumId && hasImmichKey() && Date.now() - dreamImmichAt > IMMICH_TTL) {
     void refreshImmich()
@@ -1081,6 +1112,16 @@ function handleDebugArgs(argv: string[]): void {
     openSettings()
   }
 
+  // --set-visible=0|1: the tray's Show/Hide, which a script cannot click. Hiding
+  // has to take the pet's other windows with it (see setPetVisible), and "did
+  // the string toy actually go away" is not something to take on trust.
+  const visArg = argv.find((a) => a.startsWith('--set-visible='))
+  if (visArg) {
+    const on = visArg.slice('--set-visible='.length).trim() !== '0'
+    console.log(`[debug] set pet visible = ${on}`)
+    setPetVisible(on)
+  }
+
   const arg = argv.find((a) => a.startsWith('--goto-window='))
   const value = arg?.slice('--goto-window='.length).trim()
   if (!value) return
@@ -1110,11 +1151,7 @@ if (!gotLock) {
     registerIpc()
     petWindow = createPetWindow()
     const trayCb: TrayCallbacks = {
-      onToggleVisible: () => {
-        if (!petWindow) return
-        if (petWindow.isVisible()) petWindow.hide()
-        else petWindow.show()
-      },
+      onToggleVisible: () => setPetVisible(!petWindow?.isVisible()),
       onFindCat: () => findCat(),
       onResetPosition: () => resetPetPosition(),
       onOpenSettings: () => openSettings(),

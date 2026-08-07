@@ -145,6 +145,7 @@ export class PetEngine {
   private wanderTarget: number | null = null
   private curX = 0 // internal float position (avoids get/set round-trip jitter)
   private curY = 0
+  private hidden = false // pet window hidden from the tray: stand down entirely
   private lastX = 0 // last integer position sent (avoid redundant setPosition calls)
   private lastY = 0
   private walkDist = 0 // px travelled this wander, drives the gait phase
@@ -221,6 +222,36 @@ export class PetEngine {
     if (this.ambientTimer) clearTimeout(this.ambientTimer)
     if (this.actionTimer) clearTimeout(this.actionTimer)
     if (this.careTimer) clearInterval(this.careTimer)
+  }
+
+  /**
+   * Hide/unhide the pet. This is not just cosmetic: a hidden pet must stop
+   * BEHAVING, because half of what it does spawns its own always-on-top window
+   * (the string toy, the dream bubble, a knocked-off object). Left running, an
+   * invisible cat carries on playing and those windows appear on their own with
+   * nothing to belong to — which is exactly how the string ends up orphaned.
+   */
+  setHidden(on: boolean): void {
+    if (this.hidden === on) return
+    this.hidden = on
+    if (on) {
+      this.abortStringPlay()
+      this.cancelWander()
+      this.busy = false
+      this.afterShot = null
+      this.airMode = 'none'
+      this.vx = 0
+      this.vy = 0
+      this.pendingJump = null
+      if (this.ambientTimer) { clearTimeout(this.ambientTimer); this.ambientTimer = null }
+      if (this.actionTimer) { clearTimeout(this.actionTimer); this.actionTimer = null }
+      if (this.knockTimer) { clearTimeout(this.knockTimer); this.knockTimer = null }
+      if (this.rollTimer) { clearTimeout(this.rollTimer); this.rollTimer = null }
+    } else {
+      // Come back idle wherever it was, rather than mid-whatever it was doing.
+      this.setClip('idle')
+      this.scheduleAmbient(900)
+    }
   }
 
   /** How often settling turns the pet to face you (0 = never, 1 = every time). */
@@ -548,7 +579,7 @@ export class PetEngine {
   // The always-on physics tick: walking, gravity onto whatever window/taskbar is
   // under the feet, ballistic leaps, and edge detection (teeter before a drop).
   private physics(): void {
-    if (this.win.isDestroyed()) return
+    if (this.win.isDestroyed() || this.hidden) return // frozen where it stood
     if (++this.refreshCtr >= REFRESH_EVERY) { this.refreshCtr = 0; refreshPlatforms() }
     if (this.dragging) {
       const [x, y] = this.win.getPosition()
@@ -1236,6 +1267,7 @@ export class PetEngine {
 
   private scheduleAmbient(delayMs?: number): void {
     if (this.ambientTimer) clearTimeout(this.ambientTimer)
+    if (this.hidden) { this.ambientTimer = null; return } // nothing acts while hidden
     const delay = delayMs ?? 3000 + Math.random() * 5000
     this.ambientTimer = setTimeout(() => this.ambientTick(), delay)
   }

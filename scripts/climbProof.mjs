@@ -257,6 +257,34 @@ async function phaseLive() {
     }
   }
 
+  // Hiding the pet must take its other windows with it. Reported from the field:
+  // hide the cat mid-string-play and the string was left hanging on an empty
+  // desktop. Worse, the engine kept running, so a hidden cat could start a fresh
+  // hunt and put a NEW string up on its own — hence the second wait below.
+  {
+    const cli = (...a) => spawnSync(process.execPath, ['.', `--user-data-dir=${profile}`, ...a], { cwd: root, stdio: 'ignore' })
+    cli('--set-visible=1') // make sure we start from shown
+    cli('--play-clip=bat')
+    let str = null
+    for (let i = 0; i < 30 && !str; i++) { await sleep(150); str = stringOf(probe(pet.pid)) }
+    if (!str) {
+      check(false, 'string toy came back up for the hide test', 'never appeared, so the hide could not be tested')
+    } else {
+      cli('--set-visible=0')
+      let cleared = false
+      for (let i = 0; i < 20 && !cleared; i++) { await sleep(200); cleared = !stringOf(probe(pet.pid)) }
+      check(cleared, 'hiding the pet took the string toy with it')
+      // Nothing may reappear while hidden — the behaviour has to be stood down.
+      let respawn = null
+      for (let i = 0; i < 24 && !respawn; i++) { await sleep(250); respawn = stringOf(probe(pet.pid)) }
+      check(!respawn, 'no overlay came back while the pet was hidden', respawn ? `a ${respawn.w}x${respawn.h} window reappeared` : 'quiet for 6s')
+      cli('--set-visible=1')
+      let back = null
+      for (let i = 0; i < 20 && !back; i++) { await sleep(200); back = petOf(probe(pet.pid)) }
+      check(!!back, 'the pet came back when shown again')
+    }
+  }
+
   if (settled >= 4) {
     const cover = decoy(COVER)
     cover.moveTop()
