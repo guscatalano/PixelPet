@@ -3,6 +3,16 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.11.1 — hiding the cat actually hides everything
+
+### Fixed
+- **Hiding your pet no longer leaves its things behind.** If you hid the cat while it was
+  playing with the string, the string stayed hanging on an empty desktop. And because a
+  hidden pet carried on living its life, it could wander off and start a *new* game of
+  string on its own — so a string would appear out of nowhere with no cat anywhere near it.
+  A hidden pet now properly stands down, and the string toy, dream bubble, knocked-off
+  objects and care items all go with it.
+
 ## v0.11.0 — collars, and a crash finally cornered
 
 ### New
