@@ -1,10 +1,14 @@
 name: Store package (MSIX)
 
-# Builds the Microsoft Store MSIX/APPX and uploads it as a downloadable workflow
-# artifact. Runs on every version tag, and on demand via "Run workflow". The
-# package is intentionally UNSIGNED — the Store signs it on ingestion — so no
-# signing secrets are needed. Kept separate from the GitHub-release pipeline
-# (build.yml), which produces the auto-updating direct-download installer.
+# Builds the Microsoft Store MSIX/APPX, uploads it as a workflow artifact, and
+# then publishes it to the Store (product 9MZ89Q1DGR0R) together with the
+# listing text in store/listing.en-us.json, via the shared
+# guscatalano/store-publish reusable workflow. Runs on every version tag, and
+# on demand via "Run workflow" (a manual re-run of an already-submitted
+# version is rejected by the Store — expected). The package is intentionally
+# UNSIGNED — the Store signs it on ingestion — so no signing secrets are
+# needed. Kept separate from the GitHub-release pipeline (build.yml), which
+# produces the auto-updating direct-download installer.
 
 on:
   workflow_dispatch:
@@ -37,3 +41,11 @@ jobs:
           name: pixelpet-msix
           path: release/*.appx
           if-no-files-found: error
+
+  publish:
+    needs: msix
+    uses: guscatalano/store-publish/.github/workflows/publish.yml@main
+    with:
+      product-id: 9MZ89Q1DGR0R
+      package-artifact: pixelpet-msix
+    secrets: inherit

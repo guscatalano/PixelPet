@@ -1,0 +1,25 @@
+{
+  "_comment": "Listing-as-code for the Microsoft Store (product 9MZ89Q1DGR0R, language en-us). These are the BaseListing fields the release job manages; CI reads the current submission, overwrites exactly these keys, and pushes it back (so unmanaged fields like pricing/availability are never touched). Store limits: Title<=256, ShortDescription<=1000, Description<=10000, each Feature<=200 (<=20 items), ReleaseNotes<=1500, Keywords<=7 (<=30 each). Title MUST match the reserved app name in Partner Center. Edit this file to change the listing; the next v* tag publishes it. Screenshots: store/screenshots/*.png (none in repo -- Partner Center's images stay). Description/ShortDescription/Keywords transcribed verbatim from the live listing on 2026-08-12; the Features bullets were reconstructed from a truncated catalog string (the public catalog cuts them at 200 chars), so verify them against Partner Center before the first publish.",
+  "Title": "Pixel Pets",
+  "ShortTitle": null,
+  "ShortDescription": "A tiny pixel-art cat that lives on your desktop — it naps on your windows, wanders around, and reacts when you say hello. Pick your cat, tune its personality, and optionally care for it or watch it dream of your favorite photos.",
+  "Description": "Pixel Pets puts a tiny, hand-crafted pixel-art cat on your Windows desktop — and then lets it live its own little life.\n\nYour cat sits on top of your windows, wanders along their edges, curls up for naps, grooms itself, and perks up when you say hello. Every cat has a personality: a sleepy one dozes the afternoon away, while an energetic one prowls, pounces, and prances across your screen. Hover to greet it, click it for a happy reaction, or pick it up and drop it wherever you like.\n\nIt's a companion, not a chore — but if you want more to do, switch on the extras:\n\n• Care Mode — a gentle Tamagotchi layer. Feed, play with, and look after your cat by dragging treats and toys onto it. Keep it happy and healthy, or it might sulk (and need a little cone to get better).\n\n• Dream Mode — while your cat sleeps, it dreams in little photo bubbles. Point it at your own pictures and watch them drift by above a napping kitty.\n\nMake it yours: choose from a whole roster of cats — tabbies, tuxedos, calicos, Siamese and more — resize your pet, tune its personality, and pick which animations it plays. There's even an experimental mode to generate a pixel cat from photos of your own real-life pet.\n\nPixel Pets is lightweight, stays out of your way, and only catches your mouse on the cat's actual pixels — the rest of your screen works exactly as before.",
+  "Keywords": [
+    "virtual cat",
+    "pixel art",
+    "desktop cat",
+    "cat companion",
+    "desktop pet",
+    "pixel art cat"
+  ],
+  "Features": [
+    "A hand-crafted pixel-art cat that lives on your desktop",
+    "Wanders, naps, grooms, pounces, and prances all on its own",
+    "Sits on top of and walks along your open windows",
+    "Click to react, hover to greet, drag it wherever you like"
+  ],
+  "ReleaseNotes": "Bug fixes and improvements.",
+  "CopyrightAndTrademarkInfo": "© 2026 Gus Catalano",
+  "LicenseTerms": "",
+  "DevStudio": "Gus Catalano"
+}
