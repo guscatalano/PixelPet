@@ -81,6 +81,7 @@ function createPetWindow(): BrowserWindow {
   })
 
   win.setAlwaysOnTop(true, 'screen-saver')
+  shieldFromCapture(win)
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 
   // Start click-through; the renderer disables it (per-pixel) over the cat.
@@ -221,6 +222,7 @@ function pingSonar(): void {
     webPreferences: { sandbox: true }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
+  shieldFromCapture(win)
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   win.setIgnoreMouseEvents(true) // purely decorative — never eat a click
   win.once('ready-to-show', () => { if (!win.isDestroyed()) win.showInactive() })
@@ -299,6 +301,25 @@ function stepScale(dir: 1 | -1): void {
   settings.scale = next
   saveSettings(settings)
   applyScale()
+}
+
+// ---- keeping out of screen shares -----------------------------------------
+// Windows doesn't report a Teams/Zoom screen share as full screen, so the
+// auto-hide below can't catch it. Instead the overlays opt out of capture
+// entirely (WDA_EXCLUDEFROMCAPTURE on Windows 10 2004+, NSWindowSharingNone on
+// macOS): you still see your pet, but screen shares, recordings and screenshots
+// don't. Settings and the dream photo viewer are windows you open on purpose,
+// so they stay capturable.
+
+function shieldFromCapture(win: BrowserWindow): void {
+  win.setContentProtection(settings.hideFromCapture)
+}
+
+/** Re-apply the capture setting to every overlay that's currently open. */
+function applyCaptureSetting(): void {
+  for (const w of [petWindow, sonarWindow, itemWindow, knockedWindow, stringWindow, dreamWindow]) {
+    if (w && !w.isDestroyed()) shieldFromCapture(w)
+  }
 }
 
 // ---- getting out of the way of games and presentations ---------------------
@@ -471,6 +492,7 @@ function createItemWindow(): BrowserWindow {
     webPreferences: { preload: join(__dirname, '../preload/item.js'), sandbox: false }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
+  shieldFromCapture(win)
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/item.html`)
   else win.loadFile(join(__dirname, '../renderer/item.html'))
@@ -506,6 +528,7 @@ function dropKnockedObject(x: number, ledgeY: number): void {
     webPreferences: { sandbox: true }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
+  shieldFromCapture(win)
   win.setIgnoreMouseEvents(true)
   win.once('ready-to-show', () => { if (!win.isDestroyed()) win.showInactive() })
   win.on('closed', () => { if (knockedWindow === win) knockedWindow = null })
@@ -553,6 +576,7 @@ function showStringToy(x: number, y: number, width: number, height: number, cfg:
     webPreferences: { preload: join(__dirname, '../preload/string.js'), sandbox: false }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
+  shieldFromCapture(win)
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   win.setIgnoreMouseEvents(true)
   win.once('ready-to-show', () => { if (!win.isDestroyed()) win.showInactive() })
@@ -704,6 +728,7 @@ function createDreamWindow(): BrowserWindow {
     webPreferences: { preload: join(__dirname, '../preload/dream.js'), sandbox: false }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
+  shieldFromCapture(win)
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   win.setIgnoreMouseEvents(true, { forward: true }) // decorative until the pointer is over it
   win.webContents.once('did-finish-load', () => { if (!win.isDestroyed()) win.webContents.send('dream:scale', dreamScale()) })
@@ -959,6 +984,11 @@ function registerIpc(): void {
     settings.turnMs = Math.max(MIN_TURN_MS, Math.min(MAX_TURN_MS, Math.round(ms)))
     saveSettings(settings)
     petWindow?.webContents.send('pet:set-config', { turnMs: settings.turnMs })
+  })
+  ipcMain.on('settings:set-hidecapture', (_e, v: boolean) => {
+    settings.hideFromCapture = !!v
+    saveSettings(settings)
+    applyCaptureSetting()
   })
   ipcMain.on('settings:set-hidefullscreen', (_e, v: boolean) => {
     settings.hideInFullscreen = !!v
@@ -1248,6 +1278,11 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    // Name ourselves to Windows the way the installer's Start-menu shortcut
+    // does (electron-builder stamps build.appId on it), so notifications are
+    // headed "PixelPet" rather than the exe's description. The Store package
+    // supplies its own identity, so leave that alone.
+    if (process.platform === 'win32' && !process.windowsStore) app.setAppUserModelId('com.guscatalano.pixelpet')
     // macOS: run as a menu-bar agent (no Dock icon) — the pet + tray are the UI.
     if (process.platform === 'darwin') app.dock?.hide()
     settings = loadSettings()

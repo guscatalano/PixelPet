@@ -19,6 +19,7 @@ interface SettingsApi {
   setTurnMs: (ms: number) => void
   setStayPut: (v: boolean) => void
   setHideFullscreen: (v: boolean) => void
+  setHideCapture: (v: boolean) => void
   platform: string
   setFrontScale: (k: number) => void
   setFaceChance: (v: number) => void
@@ -864,6 +865,19 @@ function buildAnimation(): void {
     hfs.disabled = true
     hfs.textContent = 'Windows only'
   }
+
+  const hcap = $<HTMLButtonElement>('hidecapture')
+  const paintHcap = (on: boolean): void => {
+    hcap.classList.toggle('on', on)
+    hcap.setAttribute('aria-pressed', String(on))
+    hcap.textContent = on ? 'On — only you can see it' : 'Off — shows in shares'
+  }
+  paintHcap(state.hideFromCapture ?? true)
+  hcap.addEventListener('click', () => {
+    state.hideFromCapture = !state.hideFromCapture
+    paintHcap(state.hideFromCapture)
+    window.settings.setHideCapture(state.hideFromCapture)
+  })
 
   buildCollar()
   void buildAutostart()

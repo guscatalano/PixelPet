@@ -102,6 +102,8 @@ export interface AppSettings {
   seenIntro: boolean
   /** Get out of the way while a full-screen game, video or presentation is up (Windows). */
   hideInFullscreen: boolean
+  /** Keep the pet and its toys out of screen shares, recordings and screenshots. */
+  hideFromCapture: boolean
 }
 
 /** Which vision provider backs "generate a pet from a photo". */

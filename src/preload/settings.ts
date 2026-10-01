@@ -21,6 +21,8 @@ const api = {
   setStayPut: (v: boolean): void => ipcRenderer.send('settings:set-stayput', v),
   /** Toggle hiding the pet while a full-screen game/video/presentation is up. */
   setHideFullscreen: (v: boolean): void => ipcRenderer.send('settings:set-hidefullscreen', v),
+  /** Toggle keeping the pet out of screen shares, recordings and screenshots. */
+  setHideCapture: (v: boolean): void => ipcRenderer.send('settings:set-hidecapture', v),
   /** The OS, for controls that only exist on one platform. */
   platform: process.platform,
   /** Set the facing-you view scale (0.65 small .. 1.0 "coming at you"). */
