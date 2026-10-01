@@ -1,11 +1,11 @@
-import { app, BrowserWindow, ipcMain, screen, Menu, dialog, powerMonitor, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, Menu, dialog, powerMonitor, globalShortcut, Notification, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { loadCreature } from '../shared/creature'
 import type { AppSettings, AiConfig, AiStatus, ClipName, Collar, LoginItem, Personality, TriggerEvent } from '../shared/types'
 import { DEFAULT_COLLAR } from '../shared/types'
-import { snapScale, petWindowSize } from '../shared/constants'
+import { snapScale, petWindowSize, SIZE_LEVELS } from '../shared/constants'
 import { createTray, applyTrayMenu, assetPath, type TrayCallbacks } from './tray'
 import { initAutoUpdate, onUpdateStateChange, isUpdateReady, pendingVersion, checkForUpdatesManual, restartToUpdate } from './updater'
 import { PetEngine } from './behavior/engine'
@@ -269,6 +269,49 @@ function setPetVisible(on: boolean): void {
   if (dreamWindow && !dreamWindow.isDestroyed()) dreamWindow.hide()
   dreamShowing = false
   petWindow.hide()
+}
+
+// ---- staying controllable ---------------------------------------------------
+// Store reviews: people couldn't find Settings, couldn't make the pet smaller,
+// and couldn't get rid of it — Windows 11 tucks new tray icons away in the
+// overflow, so the tray menu alone isn't discoverable. Everything that matters
+// is now also on the pet's own right-click menu and a global shortcut.
+
+/** Show/hide the pet from anywhere. Shown in both menus so people can learn it. */
+const SHOW_HIDE_SHORTCUT = 'CommandOrControl+Alt+P'
+const SHOW_HIDE_LABEL = process.platform === 'darwin' ? '⌘⌥P' : 'Ctrl+Alt+P'
+
+/** A small OS notification: a tray balloon on Windows (a toast on 10/11), Notification elsewhere. */
+function notify(title: string, body: string): void {
+  if (process.platform === 'win32' && tray && !tray.isDestroyed()) {
+    tray.displayBalloon({ title, content: body, iconType: 'info' })
+  } else if (Notification.isSupported()) {
+    new Notification({ title, body }).show()
+  }
+}
+
+/** Step the pet one size up or down the SIZE_LEVELS ladder. */
+function stepScale(dir: 1 | -1): void {
+  const i = SIZE_LEVELS.indexOf(settings.scale)
+  const next = SIZE_LEVELS[Math.max(0, Math.min(SIZE_LEVELS.length - 1, i + dir))]
+  if (next === settings.scale) return
+  settings.scale = next
+  saveSettings(settings)
+  applyScale()
+}
+
+let toldHowToUnhide = false
+/** Hide from the pet's own menu — and say how to get it back, once per run. */
+function hideFromMenu(): void {
+  setPetVisible(false)
+  if (toldHowToUnhide) return
+  toldHowToUnhide = true
+  notify('PixelPet is still here', `Press ${SHOW_HIDE_LABEL}, or use the 🐾 tray icon, to bring your pet back.`)
+}
+
+function quitApp(): void {
+  stopDrag()
+  app.quit()
 }
 
 function findCat(): void {
@@ -570,7 +613,13 @@ function showPetMenu(): void {
     items.push({ label: 'Turn on Care Mode…', click: () => openSettings() })
   }
   items.push({ type: 'separator' })
+  const i = SIZE_LEVELS.indexOf(settings.scale)
+  items.push({ label: 'Make smaller', enabled: i > 0, click: () => stepScale(-1) })
+  items.push({ label: 'Make larger', enabled: i < SIZE_LEVELS.length - 1, click: () => stepScale(1) })
+  items.push({ type: 'separator' })
   items.push({ label: 'Settings…', click: () => openSettings() })
+  items.push({ label: 'Hide pet', accelerator: SHOW_HIDE_SHORTCUT, registerAccelerator: false, click: () => hideFromMenu() })
+  items.push({ label: 'Quit PixelPet', click: () => quitApp() })
   Menu.buildFromTemplate(items).popup()
 }
 
@@ -1170,12 +1219,22 @@ if (!gotLock) {
       onOpenSettings: () => openSettings(),
       onCheckUpdates: () => { void checkForUpdatesManual() },
       onRestartToUpdate: () => restartToUpdate(),
-      onQuit: () => {
-        stopDrag()
-        app.quit()
-      }
+      onQuit: () => quitApp()
     }
     tray = createTray(trayCb)
+
+    // Show/hide from anywhere — the way back when the tray icon is buried in
+    // the overflow. Another app may already own the combination; that's not fatal.
+    if (!globalShortcut.register(SHOW_HIDE_SHORTCUT, () => setPetVisible(!petWindow?.isVisible()))) {
+      console.error(`[shortcut] ${SHOW_HIDE_SHORTCUT} is taken by another app`)
+    }
+
+    // First run: say where the controls are, once.
+    if (!settings.seenIntro) {
+      settings.seenIntro = true
+      saveSettings(settings)
+      notify('Your pet is here! 🐾', `Right-click it for size, settings, hide and quit. ${SHOW_HIDE_LABEL} shows or hides it anytime.`)
+    }
 
     // Auto-update: rebuild the tray menu when an update finishes downloading so
     // "Restart to update" appears.
@@ -1211,6 +1270,7 @@ if (!gotLock) {
 
   app.on('before-quit', () => {
     quitting = true // our own quit — stop quitForOs re-entering as windows close
+    globalShortcut.unregisterAll()
     stopDrag()
     stopItemDrag()
     itemWindow?.destroy()

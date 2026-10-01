@@ -40,7 +40,8 @@ export function applyTrayMenu(tray: Tray, cb: TrayCallbacks, state: { updateRead
   const menu = Menu.buildFromTemplate([
     { label: 'PixelPet', enabled: false },
     { type: 'separator' },
-    { label: 'Show / Hide Pet', click: () => cb.onToggleVisible() },
+    // Display-only: main registers the shortcut globally (index.ts).
+    { label: 'Show / Hide Pet', accelerator: 'CommandOrControl+Alt+P', registerAccelerator: false, click: () => cb.onToggleVisible() },
     // Sonar-ping where the pet is, without moving it. Reset Position is the
     // heavier hammer right below, for when you'd rather it just came home.
     { label: 'Find Cat', click: () => cb.onFindCat() },

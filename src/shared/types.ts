@@ -98,6 +98,8 @@ export interface AppSettings {
   /** Remembered pet-picker filter (All / Built-in / Yours). */
   petFilter: 'all' | 'builtin' | 'user'
   overrides: Record<string, Partial<Personality>>
+  /** The one-time "here's how to control me" hint has been shown. */
+  seenIntro: boolean
 }
 
 /** Which vision provider backs "generate a pet from a photo". */
