@@ -6,7 +6,7 @@
 //
 // Phase 1 is pure math (the jump arc). Phase 2 spawns a real pet against decoy
 // windows at known rects and watches where it ends up. Exits non-zero on failure.
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, screen } from 'electron'
 import { spawn, spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -22,11 +22,30 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const GRAVITY = 0.45
 const JUMP_CLEAR = 16
 const MAX_JUMP_VX = 5.5
+const MAX_JUMP_RISE = 300
 
-// Where the decoys go. The ledge must be within MAX_JUMP_RISE of where the pet
-// starts (bottom-right of the work area) or no single jump can reach it.
-const LEDGE = { title: 'PIXELPET-DECOY', x: 1300, y: 760, w: 560, h: 280 }
-const COVER = { title: 'PIXELPET-COVER', x: 1360, y: 690, w: 620, h: 340 }
+// Where the decoys go, laid out against the primary work area rather than fixed
+// coordinates. They were once hard-coded for a 1920x1080 screen; on a smaller
+// one the "ledge" sat at floor level and off the right edge, so the climb passed
+// trivially (the pet was already standing at that height) and the knock and the
+// fall could never happen. The pet starts bottom-right (index.ts
+// defaultPetPosition) and stands on the floor, i.e. the work area's bottom edge,
+// so: a ledge whose top is RISE above the floor — within MAX_JUMP_RISE, and tall
+// enough that a fall is unmistakable — spanning the pet's starting x; and a
+// cover that buries the ledge's top edge where the pet stands on it.
+const RISE = 240
+let LEDGE, COVER
+function layout() {
+  const wa = screen.getPrimaryDisplay().workArea
+  const floor = wa.y + wa.height
+  const rise = Math.min(RISE, Math.round(wa.height * 0.4))
+  const w = Math.min(560, Math.round(wa.width * 0.45))
+  const x = wa.x + wa.width - 60 - w
+  LEDGE = { title: 'PIXELPET-DECOY', x, y: floor - rise, w, h: rise }
+  COVER = { title: 'PIXELPET-COVER', x: x + 60, y: floor - rise - 70, w: 620, h: 340 }
+  console.log(`   work area ${wa.width}x${wa.height}: ledge ${LEDGE.w}x${LEDGE.h} at ${LEDGE.x},${LEDGE.y} (${rise}px up)`)
+  return rise
+}
 
 let failures = 0
 const check = (ok, label, detail = '') => {
@@ -144,6 +163,14 @@ const decoy = (spec) => {
 // ---- Phase 2: a real pet on a real desktop ------------------------------------
 async function phaseLive() {
   console.log('\n2. live climb onto a window, then lose the footing under it')
+  const rise = layout()
+  // A fall is only told apart from standing still by a 120px drop (see the cover
+  // check), and a ledge the pet can't reach proves nothing, so refuse to run on a
+  // screen that can't fit a meaningful one rather than pass vacuously.
+  if (rise < 150 || rise > MAX_JUMP_RISE) {
+    check(false, 'screen is big enough for a meaningful ledge', `only ${rise}px of rise available`)
+    return
+  }
   const probe = makeProbe()
   const profile = mkdtempSync(join(tmpdir(), 'pixelpet-climb-'))
   // 'bat' is disabled so an AMBIENT string hunt can't leap the pet off the ledge
