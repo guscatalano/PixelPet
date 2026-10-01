@@ -100,6 +100,8 @@ export interface AppSettings {
   overrides: Record<string, Partial<Personality>>
   /** The one-time "here's how to control me" hint has been shown. */
   seenIntro: boolean
+  /** Get out of the way while a full-screen game, video or presentation is up (Windows). */
+  hideInFullscreen: boolean
 }
 
 /** Which vision provider backs "generate a pet from a photo". */

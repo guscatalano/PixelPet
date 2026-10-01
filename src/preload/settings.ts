@@ -19,6 +19,10 @@ const api = {
   setTurnMs: (ms: number): void => ipcRenderer.send('settings:set-turnms', ms),
   /** Toggle "stay here" mode (the cat holds its spot). */
   setStayPut: (v: boolean): void => ipcRenderer.send('settings:set-stayput', v),
+  /** Toggle hiding the pet while a full-screen game/video/presentation is up. */
+  setHideFullscreen: (v: boolean): void => ipcRenderer.send('settings:set-hidefullscreen', v),
+  /** The OS, for controls that only exist on one platform. */
+  platform: process.platform,
   /** Set the facing-you view scale (0.65 small .. 1.0 "coming at you"). */
   setFrontScale: (k: number): void => ipcRenderer.send('settings:set-frontscale', k),
   /** How often it turns to face you when settling (0..1). */

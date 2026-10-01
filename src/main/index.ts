@@ -14,6 +14,7 @@ import {
   MIN_TURN_MS, MAX_TURN_MS, MIN_FRONT_SCALE, MAX_FRONT_SCALE, DETAIL_LEVELS
 } from './settings'
 import { setSelfWindow, enumWindowsTitled } from './desktop/windows'
+import { somethingIsFullscreen } from './desktop/fullscreen'
 import { clampWinCoord, winPoint } from './desktop/coords'
 import { testConnection, DEFAULT_MODEL, DEFAULT_ENDPOINT, type VisionConfig } from './ai/providers'
 import { generatePetFromPhotos, dataUrlToImage } from './ai/petGenerator'
@@ -300,10 +301,45 @@ function stepScale(dir: 1 | -1): void {
   applyScale()
 }
 
+// ---- getting out of the way of games and presentations ---------------------
+// A Store review: "it was good but i almost got in trouble from it", and
+// another couldn't "open a game without seeing him". While Windows reports a
+// full-screen app, game or presentation (desktop/fullscreen.ts), the pet stands
+// down, and comes back when it ends. It only ever undoes its OWN hiding: a pet
+// you hid stays hidden, and one you showed on purpose mid-game stays shown.
+
+const FULLSCREEN_TICK_MS = 1500
+let fullscreenTimer: ReturnType<typeof setInterval> | null = null
+let autoHidden = false // we hid it for a full-screen app, and will bring it back
+let userOverride = false // shown on purpose during full screen: hands off until it ends
+
+/** Show/hide on the user's say-so — which always beats the full-screen auto-hide. */
+function userSetVisible(on: boolean): void {
+  autoHidden = false
+  userOverride = on && somethingIsFullscreen()
+  setPetVisible(on)
+}
+
+function fullscreenTick(): void {
+  if (!petWindow || petWindow.isDestroyed()) return
+  if (!(settings.hideInFullscreen && somethingIsFullscreen())) {
+    userOverride = false
+    if (autoHidden) {
+      autoHidden = false
+      setPetVisible(true)
+    }
+    return
+  }
+  if (!userOverride && !autoHidden && petWindow.isVisible()) {
+    autoHidden = true
+    setPetVisible(false)
+  }
+}
+
 let toldHowToUnhide = false
 /** Hide from the pet's own menu — and say how to get it back, once per run. */
 function hideFromMenu(): void {
-  setPetVisible(false)
+  userSetVisible(false)
   if (toldHowToUnhide) return
   toldHowToUnhide = true
   notify('PixelPet is still here', `Press ${SHOW_HIDE_LABEL}, or use the 🐾 tray icon, to bring your pet back.`)
@@ -319,7 +355,7 @@ function findCat(): void {
     petWindow = createPetWindow() // gone entirely — a fresh one lands somewhere obvious
     return
   }
-  if (!petWindow.isVisible()) setPetVisible(true) // wakes the behaviour back up too
+  if (!petWindow.isVisible()) userSetVisible(true) // wakes the behaviour back up too
   clampPetOnScreen()
   ensureOnTop()
   engine?.forcePlay('react') // a little perk-up, so it's obvious which pixels are the cat
@@ -331,7 +367,7 @@ function resetPetPosition(): void {
   if (!petWindow) return
   const [x, y] = defaultPetPosition()
   placePet(x, y)
-  if (!petWindow.isVisible()) setPetVisible(true)
+  if (!petWindow.isVisible()) userSetVisible(true)
 }
 
 // ---- staying on top ---------------------------------------------------------
@@ -924,6 +960,11 @@ function registerIpc(): void {
     saveSettings(settings)
     petWindow?.webContents.send('pet:set-config', { turnMs: settings.turnMs })
   })
+  ipcMain.on('settings:set-hidefullscreen', (_e, v: boolean) => {
+    settings.hideInFullscreen = !!v
+    saveSettings(settings)
+    fullscreenTick() // apply now (turning it off brings an auto-hidden pet straight back)
+  })
   ipcMain.on('settings:set-stayput', (_e, v: boolean) => {
     settings.stayPut = !!v
     saveSettings(settings)
@@ -1213,7 +1254,7 @@ if (!gotLock) {
     registerIpc()
     petWindow = createPetWindow()
     const trayCb: TrayCallbacks = {
-      onToggleVisible: () => setPetVisible(!petWindow?.isVisible()),
+      onToggleVisible: () => userSetVisible(!petWindow?.isVisible()),
       onFindCat: () => findCat(),
       onResetPosition: () => resetPetPosition(),
       onOpenSettings: () => openSettings(),
@@ -1225,9 +1266,11 @@ if (!gotLock) {
 
     // Show/hide from anywhere — the way back when the tray icon is buried in
     // the overflow. Another app may already own the combination; that's not fatal.
-    if (!globalShortcut.register(SHOW_HIDE_SHORTCUT, () => setPetVisible(!petWindow?.isVisible()))) {
+    if (!globalShortcut.register(SHOW_HIDE_SHORTCUT, () => userSetVisible(!petWindow?.isVisible()))) {
       console.error(`[shortcut] ${SHOW_HIDE_SHORTCUT} is taken by another app`)
     }
+
+    if (process.platform === 'win32') fullscreenTimer = setInterval(fullscreenTick, FULLSCREEN_TICK_MS)
 
     // First run: say where the controls are, once.
     if (!settings.seenIntro) {
@@ -1271,6 +1314,7 @@ if (!gotLock) {
   app.on('before-quit', () => {
     quitting = true // our own quit — stop quitForOs re-entering as windows close
     globalShortcut.unregisterAll()
+    if (fullscreenTimer) clearInterval(fullscreenTimer)
     stopDrag()
     stopItemDrag()
     itemWindow?.destroy()

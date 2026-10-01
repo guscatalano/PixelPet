@@ -18,6 +18,8 @@ interface SettingsApi {
   setScale: (scale: number) => void
   setTurnMs: (ms: number) => void
   setStayPut: (v: boolean) => void
+  setHideFullscreen: (v: boolean) => void
+  platform: string
   setFrontScale: (k: number) => void
   setFaceChance: (v: number) => void
   setDetail: (v: number) => void
@@ -844,6 +846,24 @@ function buildAnimation(): void {
     paint(state.stayPut)
     window.settings.setStayPut(state.stayPut)
   })
+
+  const hfs = $<HTMLButtonElement>('hidefullscreen')
+  const paintHfs = (on: boolean): void => {
+    hfs.classList.toggle('on', on)
+    hfs.setAttribute('aria-pressed', String(on))
+    hfs.textContent = on ? 'On — steps aside' : 'Off — always on top'
+  }
+  if (window.settings.platform === 'win32') {
+    paintHfs(state.hideInFullscreen ?? true)
+    hfs.addEventListener('click', () => {
+      state.hideInFullscreen = !state.hideInFullscreen
+      paintHfs(state.hideInFullscreen)
+      window.settings.setHideFullscreen(state.hideInFullscreen)
+    })
+  } else {
+    hfs.disabled = true
+    hfs.textContent = 'Windows only'
+  }
 
   buildCollar()
   void buildAutostart()
