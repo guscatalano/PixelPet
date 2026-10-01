@@ -24,3 +24,6 @@ assets/appx/
 *.tsbuildinfo
 .walk*
 .walkprev.png
+
+# Claude Code personal settings
+.claude/settings.local.json
