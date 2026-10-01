@@ -3,6 +3,28 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.12.0 — a pet that stays the size you chose, and knows when to step aside
+
+### Fixed
+- **Your pet no longer grows as it walks.** On screens with display scaling above
+  100% — most laptops — the pet's window got a little bigger every time it
+  moved, until a small cat became a giant one. It now stays exactly the size you
+  picked, however far it wanders, and puts itself right if a monitor or scaling
+  change ever knocks it off.
+
+### New
+- **Everything you need is on the pet itself.** Right-click your pet to make it
+  smaller or larger, open Settings, hide it, or quit — no hunting for the tray
+  icon, which Windows 11 likes to tuck away.
+- **Ctrl+Alt+P shows or hides your pet** from anywhere (⌘⌥P on a Mac). If you
+  hide it from its menu, it tells you how to bring it back.
+- **A quick hello on first launch,** saying where the controls are.
+- **It steps aside for games and presentations.** While a full-screen game,
+  video or slideshow is up, your pet and its toys get out of the way, and come
+  back when you're done. Want it there anyway? Press Ctrl+Alt+P and it stays.
+  On by default; *Settings → Behavior → Games & full screen* turns it off.
+  (Windows only, for now.)
+
 ## v0.11.1 — hiding the cat actually hides everything
 
 ### Fixed
