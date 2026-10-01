@@ -148,6 +148,9 @@ export class PetEngine {
   private hidden = false // pet window hidden from the tray: stand down entirely
   private lastX = 0 // last integer position sent (avoid redundant setPosition calls)
   private lastY = 0
+  /** The window size main wants (petWindowSize at the current scale). Every move
+   *  re-asserts it: see the note where the physics tick places the window. */
+  private size: { width: number; height: number } | null = null
   private walkDist = 0 // px travelled this wander, drives the gait phase
   private stalkHoldUntil = 0 // frozen mid-creep until this timestamp
   private stalkNextPauseAt = 0 // walkDist at which the next freeze begins
@@ -199,6 +202,11 @@ export class PetEngine {
     private readonly win: BrowserWindow,
     public personality: Personality
   ) {}
+
+  /** The size the pet window must keep (main calls this on create and on rescale). */
+  setWindowSize(size: { width: number; height: number }): void {
+    this.size = { width: size.width, height: size.height }
+  }
 
   /** Begin idling + ambient scheduling once the renderer is ready. */
   start(): void {
@@ -708,7 +716,14 @@ export class PetEngine {
       return
     }
     if (rx !== this.lastX || ry !== this.lastY) {
-      this.win.setPosition(rx, ry)
+      // setBounds with the intended size, never a bare setPosition: on Windows a
+      // non-resizable window moved with setPosition at non-100% display scaling
+      // (or across monitors with different scaling) has its size re-derived from
+      // a rounded DIP<->pixel conversion each time, and the error accumulates —
+      // the pet visibly grows the longer it walks. Restating the size every move
+      // pins it.
+      if (this.size) this.win.setBounds({ x: rx, y: ry, ...this.size })
+      else this.win.setPosition(rx, ry)
       this.lastX = rx
       this.lastY = ry
     }

@@ -92,7 +92,7 @@ function createPetWindow(): BrowserWindow {
   }
 
   const [px, py] = defaultPetPosition()
-  win.setPosition(px, py)
+  win.setBounds({ x: px, y: py, width, height })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/pet.html`)
@@ -113,6 +113,7 @@ function createPetWindow(): BrowserWindow {
     // so orphaned timers don't keep running and fighting over the window.
     engine?.dispose()
     engine = new PetEngine(win, effectivePersonality(settings, settings.activePetId))
+    engine.setWindowSize(petWindowSize(settings.scale))
     engine.setStayPut(settings.stayPut)
     engine.setFaceChance(settings.faceChance)
     engine.setDisabled(settings.disabledAnims)
@@ -153,6 +154,16 @@ function createPetWindow(): BrowserWindow {
   return win
 }
 
+/**
+ * Move the pet window, restating its intended size. A bare setPosition lets
+ * Windows re-derive the size from a rounded DIP<->pixel conversion at non-100%
+ * scaling, and repeated moves make the pet grow (see the physics tick in engine).
+ */
+function placePet(x: number, y: number): void {
+  if (!petWindow || petWindow.isDestroyed()) return
+  petWindow.setBounds({ x: clampWinCoord(x), y: clampWinCoord(y), ...petWindowSize(settings.scale) })
+}
+
 function startDrag(): void {
   if (!petWindow) return
   const [winX, winY] = petWindow.getPosition()
@@ -164,7 +175,7 @@ function startDrag(): void {
   dragTimer = setInterval(() => {
     if (!petWindow) return
     const c = screen.getCursorScreenPoint()
-    petWindow.setPosition(c.x - offsetX, c.y - offsetY)
+    placePet(c.x - offsetX, c.y - offsetY)
   }, 16)
 }
 
@@ -276,7 +287,7 @@ function findCat(): void {
 function resetPetPosition(): void {
   if (!petWindow) return
   const [x, y] = defaultPetPosition()
-  petWindow.setPosition(x, y)
+  placePet(x, y)
   if (!petWindow.isVisible()) setPetVisible(true)
 }
 
@@ -301,13 +312,14 @@ function ensureOnTop(): void {
 /** Nudge the pet fully back on-screen (e.g. after a monitor is unplugged). */
 function clampPetOnScreen(): void {
   if (!petWindow || petWindow.isDestroyed()) return
-  const [x, y] = petWindow.getPosition()
-  const { width: w, height: h } = petWindow.getBounds()
+  const { x, y, width: curW, height: curH } = petWindow.getBounds()
+  // Clamp against the size the pet SHOULD be, and restore it if it has drifted.
+  const { width: w, height: h } = petWindowSize(settings.scale)
   const disp = screen.getDisplayNearestPoint(winPoint(x + w / 2, y + h / 2))
   const wa = disp.workArea
   const nx = Math.max(wa.x, Math.min(wa.x + wa.width - w, x))
   const ny = Math.max(wa.y, Math.min(wa.y + wa.height - h, y))
-  if (nx !== x || ny !== y) petWindow.setPosition(nx, ny)
+  if (nx !== x || ny !== y || curW !== w || curH !== h) placePet(nx, ny)
 }
 
 // ---- settings window -------------------------------------------------------
@@ -805,6 +817,7 @@ function applyScale(): void {
   const nx = clampWinCoord(x + (ow - width) / 2)
   const ny = clampWinCoord(y + (oh - height))
   petWindow.setBounds({ x: nx, y: ny, width, height })
+  engine?.setWindowSize({ width, height })
   clampPetOnScreen()
 }
 
