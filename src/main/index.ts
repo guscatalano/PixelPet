@@ -311,8 +311,17 @@ function stepScale(dir: 1 | -1): void {
 // don't. Settings and the dream photo viewer are windows you open on purpose,
 // so they stay capturable.
 
+const shielded = new WeakSet<BrowserWindow>()
 function shieldFromCapture(win: BrowserWindow): void {
   win.setContentProtection(settings.hideFromCapture)
+  // Windows forgets a window's display affinity when it is hidden: one
+  // hide()/show() and the pet was back in every screen share (measured — 0%
+  // of the pet in a capture on a fresh launch, 27% after Ctrl+Alt+P twice).
+  // Overlays hide and show all the time (the shortcut, the full-screen
+  // step-aside, toys), so re-assert it on every show.
+  if (shielded.has(win)) return
+  shielded.add(win)
+  win.on('show', () => { if (!win.isDestroyed()) win.setContentProtection(settings.hideFromCapture) })
 }
 
 /** Re-apply the capture setting to every overlay that's currently open. */
