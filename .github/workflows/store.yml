@@ -35,11 +35,19 @@ jobs:
       - name: Build MSIX (electron-builder --win appx)
         run: npm run pack:store
 
+      # electron-builder names it .appx, but `msstore publish` picks its publisher
+      # by extension and has none for .appx ("We could not find a project
+      # publisher" — the v0.12.0 Store run). Same OPC package format either way;
+      # .msix is the extension the CLI (and the shared workflow) expects.
+      - name: Rename .appx to .msix
+        shell: pwsh
+        run: Get-ChildItem release/*.appx | Rename-Item -NewName { $_.BaseName + '.msix' }
+
       - name: Upload MSIX artifact
         uses: actions/upload-artifact@v5
         with:
           name: pixelpet-msix
-          path: release/*.appx
+          path: release/*.msix
           if-no-files-found: error
 
   publish:
