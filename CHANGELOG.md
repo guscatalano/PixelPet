@@ -24,6 +24,15 @@ All notable changes to PixelPet are documented here. This project follows
   back when you're done. Want it there anyway? Press Ctrl+Alt+P and it stays.
   On by default; *Settings → Behavior → Games & full screen* turns it off.
   (Windows only, for now.)
+- **Your pet stays out of screen shares.** It's still on your screen, but it no
+  longer shows up when you share your screen in Teams, Zoom or Discord, or in
+  recordings and screenshots — so it can't wander across a work presentation.
+  Want a screenshot of your pet? *Settings → Behavior → Screen sharing* turns
+  this off.
+
+### Changed
+- **Notifications say they're from PixelPet,** instead of being headed with the
+  app's description.
 
 ## v0.11.1 — hiding the cat actually hides everything
 
