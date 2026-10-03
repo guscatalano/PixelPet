@@ -3,6 +3,12 @@
 All notable changes to PixelPet are documented here. This project follows
 [Semantic Versioning](https://semver.org/) (staying in `0.x` while pre-1.0).
 
+## v0.13.0 — v0.12.0, now on the Microsoft Store
+
+Everything in v0.12.0 below, re-released so it can reach Microsoft Store users:
+the v0.12.0 Store submission got stuck during a Store service issue. If you
+installed from GitHub, there's nothing new for you in this one.
+
 ## v0.12.0 — a pet that stays the size you chose, and knows when to step aside
 
 ### Fixed
