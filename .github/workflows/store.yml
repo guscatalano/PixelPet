@@ -56,4 +56,9 @@ jobs:
     with:
       product-id: 9MZ89Q1DGR0R
       package-artifact: pixelpet-msix
+      # Newest tag wins: a release stuck in the Store's one submission slot
+      # (v0.12.0 sat there through a Store service outage) is replaced by the
+      # next tag instead of blocking it. For PixelPet the newest build is
+      # always the one we want out.
+      supersede-pending: true
     secrets: inherit
