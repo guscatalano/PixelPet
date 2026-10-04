@@ -87,6 +87,8 @@
       "displayName": "Pixel Pets",
       "backgroundColor": "#1c1d30",
       "showNameOnTiles": true,
+      "minVersion": "10.0.17763.0",
+      "maxVersionTested": "10.0.26100.0",
       "languages": [
         "en-US"
       ]
