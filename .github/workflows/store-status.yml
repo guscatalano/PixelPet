@@ -39,7 +39,7 @@ jobs:
             # With something pending, `submission get` returns that pending submission.
             $sub = Read-Json ((msstore submission get $productId) -join "`n")
             $versions = ($sub.ApplicationPackages | ForEach-Object { $_.Version }) -join ', '
-            $lines += '', "**Pending submission $pendingId: $($sub.Status)** (package $versions)"
+            $lines += '', "**Pending submission ${pendingId}: $($sub.Status)** (package $versions)"
             foreach ($kind in 'Errors', 'Warnings') {
               foreach ($e in $sub.StatusDetails.$kind) { $lines += "- ${kind}: $($e.Code) — $($e.Details)" }
             }
