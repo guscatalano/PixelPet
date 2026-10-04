@@ -1,0 +1,50 @@
+name: Store status
+
+# Where is the Store submission? Run on demand ("Run workflow") to see what is
+# live and what is pending — In certification, Publishing, CommitFailed, … —
+# without opening Partner Center. Read-only: it never creates, changes or
+# deletes a submission.
+#
+# Prints only chosen fields. The raw submission JSON carries signed Azure
+# upload URLs (FileUploadUrl), and this repo's Actions logs are public.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  status:
+    runs-on: windows-latest
+    steps:
+      - uses: microsoft/setup-msstore-cli@v1.4
+
+      - name: Sign in to the Store API
+        run: msstore reconfigure --tenantId ${{ secrets.STORE_TENANT_ID }} --clientId ${{ secrets.STORE_CLIENT_ID }} --clientSecret ${{ secrets.STORE_CLIENT_SECRET }} --sellerId ${{ secrets.STORE_SELLER_ID }}
+
+      - name: Report submission status
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $productId = '9MZ89Q1DGR0R'
+          # msstore prints progress text before the JSON; parse from the first '{'.
+          function Read-Json($text) { ($text.Substring($text.IndexOf('{')) -replace "\r?\n[ \t]*", '') | ConvertFrom-Json -Depth 50 }
+
+          $app = Read-Json ((msstore apps get $productId) -join "`n")
+          $live = $app.LastPublishedApplicationSubmission.Id
+          $pendingId = "$($app.PendingApplicationSubmission.Id)"
+          $lines = @("## Pixel Pets ($productId)", '', "Last published submission: $live")
+
+          if (-not $pendingId) {
+            $lines += '', '**No pending submission.** Whatever was last submitted has finished (or nothing is queued).'
+          } else {
+            # With something pending, `submission get` returns that pending submission.
+            $sub = Read-Json ((msstore submission get $productId) -join "`n")
+            $versions = ($sub.ApplicationPackages | ForEach-Object { $_.Version }) -join ', '
+            $lines += '', "**Pending submission $pendingId: $($sub.Status)** (package $versions)"
+            foreach ($kind in 'Errors', 'Warnings') {
+              foreach ($e in $sub.StatusDetails.$kind) { $lines += "- ${kind}: $($e.Code) — $($e.Details)" }
+            }
+            foreach ($r in $sub.StatusDetails.CertificationReports) { $lines += "- Certification report $($r.Date)" }
+          }
+
+          $lines | ForEach-Object { Write-Host $_ }
+          $lines -join "`n" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
